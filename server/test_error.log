@@ -1,0 +1,130 @@
+
+> server@1.0.0 test
+> jest server/__tests__/voucher.test.js
+
+FAIL __tests__/voucher.test.js
+  Voucher Routes
+    GET /api/vouchers
+      ΓêÜ should return list of vouchers (24 ms)
+      ├ù should filter by type and date (5 ms)
+    GET /api/vouchers/:id
+      ├ù should return voucher with items (4 ms)
+      ΓêÜ should return 404 if voucher not found (2 ms)
+    POST /api/vouchers
+      ├ù should create new voucher and items (11 ms)
+      ΓêÜ should return 403 if period is locked (3 ms)
+    DELETE /api/vouchers/:id
+      ├ù should delete voucher and related data (3 ms)
+      ΓêÜ should return 404 if not found (2 ms)
+      ├ù should prevent delete if locked (4 ms)
+    Staging Import
+      ├ù POST /api/staging/import should insert data (3 ms)
+
+  ΓùÅ Voucher Routes ΓÇ║ GET /api/vouchers ΓÇ║ should filter by type and date
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: StringContaining "WHERE type = ? AND doc_date >= ?", ["PAYMENT", "2024-01-01"], Any<Function>
+
+    Number of calls: 0
+
+      79 |             await request(app).get('/api/vouchers?type=PAYMENT&fromDate=2024-01-01');
+      80 |
+    > 81 |             expect(mockDb.all).toHaveBeenCalledWith(
+         |                                ^
+      82 |                 expect.stringContaining('WHERE type = ? AND doc_date >= ?'),
+      83 |                 ['PAYMENT', '2024-01-01'],
+      84 |                 expect.any(Function)
+
+      at Object.toHaveBeenCalledWith (__tests__/voucher.test.js:81:32)
+
+  ΓùÅ Voucher Routes ΓÇ║ GET /api/vouchers/:id ΓÇ║ should return voucher with items
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 404
+
+       97 |             const response = await request(app).get('/api/vouchers/V1');
+       98 |
+    >  99 |             expect(response.status).toBe(200);
+          |                                     ^
+      100 |             expect(response.body).toEqual({ ...mockVoucher, items: mockItems });
+      101 |         });
+      102 |
+
+      at Object.toBe (__tests__/voucher.test.js:99:37)
+
+  ΓùÅ Voucher Routes ΓÇ║ POST /api/vouchers ΓÇ║ should create new voucher and items
+
+    expect(jest.fn()).toHaveBeenCalled()
+
+    Expected number of calls: >= 1
+    Received number of calls:    0
+
+      132 |
+      133 |             // Check transactions
+    > 134 |             expect(mockDb.serialize).toHaveBeenCalled();
+          |                                      ^
+      135 |             expect(mockDb.run).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      136 |
+      137 |             // Check Insert Voucher logic
+
+      at Object.toHaveBeenCalled (__tests__/voucher.test.js:134:38)
+
+  ΓùÅ Voucher Routes ΓÇ║ DELETE /api/vouchers/:id ΓÇ║ should delete voucher and related data
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 404
+
+      160 |             const response = await request(app).delete('/api/vouchers/V1');
+      161 |
+    > 162 |             expect(response.status).toBe(200);
+          |                                     ^
+      163 |             expect(response.body.message).toContain('Voucher deleted');
+      164 |             expect(mockDb.run).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      165 |             expect(mockDb.run).toHaveBeenCalledWith('DELETE FROM vouchers WHERE id = ?', ['V1'], expect.any(Function));
+
+      at Object.toBe (__tests__/voucher.test.js:162:37)
+
+  ΓùÅ Voucher Routes ΓÇ║ DELETE /api/vouchers/:id ΓÇ║ should prevent delete if locked
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 403
+    Received: 404
+
+      178 |             const response = await request(app).delete('/api/vouchers/V1');
+      179 |
+    > 180 |             expect(response.status).toBe(403);
+          |                                     ^
+      181 |             expect(response.body.error).toContain('Kß╗│ kß║┐ to├ín ─æ├ú kh├│a');
+      182 |         });
+      183 |     });
+
+      at Object.toBe (__tests__/voucher.test.js:180:37)
+
+  ΓùÅ Voucher Routes ΓÇ║ Staging Import ΓÇ║ POST /api/staging/import should insert data
+
+    expect(jest.fn()).toHaveBeenCalled()
+
+    Expected number of calls: >= 1
+    Received number of calls:    0
+
+      194 |
+      195 |             expect(response.status).toBe(200);
+    > 196 |             expect(mockDb.prepare).toHaveBeenCalled();
+          |                                    ^
+      197 |             // Verify stmt.run called
+      198 |         });
+      199 |     });
+
+      at Object.toHaveBeenCalled (__tests__/voucher.test.js:196:36)
+
+Test Suites: 1 failed, 1 total
+Tests:       6 failed, 4 passed, 10 total
+Snapshots:   0 total
+Time:        0.356 s, estimated 1 s
+Ran all test suites matching server/__tests__/voucher.test.js.

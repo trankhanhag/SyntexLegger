@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FinExcel Pro - Phần mềm Kế toán</title>
+<!-- Google Fonts & Icons -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#137fec",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101922",
+              "surface-light": "#ffffff",
+              "surface-dark": "#1e293b",
+              "border-light": "#cfdbe7",
+              "border-dark": "#334155",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        /* Custom scrollbar for Excel-like feel */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .excel-grid-header {
+            background-color: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: center;
+            font-weight: 600;
+            color: #64748b;
+        }
+        .excel-cell {
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            outline: none;
+        }
+        .excel-cell:focus {
+            box-shadow: inset 0 0 0 2px #137fec;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 overflow-hidden h-screen flex flex-col group/design-root">
+<!-- 1. Header (Compact) -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-border-light bg-surface-light dark:bg-surface-dark dark:border-border-dark px-4 py-2 shrink-0 h-14">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3 text-slate-900 dark:text-white">
+<div class="size-8 bg-primary rounded flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-[20px]">table_view</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-[-0.015em]">FinExcel Pro</h2>
+</div>
+<div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+<!-- File Menu Mockup -->
+<div class="flex gap-1">
+<button class="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded dark:text-slate-300 dark:hover:bg-slate-700">Tệp</button>
+<button class="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded dark:text-slate-300 dark:hover:bg-slate-700">Chỉnh sửa</button>
+<button class="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded dark:text-slate-300 dark:hover:bg-slate-700">Xem</button>
+<button class="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded dark:text-slate-300 dark:hover:bg-slate-700">Trợ giúp</button>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<label class="flex items-center relative min-w-40 h-8">
+<span class="absolute left-2.5 text-slate-400 material-symbols-outlined text-[18px]">search</span>
+<input class="form-input flex w-full rounded-md text-slate-900 dark:text-white focus:outline-0 focus:ring-1 ring-primary/50 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 h-full placeholder:text-slate-400 pl-9 pr-3 text-sm font-normal" placeholder="Tìm kiếm chứng từ..." value=""/>
+</label>
+<div class="flex items-center gap-2">
+<button class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-slate-200" data-alt="User profile avatar showing a professional looking person" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD3y6BY7lD3ZiyWwytj-YSSAch1sxkW7FIEnLeOS2ybqTc-F7Eh8kAaEJG9P5CI9ruzKBgUV_zLpYkWc8Y0D10R6MEMsICck33Fp-1lkldHuUslOYW_ElIFtynXWh1k3_JIcKpPLfBs9m47ZtlcoSLIZVOG0lybERD60l_ACrqMPKLBCP4-JKiNJe68L5y-OOSfdbpkPXdT5ndEvDkGhXKPrAlTCk092ABV1ikNEkHJzGaL7hXnt6veBmzF1aQahBrc2H1wV2bFx0fs");'></div>
+</div>
+</div>
+</header>
+<!-- 2. Ribbon Interface -->
+<div class="flex flex-col border-b border-border-light bg-surface-light dark:bg-surface-dark dark:border-border-dark shrink-0">
+<!-- Tabs -->
+<div class="flex px-4 gap-6 border-b border-slate-100 dark:border-slate-800 overflow-x-auto">
+<button class="flex items-center justify-center border-b-[3px] border-b-primary text-primary pb-2 pt-3 px-1 transition-colors">
+<p class="text-sm font-bold leading-normal">Nhập liệu</p>
+</button>
+<button class="flex items-center justify-center border-b-[3px] border-b-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 pb-2 pt-3 px-1 transition-colors">
+<p class="text-sm font-bold leading-normal">Báo cáo</p>
+</button>
+<button class="flex items-center justify-center border-b-[3px] border-b-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 pb-2 pt-3 px-1 transition-colors">
+<p class="text-sm font-bold leading-normal">Ngân quỹ</p>
+</button>
+<button class="flex items-center justify-center border-b-[3px] border-b-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 pb-2 pt-3 px-1 transition-colors">
+<p class="text-sm font-bold leading-normal">Thuế</p>
+</button>
+<button class="flex items-center justify-center border-b-[3px] border-b-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 pb-2 pt-3 px-1 transition-colors">
+<p class="text-sm font-bold leading-normal">Tài sản</p>
+</button>
+<button class="flex items-center justify-center border-b-[3px] border-b-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 pb-2 pt-3 px-1 transition-colors">
+<p class="text-sm font-bold leading-normal">Hệ thống</p>
+</button>
+</div>
+<!-- Toolbar Icons -->
+<div class="flex justify-between items-center gap-2 px-4 py-2 bg-slate-50/50 dark:bg-slate-800/50">
+<div class="flex items-center gap-1 divide-x divide-slate-200 dark:divide-slate-700">
+<!-- Group 1: Clipboard -->
+<div class="flex gap-1 pr-2">
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="Lưu">
+<span class="material-symbols-outlined text-[20px]">save</span>
+</button>
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="In">
+<span class="material-symbols-outlined text-[20px]">print</span>
+</button>
+</div>
+<!-- Group 2: Edit -->
+<div class="flex gap-1 px-2">
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="Sao chép">
+<span class="material-symbols-outlined text-[20px]">content_copy</span>
+</button>
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="Dán">
+<span class="material-symbols-outlined text-[20px]">content_paste</span>
+</button>
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="Xóa">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+<!-- Group 3: Data Actions -->
+<div class="flex gap-1 px-2">
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="Lọc dữ liệu">
+<span class="material-symbols-outlined text-[20px]">filter_alt</span>
+</button>
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="Sắp xếp tăng dần">
+<span class="material-symbols-outlined text-[20px]">sort</span>
+</button>
+<button class="p-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700" title="Hoàn tác">
+<span class="material-symbols-outlined text-[20px]">undo</span>
+</button>
+</div>
+<!-- Group 4: Formulas -->
+<div class="flex gap-1 px-2">
+<button class="flex items-center gap-1 px-2 py-1.5 text-slate-700 hover:bg-slate-200 rounded dark:text-slate-300 dark:hover:bg-slate-700 text-sm font-medium">
+<span class="material-symbols-outlined text-[20px] text-orange-500">functions</span>
+                        Hàm
+                    </button>
+</div>
+</div>
+<!-- Primary Action -->
+<button class="flex items-center justify-center overflow-hidden rounded-md h-9 bg-green-600 hover:bg-green-700 text-white gap-2 text-sm font-bold px-4 transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[20px]">table_view</span>
+<span class="truncate">Xuất Excel</span>
+</button>
+</div>
+</div>
+<!-- 3. Formula Bar -->
+<div class="flex items-center gap-2 px-4 py-2 border-b border-border-light bg-surface-light dark:bg-surface-dark dark:border-border-dark shrink-0">
+<div class="relative w-24">
+<input class="w-full h-8 px-2 text-center text-sm font-medium border border-slate-300 rounded bg-white text-slate-700 focus:outline-none focus:border-primary dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300" readonly="" value="E5"/>
+</div>
+<div class="text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</div>
+<div class="text-primary cursor-pointer hover:text-blue-700">
+<span class="material-symbols-outlined text-[20px] font-bold">function</span>
+</div>
+<div class="flex-1 relative">
+<input class="w-full h-8 px-3 text-sm border border-slate-300 rounded bg-white text-slate-700 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 font-mono dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300" placeholder="Fx" value="=SUM(E2:E4)"/>
+</div>
+</div>
+<!-- 4. Main Workspace (Grid + Sidebar) -->
+<div class="flex-1 flex overflow-hidden bg-slate-100 dark:bg-slate-900">
+<!-- Sidebar (Navigation) -->
+<div class="w-60 bg-white dark:bg-slate-800 border-r border-border-light dark:border-border-dark flex flex-col hidden lg:flex shrink-0">
+<div class="p-3">
+<p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Truy cập nhanh</p>
+<nav class="space-y-0.5">
+<a class="flex items-center gap-3 px-2 py-2 text-sm font-medium bg-primary/10 text-primary rounded-md" href="#">
+<span class="material-symbols-outlined text-[20px]">receipt_long</span>
+                        Chứng từ nghiệp vụ
+                    </a>
+<a class="flex items-center gap-3 px-2 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md" href="#">
+<span class="material-symbols-outlined text-[20px]">account_balance</span>
+                        Ngân hàng
+                    </a>
+<a class="flex items-center gap-3 px-2 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md" href="#">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+                        Kho hàng
+                    </a>
+<a class="flex items-center gap-3 px-2 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md" href="#">
+<span class="material-symbols-outlined text-[20px]">attach_money</span>
+                        Lương nhân viên
+                    </a>
+</nav>
+</div>
+<div class="mt-auto p-4 border-t border-slate-100 dark:border-slate-700">
+<div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
+<p class="text-xs font-semibold text-primary mb-1">Số dư tiền mặt</p>
+<p class="text-lg font-bold text-slate-800 dark:text-slate-200">1.250.000.000 ₫</p>
+</div>
+</div>
+</div>
+<!-- Spreadsheet Grid Container -->
+<div class="flex-1 flex flex-col relative bg-white dark:bg-slate-900 overflow-hidden">
+<!-- Grid Header (A, B, C...) - Optional decorative or functional -->
+<!-- We will integrate this into the main table for simpler implementation in one scrolling container -->
+<!-- Main Scrollable Table Area -->
+<div class="flex-1 overflow-auto bg-white dark:bg-slate-900 relative">
+<table class="w-full border-collapse text-sm">
+<thead class="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 shadow-sm">
+<tr>
+<!-- Row Number Header -->
+<th class="w-10 border-r border-b border-border-light dark:border-border-dark bg-slate-100 dark:bg-slate-700"></th>
+<!-- Column Headers -->
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 w-32 min-w-[120px]">Ngày CT</th>
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 w-24 min-w-[100px]">Số CT</th>
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 min-w-[300px]">Diễn giải</th>
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-center font-semibold text-slate-600 dark:text-slate-300 w-20">TK Nợ</th>
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-center font-semibold text-slate-600 dark:text-slate-300 w-20">TK Có</th>
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-right font-semibold text-slate-600 dark:text-slate-300 w-32 min-w-[140px]">Số tiền</th>
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 w-40 min-w-[160px]">Đối tượng</th>
+<th class="border-r border-b border-border-light dark:border-border-dark px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 w-40 min-w-[160px]">Ghi chú</th>
+</tr>
+</thead>
+<tbody class="text-slate-700 dark:text-slate-300">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800 group">
+<td class="bg-slate-50 dark:bg-slate-800 border-r border-b border-border-light dark:border-border-dark text-center text-xs text-slate-400 font-medium">1</td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="12/10/2023"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm font-medium" value="PC001"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="Chi tiền mua VPP"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">642</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-bold">111</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm text-right font-mono" value="1,500,000"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="NCC A"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value=""/></td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800 group">
+<td class="bg-slate-50 dark:bg-slate-800 border-r border-b border-border-light dark:border-border-dark text-center text-xs text-slate-400 font-medium">2</td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="12/10/2023"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm font-medium" value="PT001"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="Thu tiền bán hàng"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-bold">111</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-bold">511</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm text-right font-mono" value="15,000,000"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="KH B"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value=""/></td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800 group">
+<td class="bg-slate-50 dark:bg-slate-800 border-r border-b border-border-light dark:border-border-dark text-center text-xs text-slate-400 font-medium">3</td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="13/10/2023"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm font-medium" value="BN001"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="Báo nợ ngân hàng"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">112</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-bold">131</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm text-right font-mono" value="50,000,000"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="KH C"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="TT đợt 1"/></td>
+</tr>
+<!-- Active Row Example -->
+<tr class="bg-blue-50/50 dark:bg-blue-900/10 group">
+<td class="bg-blue-50 dark:bg-blue-900/20 border-r border-b border-border-light dark:border-border-dark text-center text-xs text-primary font-bold border-l-4 border-l-primary">4</td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="14/10/2023"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm font-medium" value="UNC002"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="Chi lương tháng 9"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-bold">334</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 text-center"><span class="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">112</span></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0 ring-2 ring-primary ring-inset z-10"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm text-right font-mono" value="230,000,000"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value="NV Toàn Cty"/></td>
+<td class="border-r border-b border-border-light dark:border-border-dark p-0"><input class="w-full h-full px-2 py-1.5 bg-transparent border-none focus:ring-0 text-sm" value=""/></td>
+</tr>
+<!-- Empty Rows Filler -->
+<script>
+                            // Simple hack to generate empty rows for visualization
+                            for(let i=5; i<=25; i++) {
+                                document.write(`
+                                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800">
+                                    <td class="bg-slate-50 dark:bg-slate-800 border-r border-b border-border-light dark:border-border-dark text-center text-xs text-slate-400 font-medium">${i}</td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                    <td class="border-r border-b border-border-light dark:border-border-dark p-0 h-8"></td>
+                                </tr>
+                                `)
+                            }
+                        </script>
+</tbody>
+</table>
+</div>
+<!-- Spreadsheet Tabs (Bottom) -->
+<div class="h-9 bg-slate-100 border-t border-border-light dark:bg-slate-800 dark:border-border-dark flex items-center px-2 gap-1 shrink-0 overflow-x-auto">
+<div class="flex items-center gap-2 mr-2 text-slate-500">
+<span class="material-symbols-outlined text-[18px] cursor-pointer hover:text-slate-800">first_page</span>
+<span class="material-symbols-outlined text-[18px] cursor-pointer hover:text-slate-800">chevron_left</span>
+<span class="material-symbols-outlined text-[18px] cursor-pointer hover:text-slate-800">chevron_right</span>
+</div>
+<button class="px-4 py-1 bg-white dark:bg-slate-700 text-primary font-semibold text-xs border-t-2 border-primary rounded-t shadow-sm">
+                    Nhật ký chung
+                </button>
+<button class="px-4 py-1 hover:bg-white/50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400 font-medium text-xs border-t-2 border-transparent rounded-t transition-colors">
+                    Sổ cái
+                </button>
+<button class="px-4 py-1 hover:bg-white/50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400 font-medium text-xs border-t-2 border-transparent rounded-t transition-colors">
+                    Cân đối kế toán
+                </button>
+<button class="px-4 py-1 hover:bg-white/50 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-400 font-medium text-xs border-t-2 border-transparent rounded-t transition-colors">
+                    Báo cáo KQKD
+                </button>
+<button class="size-6 flex items-center justify-center text-slate-500 hover:bg-slate-200 rounded-full ml-1">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- 5. Footer Status Bar -->
+<div class="h-7 bg-primary text-white text-xs flex items-center px-4 justify-between shrink-0 font-medium z-30">
+<div class="flex items-center gap-6">
+<span class="opacity-80">Sẵn sàng</span>
+<span class="opacity-80">Chế độ ghi đè: Tắt</span>
+</div>
+<div class="flex items-center gap-6">
+<span>Trung bình: 296,500,000</span>
+<span>Đếm: 4</span>
+<span class="font-bold">Tổng: 1,186,000,000</span>
+<div class="flex items-center gap-2 ml-4 border-l border-white/20 pl-4">
+<span class="material-symbols-outlined text-[16px] opacity-80 cursor-pointer">remove</span>
+<span class="bg-white/20 px-2 py-0.5 rounded text-[10px]">100%</span>
+<span class="material-symbols-outlined text-[16px] opacity-80 cursor-pointer">add</span>
+</div>
+</div>
+</div>
+</body></html>

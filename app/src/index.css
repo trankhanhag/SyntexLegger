@@ -1,0 +1,271 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        font-size: 13px;
+    }
+
+    body {
+        font-family: "Be Vietnam Pro", Arial, sans-serif;
+        line-height: 1.4;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+    }
+}
+
+@layer components {
+    .form-modal {
+        @apply bg-white dark:bg-slate-900 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[92vh] border border-slate-200 dark:border-slate-700;
+    }
+
+    .form-modal__header {
+        @apply flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800;
+    }
+
+    .form-modal__title {
+        @apply text-base font-bold text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2;
+    }
+
+    .form-modal__icon {
+        @apply text-blue-600;
+    }
+
+    .form-modal__close {
+        @apply w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors;
+    }
+
+    .form-modal__body {
+        @apply p-6 overflow-y-auto;
+    }
+
+    .form-label {
+        @apply block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1;
+    }
+
+    .form-input {
+        @apply w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500;
+    }
+
+    .form-select {
+        @apply w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500;
+    }
+
+    .form-textarea {
+        @apply w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500;
+    }
+
+    .form-actions {
+        @apply flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800;
+    }
+
+    .form-button-secondary {
+        @apply px-5 py-1.5 rounded-lg font-semibold text-[13px] text-slate-600 border border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors;
+    }
+
+    .form-button-primary {
+        @apply px-6 py-1.5 rounded-lg font-semibold text-[13px] bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-colors;
+    }
+}
+
+/* Custom scrollbar for Excel-like feel */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.excel-grid-header {
+    background-color: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: center;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.excel-cell {
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    outline: none;
+}
+
+.excel-cell:focus {
+    box-shadow: inset 0 0 0 2px #137fec;
+    z-index: 10;
+}
+
+@media print {
+
+    /* Page settings */
+    @page {
+        size: A4;
+        margin: 15mm 10mm;
+    }
+
+    /* Hide absolutely everything first */
+    * {
+        visibility: hidden !important;
+        background: transparent !important;
+        background-color: transparent !important;
+    }
+
+    /* Reset document */
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 210mm !important;
+        height: auto !important;
+        background: white !important;
+        overflow: visible !important;
+    }
+
+    body {
+        font-family: "Times New Roman", serif !important;
+        font-size: 11pt !important;
+        line-height: 1.4 !important;
+    }
+
+    /* The printable area - make it visible and fill the page */
+    .printable-area {
+        visibility: visible !important;
+        display: block !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 210mm !important;
+        min-height: 297mm !important;
+        margin: 0 !important;
+        padding: 15mm 20mm !important;
+        background: white !important;
+        background-color: white !important;
+        color: black !important;
+        box-sizing: border-box !important;
+        z-index: 999999 !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* All children of printable-area must be visible */
+    .printable-area *,
+    .printable-area div,
+    .printable-area p,
+    .printable-area span,
+    .printable-area h1,
+    .printable-area h2,
+    .printable-area h3,
+    .printable-area table,
+    .printable-area thead,
+    .printable-area tbody,
+    .printable-area tfoot,
+    .printable-area tr,
+    .printable-area th,
+    .printable-area td {
+        visibility: visible !important;
+        position: static !important;
+        color: black !important;
+        font-family: "Times New Roman", serif !important;
+        background: transparent !important;
+    }
+
+    /* Table header cells get light background */
+    .printable-area th,
+    .printable-area .bg-slate-50 {
+        background-color: #f8fafc !important;
+    }
+
+    /* Borders for tables */
+    .printable-area table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        page-break-inside: auto !important;
+        background: white !important;
+    }
+
+    .printable-area th,
+    .printable-area td {
+        border: 1px solid black !important;
+        padding: 4px 8px !important;
+    }
+
+    .printable-area tr {
+        page-break-inside: avoid !important;
+    }
+
+    .printable-area thead {
+        display: table-header-group !important;
+    }
+
+    /* Hide buttons and no-print elements */
+    .printable-area button,
+    .printable-area .no-print,
+    button,
+    .no-print {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    /* Page break utility */
+    .page-break {
+        page-break-before: always !important;
+    }
+
+    /* Color preservation */
+    .printable-area,
+    .printable-area * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+/* Animation utilities for mobile sidebar */
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.2s ease-out forwards;
+}
+
+/* Accessibility: Prefers-Reduced-Motion Support */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .animate-spin,
+    .animate-pulse,
+    .animate-bounce,
+    .animate-fade-in {
+        animation: none !important;
+    }
+}

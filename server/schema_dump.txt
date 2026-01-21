@@ -1,0 +1,302 @@
+[
+  {
+    "name": "sqlite_sequence",
+    "sql": "CREATE TABLE sqlite_sequence(name,seq)"
+  },
+  {
+    "name": "long_term_investments",
+    "sql": "CREATE TABLE long_term_investments (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE NOT NULL,\n    name TEXT NOT NULL,\n    type TEXT NOT NULL,                      -- 'SUBSIDIARY', 'ASSOCIATE', 'OTHER'\n    account_code TEXT DEFAULT '221',         -- TK: 221, 222, 228\n    \n    investee_name TEXT,                      -- Tên đơn vị nhận đầu tư\n    investee_tax_code TEXT,                  -- MST đơn vị nhận đầu tư\n    \n    investment_amount REAL NOT NULL DEFAULT 0,\n    ownership_percentage REAL,               -- Tỷ lệ sở hữu (%)\n    investment_date TEXT,\n    \n    current_value REAL DEFAULT 0,\n    income_received REAL DEFAULT 0,          -- Thu nhập đã nhận\n    \n    status TEXT DEFAULT 'ACTIVE',\n    fund_source_id TEXT,\n    \n    created_at TEXT,\n    updated_at TEXT,\n    \n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)\n)"
+  },
+  {
+    "name": "revenue_categories",
+    "sql": "CREATE TABLE revenue_categories (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE NOT NULL,\n    name TEXT NOT NULL,\n    revenue_type TEXT,                       -- 'RECURRENT', 'NON_RECURRENT', 'PRODUCTION'\n    account_code TEXT DEFAULT '511',         -- TK: 511.xx\n    description TEXT,\n    active BOOLEAN DEFAULT 1,\n    created_at TEXT\n)"
+  },
+  {
+    "name": "revenue_receipts",
+    "sql": "CREATE TABLE revenue_receipts (\n    id TEXT PRIMARY KEY,\n    receipt_no TEXT UNIQUE NOT NULL,\n    receipt_date TEXT NOT NULL,\n    fiscal_year INTEGER,\n    \n    -- Người nộp tiền\n    payer_name TEXT NOT NULL,\n    payer_id_card TEXT,\n    payer_address TEXT,\n    \n    -- Phân loại thu\n    revenue_type TEXT,                       -- 'RECURRENT', 'NON_RECURRENT', 'PRODUCTION'\n    category_code TEXT,\n    category_name TEXT,\n    \n    -- Số tiền\n    amount REAL NOT NULL,\n    \n    -- Liên kết HCSN\n    fund_source_id TEXT,\n    budget_estimate_id TEXT,\n    \n    -- Kế toán\n    payment_method TEXT DEFAULT 'CASH',      -- 'CASH', 'TRANSFER'\n    bank_account TEXT,\n    account_code TEXT DEFAULT '511',\n    \n    notes TEXT,\n    voucher_id TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    \n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),\n    FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id),\n    FOREIGN KEY (category_code) REFERENCES revenue_categories(code)\n)"
+  },
+  {
+    "name": "expense_categories",
+    "sql": "CREATE TABLE expense_categories (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE NOT NULL,\n    name TEXT NOT NULL,\n    expense_type TEXT,\n    account_code TEXT DEFAULT '611',\n    description TEXT,\n    active BOOLEAN DEFAULT 1,\n    created_at TEXT\n)"
+  },
+  {
+    "name": "expense_vouchers",
+    "sql": "CREATE TABLE expense_vouchers (\n    id TEXT PRIMARY KEY,\n    voucher_no TEXT UNIQUE NOT NULL,\n    voucher_date TEXT NOT NULL,\n    fiscal_year INTEGER,\n    \n\n    payee_name TEXT NOT NULL,\n    payee_tax_code TEXT,\n    payee_address TEXT,\n    \n\n    expense_type TEXT,\n    category_code TEXT,\n    category_name TEXT,\n    \n\n    amount REAL NOT NULL,\n    \n\n    fund_source_id TEXT,\n    budget_estimate_id TEXT,\n    \n\n    payment_method TEXT DEFAULT 'CASH',\n    bank_account TEXT,\n    account_code TEXT DEFAULT '611',\n    \n    notes TEXT,\n    ledger_voucher_id TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    \n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),\n    FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id),\n    FOREIGN KEY (category_code) REFERENCES expense_categories(code)\n)"
+  },
+  {
+    "name": "asset_depreciation_log",
+    "sql": "CREATE TABLE asset_depreciation_log (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    asset_id TEXT NOT NULL,\n    period TEXT NOT NULL,\n    depreciation_amount REAL NOT NULL DEFAULT 0,\n    accumulated_depreciation REAL DEFAULT 0,\n    net_value REAL DEFAULT 0,\n    voucher_id TEXT,\n    \n    created_at TEXT DEFAULT (datetime('now')),\n    created_by TEXT,\n    \n    FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)\n)"
+  },
+  {
+    "name": "asset_cards",
+    "sql": "CREATE TABLE asset_cards (\n    id TEXT PRIMARY KEY,\n    asset_id TEXT NOT NULL,\n    card_no TEXT UNIQUE,\n    fiscal_year INTEGER,\n    \n\n    opening_value REAL DEFAULT 0,\n    opening_depreciation REAL DEFAULT 0,\n    \n\n    increase_value REAL DEFAULT 0,\n    decrease_value REAL DEFAULT 0,\n    revaluation_value REAL DEFAULT 0,\n    depreciation_current_year REAL DEFAULT 0,\n    \n\n    closing_value REAL DEFAULT 0,\n    closing_depreciation REAL DEFAULT 0,\n    closing_net_value REAL DEFAULT 0,\n    \n    created_at TEXT,\n    updated_at TEXT,\n    \n    FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)\n)"
+  },
+  {
+    "name": "asset_inventory_items",
+    "sql": "CREATE TABLE asset_inventory_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    inventory_id TEXT NOT NULL,\n    asset_id TEXT NOT NULL,\n    \n\n    book_quantity INTEGER DEFAULT 1,\n    book_value REAL DEFAULT 0,\n    \n\n    actual_quantity INTEGER DEFAULT 1,\n    actual_condition TEXT,\n    actual_location TEXT,\n    \n\n    diff_quantity INTEGER,\n    diff_value REAL,\n    reason TEXT,\n    \n    checked_by TEXT,\n    checked_date TEXT,\n    notes TEXT,\n    \n    FOREIGN KEY (inventory_id) REFERENCES asset_inventory(id),\n    FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)\n)"
+  },
+  {
+    "name": "asset_movements",
+    "sql": "CREATE TABLE asset_movements (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    asset_id TEXT NOT NULL,\n    movement_type TEXT NOT NULL,\n    movement_date TEXT NOT NULL,\n    \n    from_department TEXT,\n    to_department TEXT,\n    from_location TEXT,\n    to_location TEXT,\n    \n    value_change REAL DEFAULT 0,\n    reason TEXT,\n    approval_no TEXT,\n    voucher_id TEXT,\n    \n    note TEXT,\n    created_at TEXT DEFAULT (datetime('now')),\n    created_by TEXT,\n    \n    FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)\n)"
+  },
+  {
+    "name": "salary_grades",
+    "sql": "CREATE TABLE salary_grades (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE NOT NULL, -- 01.003\n    name TEXT NOT NULL, -- Chuyên viên\n    category TEXT -- A1, A2...\n)"
+  },
+  {
+    "name": "employees",
+    "sql": "CREATE TABLE employees (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE NOT NULL,\n    name TEXT NOT NULL,\n    date_of_birth TEXT,\n    department TEXT,\n    position TEXT,\n    \n    -- Thông tin lương HCSN\n    salary_grade_id TEXT,\n    salary_level INTEGER DEFAULT 1,\n    salary_coefficient REAL DEFAULT 2.34,\n    \n    start_date TEXT,\n    contract_type TEXT, -- BIEN_CHE, HOP_DONG\n    status TEXT DEFAULT 'ACTIVE',\n    \n    bank_account TEXT,\n    bank_name TEXT,\n    tax_code TEXT,\n    insurance_number TEXT,\n    \n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (salary_grade_id) REFERENCES salary_grades(id)\n)"
+  },
+  {
+    "name": "vouchers",
+    "sql": "CREATE TABLE vouchers (\n            id TEXT PRIMARY KEY,\n            doc_no TEXT UNIQUE,\n            doc_date TEXT,\n            post_date TEXT,\n            description TEXT,\n            type TEXT, -- 'GENERAL', 'CASH_IN', 'CASH_OUT', etc.\n            ref_no TEXT,\n            attachments INTEGER DEFAULT 0,\n            currency TEXT DEFAULT 'VND',\n            fx_rate REAL DEFAULT 1,\n            total_amount REAL DEFAULT 0,\n            status TEXT DEFAULT 'POSTED', -- 'POSTED', 'DRAFT'\n            created_at TEXT\n        )"
+  },
+  {
+    "name": "voucher_items",
+    "sql": "CREATE TABLE voucher_items (\n            id INTEGER PRIMARY KEY AUTOINCREMENT,\n            voucher_id TEXT,\n            description TEXT,\n            debit_acc TEXT,\n            credit_acc TEXT,\n            amount REAL,\n            dim1 TEXT,\n            dim2 TEXT,\n            dim3 TEXT,\n            dim4 TEXT,\n            dim5 TEXT,\n            project_code TEXT,\n            contract_code TEXT,\n            debt_note TEXT,\n            partner_code TEXT,\n            fund_source_id TEXT,\n            budget_estimate_id TEXT, input_quantity REAL DEFAULT 0, quantity REAL DEFAULT 0, cost_price REAL DEFAULT 0, input_unit TEXT, budget_category TEXT, estimate_id TEXT,\n            FOREIGN KEY (voucher_id) REFERENCES vouchers (id) ON DELETE CASCADE\n        )"
+  },
+  {
+    "name": "asset_inventory",
+    "sql": "CREATE TABLE asset_inventory (\n    id TEXT PRIMARY KEY,\n    inventory_no TEXT UNIQUE,\n    inventory_date TEXT,\n    fiscal_year INTEGER,\n    inventory_type TEXT,\n    department TEXT,\n    \n    status TEXT DEFAULT 'DRAFT',\n    \n    approved_by TEXT,\n    approved_date TEXT,\n    notes TEXT,\n    \n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT\n)"
+  },
+  {
+    "name": "staging_transactions",
+    "sql": "CREATE TABLE staging_transactions (\n            id TEXT PRIMARY KEY,\n            batch_id TEXT,\n            row_index INTEGER,\n            trx_date TEXT,\n            doc_no TEXT,\n            description TEXT,\n            debit_acc TEXT,\n            credit_acc TEXT,\n            amount REAL,\n            partner_code TEXT,\n            is_valid INTEGER DEFAULT 0,\n            error_log TEXT,\n            raw_data TEXT\n        , suggested_debit TEXT, suggested_credit TEXT, source TEXT DEFAULT 'manual')"
+  },
+  {
+    "name": "off_balance_tracking",
+    "sql": "CREATE TABLE off_balance_tracking (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    account_code TEXT,\n    transaction_date TEXT,\n    doc_no TEXT,\n    description TEXT,\n    increase_amount REAL DEFAULT 0,\n    decrease_amount REAL DEFAULT 0,\n    balance REAL DEFAULT 0,\n    created_at TEXT\n)"
+  },
+  {
+    "name": "infrastructure_assets",
+    "sql": "CREATE TABLE infrastructure_assets (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE,\n    name TEXT,\n    category TEXT,\n    location TEXT,\n    construction_year INTEGER,\n    original_value REAL DEFAULT 0,\n    accumulated_depreciation REAL DEFAULT 0,\n    net_value REAL DEFAULT 0,\n    condition TEXT DEFAULT 'GOOD',\n    fund_source_id TEXT,\n    managed_by TEXT,\n    \n\n    last_maintenance_date TEXT,\n    next_maintenance_date TEXT,\n    maintenance_cost REAL DEFAULT 0,\n    \n\n    condition_assessment_date TEXT,\n    condition_note TEXT,\n    \n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)\n)"
+  },
+  {
+    "name": "fixed_assets",
+    "sql": "CREATE TABLE fixed_assets (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE NOT NULL,\n    name TEXT NOT NULL,\n    asset_category TEXT DEFAULT 'TANGIBLE',\n    account_code TEXT DEFAULT '211',\n    original_value REAL NOT NULL DEFAULT 0,\n    accumulated_depreciation REAL DEFAULT 0,\n    net_value REAL DEFAULT 0,\n    depreciation_method TEXT DEFAULT 'STRAIGHT_LINE',\n    useful_life INTEGER,\n    depreciation_rate REAL,\n    residual_value REAL DEFAULT 0,\n    purchase_date TEXT,\n    usage_date TEXT,\n    start_date TEXT,\n    location TEXT,\n    dept TEXT,\n    manager TEXT,\n    status TEXT DEFAULT 'ACTIVE',\n    asset_condition TEXT DEFAULT 'GOOD',\n    warranty_expiry TEXT,\n    fund_source_id TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)\n)"
+  },
+  {
+    "name": "roles",
+    "sql": "CREATE TABLE roles (\n                id TEXT PRIMARY KEY,\n                name TEXT,\n                permissions TEXT,\n                created_at TEXT DEFAULT CURRENT_TIMESTAMP,\n                updated_at TEXT\n            )"
+  },
+  {
+    "name": "bank_accounts",
+    "sql": "CREATE TABLE bank_accounts (\n            id TEXT PRIMARY KEY,\n            bank_name TEXT,\n            acc_no TEXT UNIQUE,\n            api_key TEXT,\n            status TEXT DEFAULT 'active',\n            created_at TEXT\n        )"
+  },
+  {
+    "name": "allocations",
+    "sql": "CREATE TABLE allocations (\n                id TEXT PRIMARY KEY,\n                payment_voucher_id TEXT,\n                invoice_voucher_id TEXT,\n                amount REAL,\n                allocated_at TEXT,\n                FOREIGN KEY (payment_voucher_id) REFERENCES vouchers (id) ON DELETE CASCADE,\n                FOREIGN KEY (invoice_voucher_id) REFERENCES vouchers (id) ON DELETE CASCADE\n            )"
+  },
+  {
+    "name": "system_settings",
+    "sql": "CREATE TABLE system_settings (\n                key TEXT PRIMARY KEY,\n                value TEXT\n            )"
+  },
+  {
+    "name": "checklist_tasks",
+    "sql": "CREATE TABLE checklist_tasks (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    title TEXT,\n                    category TEXT,\n                    status TEXT DEFAULT 'todo',\n                    is_visible INTEGER DEFAULT 1,\n                    created_at TEXT DEFAULT CURRENT_TIMESTAMP\n                )"
+  },
+  {
+    "name": "timekeeping",
+    "sql": "CREATE TABLE timekeeping (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    employee_id TEXT,\n                    period TEXT, -- YYYY-MM\n                    standard_days INTEGER,\n                    actual_days INTEGER,\n                    overtime_hours INTEGER,\n                    FOREIGN KEY (employee_id) REFERENCES employees (id)\n                )"
+  },
+  {
+    "name": "payroll",
+    "sql": "CREATE TABLE payroll (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    employee_id TEXT,\n                    period TEXT, -- YYYY-MM\n                    gross_salary REAL,\n                    allowance REAL,\n                    insurance_deduction REAL,\n                    income_tax REAL,\n                    net_salary REAL,\n                    created_at TEXT,\n                    FOREIGN KEY (employee_id) REFERENCES employees (id)\n                )"
+  },
+  {
+    "name": "sales_invoices",
+    "sql": "CREATE TABLE sales_invoices (\n                    id TEXT PRIMARY KEY,\n                    date TEXT,\n                    doc_no TEXT,\n                    customer TEXT,\n                    description TEXT,\n                    amount REAL,\n                    tax REAL,\n                    total REAL,\n                    contract_code TEXT,\n                    project_code TEXT,\n                    dim1 TEXT,\n                    dim2 TEXT\n                )"
+  },
+  {
+    "name": "sales_orders",
+    "sql": "CREATE TABLE sales_orders (\n                    id TEXT PRIMARY KEY,\n                    date TEXT,\n                    doc_no TEXT,\n                    customer TEXT,\n                    description TEXT,\n                    amount REAL,\n                    status TEXT\n                )"
+  },
+  {
+    "name": "purchase_invoices",
+    "sql": "CREATE TABLE purchase_invoices (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    date TEXT,\n                    doc_no TEXT,\n                    description TEXT,\n                    warehouse TEXT,\n                    supplier TEXT,\n                    amount REAL,\n                    tax REAL,\n                    total REAL,\n                    type TEXT -- 'INBOUND' or 'SERVICE'\n                )"
+  },
+  {
+    "name": "contracts",
+    "sql": "CREATE TABLE contracts (\n                    id TEXT PRIMARY KEY,\n                    code TEXT,\n                    name TEXT,\n                    partner TEXT,\n                    date TEXT,\n                    value REAL,\n                    received_or_paid REAL,\n                    status TEXT,\n                    type TEXT\n                )"
+  },
+  {
+    "name": "purchase_orders",
+    "sql": "CREATE TABLE purchase_orders (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    docNo TEXT,\n                    date TEXT,\n                    supplier TEXT,\n                    amount REAL,\n                    status TEXT,\n                    deliveryDate TEXT\n                )"
+  },
+  {
+    "name": "contract_appendices",
+    "sql": "CREATE TABLE contract_appendices (\n                    id TEXT PRIMARY KEY,\n                    contract_id TEXT,\n                    code TEXT,\n                    name TEXT,\n                    date TEXT,\n                    value REAL,\n                    content TEXT,\n                    FOREIGN KEY (contract_id) REFERENCES contracts (id)\n                )"
+  },
+  {
+    "name": "project_tasks",
+    "sql": "CREATE TABLE project_tasks (\n                    id TEXT PRIMARY KEY,\n                    project_id TEXT,\n                    task TEXT,\n                    owner TEXT,\n                    deadline TEXT,\n                    progress INTEGER,\n                    status TEXT,\n                    FOREIGN KEY (project_id) REFERENCES projects (id)\n                )"
+  },
+  {
+    "name": "projects",
+    "sql": "CREATE TABLE projects (\n                    id TEXT PRIMARY KEY,\n                    code TEXT,\n                    name TEXT,\n                    customer TEXT,\n                    budget REAL,\n                    start TEXT,\n                    end TEXT,\n                    progress INTEGER,\n                    status TEXT\n                )"
+  },
+  {
+    "name": "loan_contracts",
+    "sql": "CREATE TABLE loan_contracts (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    docNo TEXT,\n                    partner TEXT,\n                    limit_amount REAL,\n                    collateral TEXT,\n                    status TEXT,\n                    date TEXT\n                )"
+  },
+  {
+    "name": "project_budget_lines",
+    "sql": "CREATE TABLE project_budget_lines (\n                    id TEXT PRIMARY KEY,\n                    project_id TEXT,\n                    category TEXT,\n                    budget REAL,\n                    FOREIGN KEY (project_id) REFERENCES projects (id)\n                )"
+  },
+  {
+    "name": "dimensions",
+    "sql": "CREATE TABLE dimensions (\n                    id TEXT PRIMARY KEY,\n                    code TEXT,\n                    name TEXT,\n                    type INTEGER, -- 1 to 5\n                    description TEXT\n                )"
+  },
+  {
+    "name": "debt_notes",
+    "sql": "CREATE TABLE debt_notes (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    contract_id INTEGER,\n                    doc_no TEXT UNIQUE,\n                    amount REAL,\n                    rate REAL,\n                    start_date TEXT,\n                    end_date TEXT,\n                    purpose TEXT,\n                    FOREIGN KEY (contract_id) REFERENCES loan_contracts (id)\n                )"
+  },
+  {
+    "name": "dimension_group_members",
+    "sql": "CREATE TABLE dimension_group_members (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    group_id TEXT,\n                    dimension_id TEXT,\n                    FOREIGN KEY (group_id) REFERENCES dimension_groups (id) ON DELETE CASCADE,\n                    FOREIGN KEY (dimension_id) REFERENCES dimensions (id) ON DELETE CASCADE\n                )"
+  },
+  {
+    "name": "dimension_groups",
+    "sql": "CREATE TABLE dimension_groups (\n                    id TEXT PRIMARY KEY,\n                    code TEXT,\n                    name TEXT,\n                    dim_type INTEGER,\n                    description TEXT\n                )"
+  },
+  {
+    "name": "dimension_configs",
+    "sql": "CREATE TABLE dimension_configs (\n                    id INTEGER PRIMARY KEY,\n                    name TEXT,\n                    label TEXT,\n                    isActive INTEGER,\n                    isMandatory INTEGER,\n                    note TEXT\n                )"
+  },
+  {
+    "name": "products",
+    "sql": "CREATE TABLE products (\n                        id INTEGER PRIMARY KEY AUTOINCREMENT,\n                        code TEXT UNIQUE,\n                        name TEXT,\n                        unit TEXT,\n                        price REAL,\n                        tax REAL,\n                        type TEXT,\n                        conversion_units TEXT -- JSON string for unit matrix\n                    )"
+  },
+  {
+    "name": "ccdc_items",
+    "sql": "CREATE TABLE ccdc_items (\n                    id TEXT PRIMARY KEY,\n                    code TEXT,\n                    name TEXT,\n                    start_date TEXT,\n                    cost REAL,\n                    life_months INTEGER,\n                    allocated REAL,\n                    remaining REAL\n                )"
+  },
+  {
+    "name": "system_logs",
+    "sql": "CREATE TABLE system_logs (\n                        id INTEGER PRIMARY KEY AUTOINCREMENT,\n                        timestamp TEXT DEFAULT CURRENT_TIMESTAMP,\n                        user TEXT,\n                        action TEXT,\n                        details TEXT,\n                        target TEXT\n                    )"
+  },
+  {
+    "name": "payroll_periods",
+    "sql": "CREATE TABLE payroll_periods (\n    id TEXT PRIMARY KEY, -- YYYY-MM\n    name TEXT,\n    start_date TEXT,\n    end_date TEXT,\n    standard_days INTEGER DEFAULT 22,\n    base_salary REAL DEFAULT 2340000, -- Lương cơ sở từ 1/7/2024\n    status TEXT DEFAULT 'DRAFT', -- DRAFT, LOCKED, POSTED\n    created_at TEXT\n)"
+  },
+  {
+    "name": "salary_history",
+    "sql": "CREATE TABLE salary_history (\n    id TEXT PRIMARY KEY,\n    employee_id TEXT,\n    effective_date TEXT NOT NULL,\n    change_type TEXT, -- NANG_BAC, THANG_HANG, BOI_DUONG_DONG, KHAC\n    old_grade_id TEXT,\n    new_grade_id TEXT,\n    old_level INTEGER,\n    new_level INTEGER,\n    old_coefficient REAL,\n    new_coefficient REAL,\n    decision_no TEXT,\n    decision_date TEXT,\n    notes TEXT,\n    created_at TEXT,\n    FOREIGN KEY (employee_id) REFERENCES employees(id),\n    FOREIGN KEY (old_grade_id) REFERENCES salary_grades(id),\n    FOREIGN KEY (new_grade_id) REFERENCES salary_grades(id)\n)"
+  },
+  {
+    "name": "payroll_details",
+    "sql": "CREATE TABLE payroll_details (\n    id TEXT PRIMARY KEY,\n    period_id TEXT,\n    employee_id TEXT,\n    \n    -- Inputs\n    salary_coefficient REAL,\n    base_salary REAL,\n    standard_days REAL,\n    actual_days REAL,\n    \n    -- Calculated\n    salary_amount REAL, -- (Hệ số * Lương CS) * (Ngày thực / Ngày chuẩn)\n    allowance_amount REAL,\n    \n    gross_income REAL,\n    \n    -- Deductions\n    insurance_deduction REAL, -- 10.5%\n    union_dues REAL,\n    tax_deduction REAL,\n    \n    net_income REAL,\n    \n    created_at TEXT,\n    FOREIGN KEY (period_id) REFERENCES payroll_periods(id),\n    FOREIGN KEY (employee_id) REFERENCES employees(id)\n)"
+  },
+  {
+    "name": "employee_contracts",
+    "sql": "CREATE TABLE employee_contracts (\n    id TEXT PRIMARY KEY,\n    employee_id TEXT,\n    contract_type TEXT, -- HOP_DONG_LAO_DONG, QUYET_DINH_BO_NHIEM, QUYET_DINH_DIEU_DONG\n    contract_no TEXT UNIQUE NOT NULL,\n    contract_date TEXT,\n    effective_date TEXT,\n    expiry_date TEXT,\n    position TEXT,\n    department TEXT,\n    salary_grade_id TEXT,\n    salary_level INTEGER,\n    salary_coefficient REAL,\n    status TEXT DEFAULT 'ACTIVE', -- ACTIVE, EXPIRED, TERMINATED\n    notes TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (employee_id) REFERENCES employees(id),\n    FOREIGN KEY (salary_grade_id) REFERENCES salary_grades(id)\n)"
+  },
+  {
+    "name": "material_receipts",
+    "sql": "CREATE TABLE material_receipts (\n    id TEXT PRIMARY KEY,\n    receipt_no TEXT UNIQUE,\n    receipt_date TEXT,\n    fiscal_year INTEGER,\n    fund_source_id TEXT,\n    supplier TEXT,\n    warehouse TEXT,\n    total_amount REAL DEFAULT 0,\n    notes TEXT,\n    status TEXT DEFAULT 'POSTED',\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)\n)"
+  },
+  {
+    "name": "material_receipt_items",
+    "sql": "CREATE TABLE material_receipt_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    receipt_id TEXT,\n    material_id TEXT,\n    quantity REAL,\n    unit_price REAL,\n    amount REAL,\n    account_code TEXT,\n    notes TEXT,\n    FOREIGN KEY (receipt_id) REFERENCES material_receipts(id) ON DELETE CASCADE,\n    FOREIGN KEY (material_id) REFERENCES materials(id)\n)"
+  },
+  {
+    "name": "material_issues",
+    "sql": "CREATE TABLE material_issues (\n    id TEXT PRIMARY KEY,\n    issue_no TEXT UNIQUE,\n    issue_date TEXT,\n    fiscal_year INTEGER,\n    department TEXT,\n    receiver_name TEXT,\n    purpose TEXT,\n    warehouse TEXT,\n    total_amount REAL DEFAULT 0,\n    notes TEXT,\n    status TEXT DEFAULT 'POSTED',\n    approved_by TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT\n)"
+  },
+  {
+    "name": "material_issue_items",
+    "sql": "CREATE TABLE material_issue_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    issue_id TEXT,\n    material_id TEXT,\n    quantity REAL,\n    unit_price REAL,\n    amount REAL,\n    expense_account_code TEXT,\n    notes TEXT,\n    FOREIGN KEY (issue_id) REFERENCES material_issues(id) ON DELETE CASCADE,\n    FOREIGN KEY (material_id) REFERENCES materials(id)\n)"
+  },
+  {
+    "name": "material_transfers",
+    "sql": "CREATE TABLE material_transfers (\n    id TEXT PRIMARY KEY,\n    transfer_no TEXT UNIQUE,\n    transfer_date TEXT,\n    fiscal_year INTEGER,\n    from_warehouse TEXT,\n    to_warehouse TEXT,\n    notes TEXT,\n    status TEXT DEFAULT 'POSTED',\n    approved_by TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT\n)"
+  },
+  {
+    "name": "material_transfer_items",
+    "sql": "CREATE TABLE material_transfer_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    transfer_id TEXT,\n    material_id TEXT,\n    quantity REAL,\n    notes TEXT,\n    FOREIGN KEY (transfer_id) REFERENCES material_transfers(id) ON DELETE CASCADE,\n    FOREIGN KEY (material_id) REFERENCES materials(id)\n)"
+  },
+  {
+    "name": "insurance_discrepancies",
+    "sql": "CREATE TABLE insurance_discrepancies (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    period TEXT NOT NULL,\n    employee_id INTEGER,\n    employee_code TEXT,\n    employee_name TEXT,\n    discrepancy_type TEXT NOT NULL,\n    internal_value REAL,\n    bhxh_value REAL,\n    variance REAL,\n    status TEXT DEFAULT 'PENDING',\n    resolution TEXT,\n    resolution_notes TEXT,\n    resolved_by TEXT,\n    resolved_date TEXT,\n    created_date TEXT DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (employee_id) REFERENCES employees(id)\n)"
+  },
+  {
+    "name": "temporary_advances",
+    "sql": "CREATE TABLE temporary_advances (\n    id TEXT PRIMARY KEY,\n    doc_no TEXT UNIQUE NOT NULL,\n    doc_date TEXT NOT NULL,\n    fiscal_year INTEGER,\n    employee_id TEXT,\n    employee_name TEXT NOT NULL,\n    employee_dept TEXT,\n    purpose TEXT,\n    amount REAL DEFAULT 0,\n    settled_amount REAL DEFAULT 0,\n    remaining REAL DEFAULT 0,\n    status TEXT DEFAULT 'PENDING', -- PENDING, SETTLED, PARTIAL, OVERDUE\n    settlement_date TEXT,\n    settlement_doc_no TEXT,\n    approval_no TEXT,\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT\n)"
+  },
+  {
+    "name": "budget_advances",
+    "sql": "CREATE TABLE budget_advances (\n    id TEXT PRIMARY KEY,\n    doc_no TEXT UNIQUE NOT NULL,\n    fiscal_year INTEGER NOT NULL,\n    advance_type TEXT, -- 'NEXT_YEAR', 'EMERGENCY', 'SUPPLEMENTARY'\n    amount REAL NOT NULL,\n    approval_doc TEXT,\n    approval_date TEXT,\n    disbursement_date TEXT,\n    repayment_deadline TEXT,\n    repaid_amount REAL DEFAULT 0,\n    remaining REAL,\n    status TEXT DEFAULT 'ACTIVE', -- ACTIVE, REPAID, OVERDUE\n    fund_source_id TEXT,\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)\n)"
+  },
+  {
+    "name": "receivables",
+    "sql": "CREATE TABLE receivables (\n    id TEXT PRIMARY KEY,\n    doc_no TEXT NOT NULL,\n    doc_date TEXT NOT NULL,\n    fiscal_year INTEGER,\n    partner_code TEXT,\n    partner_name TEXT,\n    account_code TEXT DEFAULT '136', -- 136: Internal receivables, 138: Other receivables\n    account_name TEXT,\n    description TEXT,\n    original_amount REAL NOT NULL,\n    received_amount REAL DEFAULT 0,\n    remaining REAL,\n    due_date TEXT,\n    overdue_days INTEGER DEFAULT 0,\n    status TEXT DEFAULT 'UNPAID', -- UNPAID, PARTIAL, PAID, OVERDUE\n    revenue_category_id TEXT,\n    payment_method TEXT,\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (partner_code) REFERENCES partners(partner_code),\n    FOREIGN KEY (revenue_category_id) REFERENCES revenue_categories(id)\n)"
+  },
+  {
+    "name": "payables",
+    "sql": "CREATE TABLE payables (\n    id TEXT PRIMARY KEY,\n    doc_no TEXT NOT NULL,\n    doc_date TEXT NOT NULL,\n    fiscal_year INTEGER,\n    partner_code TEXT,\n    partner_name TEXT,\n    account_code TEXT DEFAULT '331', -- 331: Trade payables, 336: Internal payables, 338: Other payables\n    account_name TEXT,\n    description TEXT,\n    original_amount REAL NOT NULL,\n    paid_amount REAL DEFAULT 0,\n    remaining REAL,\n    due_date TEXT,\n    overdue_days INTEGER DEFAULT 0,\n    status TEXT DEFAULT 'UNPAID', -- UNPAID, PARTIAL, PAID, OVERDUE\n    expense_category_id TEXT,\n    payment_method TEXT,\n    fund_source_id TEXT,\n    budget_estimate_id TEXT,\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    updated_at TEXT,\n    FOREIGN KEY (partner_code) REFERENCES partners(partner_code),\n    FOREIGN KEY (expense_category_id) REFERENCES expense_categories(id),\n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),\n    FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id)\n)"
+  },
+  {
+    "name": "receivable_payments",
+    "sql": "CREATE TABLE receivable_payments (\n    id TEXT PRIMARY KEY,\n    receivable_id TEXT NOT NULL,\n    payment_date TEXT NOT NULL,\n    amount REAL NOT NULL,\n    payment_method TEXT,\n    voucher_id TEXT,\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    FOREIGN KEY (receivable_id) REFERENCES receivables(id) ON DELETE CASCADE\n)"
+  },
+  {
+    "name": "payable_payments",
+    "sql": "CREATE TABLE payable_payments (\n    id TEXT PRIMARY KEY,\n    payable_id TEXT NOT NULL,\n    payment_date TEXT NOT NULL,\n    amount REAL NOT NULL,\n    payment_method TEXT,\n    voucher_id TEXT,\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT,\n    FOREIGN KEY (payable_id) REFERENCES payables(id) ON DELETE CASCADE\n)"
+  },
+  {
+    "name": "materials",
+    "sql": "CREATE TABLE materials (\n    id TEXT PRIMARY KEY,\n    code TEXT UNIQUE,\n    name TEXT,\n    category TEXT,\n    unit TEXT,\n    account_code TEXT,\n    unit_price REAL DEFAULT 0,\n    min_stock REAL DEFAULT 0,\n    max_stock REAL DEFAULT 0,\n    status TEXT DEFAULT 'ACTIVE',\n    notes TEXT,\n    created_at TEXT,\n    updated_at TEXT\n)"
+  },
+  {
+    "name": "inventory_cards",
+    "sql": "CREATE TABLE inventory_cards (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    material_id TEXT,\n    fund_source_id TEXT,\n    fiscal_year INTEGER,\n    warehouse TEXT,\n    opening_qty REAL DEFAULT 0,\n    opening_amount REAL DEFAULT 0,\n    receipts_qty REAL DEFAULT 0,\n    receipts_amount REAL DEFAULT 0,\n    issues_qty REAL DEFAULT 0,\n    issues_amount REAL DEFAULT 0,\n    closing_qty REAL DEFAULT 0,\n    closing_amount REAL DEFAULT 0,\n    last_updated TEXT,\n    FOREIGN KEY (material_id) REFERENCES materials(id),\n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),\n    UNIQUE(material_id, fund_source_id, fiscal_year, warehouse)\n)"
+  },
+  {
+    "name": "bhxh_authority_data",
+    "sql": "CREATE TABLE bhxh_authority_data (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    period TEXT NOT NULL,\n    employee_code TEXT NOT NULL,\n    employee_name TEXT,\n    insurance_salary REAL,\n    bhxh_employee REAL,\n    bhyt_employee REAL,\n    bhtn_employee REAL,\n    bhxh_company REAL,\n    bhyt_company REAL,\n    bhtn_company REAL,\n    union_fee REAL,\n    import_date TEXT DEFAULT CURRENT_TIMESTAMP,\n    source TEXT DEFAULT 'BHXH_AUTHORITY'\n)"
+  },
+  {
+    "name": "chart_of_accounts",
+    "sql": "CREATE TABLE chart_of_accounts (\n                account_code TEXT PRIMARY KEY,\n                account_name TEXT,\n                category TEXT\n            , account_type TEXT, budget_category TEXT, is_off_balance INTEGER DEFAULT 0, tt24_classification TEXT)"
+  },
+  {
+    "name": "partners",
+    "sql": "CREATE TABLE partners (\n                partner_code TEXT PRIMARY KEY,\n                partner_name TEXT,\n                tax_code TEXT,\n                address TEXT\n            )"
+  },
+  {
+    "name": "general_ledger",
+    "sql": "CREATE TABLE general_ledger (\n                id TEXT PRIMARY KEY,\n                trx_date TEXT,\n                posted_at TEXT,\n                doc_no TEXT,\n                description TEXT,\n                account_code TEXT,\n                reciprocal_acc TEXT,\n                debit_amount REAL,\n                credit_amount REAL,\n                origin_staging_id TEXT\n            , partner_code TEXT)"
+  },
+  {
+    "name": "budgets",
+    "sql": "CREATE TABLE budgets (\n                        id INTEGER PRIMARY KEY AUTOINCREMENT,\n                        period TEXT,\n                        account_code TEXT,\n                        budget_amount REAL,\n                        notes TEXT,\n                        created_at TEXT\n                    )"
+  },
+  {
+    "name": "fund_sources",
+    "sql": "CREATE TABLE fund_sources (\n    id TEXT PRIMARY KEY,\n    company_id TEXT NOT NULL,\n    code TEXT NOT NULL,\n    name TEXT NOT NULL,\n    type TEXT NOT NULL, -- 'BUDGET_REGULAR', 'BUDGET_NON_REGULAR', 'REVENUE_RETAINED', 'AID', 'OTHER'\n    fiscal_year INTEGER NOT NULL,\n    allocated_amount REAL DEFAULT 0,\n    spent_amount REAL DEFAULT 0,\n    remaining_amount REAL DEFAULT 0,\n    status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'CLOSED'\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT DEFAULT CURRENT_TIMESTAMP,\n    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (company_id) REFERENCES companies(id),\n    UNIQUE(company_id, code, fiscal_year)\n)"
+  },
+  {
+    "name": "budget_estimates",
+    "sql": "CREATE TABLE budget_estimates (\n    id TEXT PRIMARY KEY,\n    company_id TEXT NOT NULL,\n    fiscal_year INTEGER NOT NULL,\n    fund_source_id TEXT,\n    \n    -- Phân loại dự toán\n    chapter_code TEXT,  -- Mã chương (018, 030, ...)\n    item_code TEXT,     -- Mã tiểu mục (511, 521, 523, 611, ...)\n    item_name TEXT,\n    \n    -- Số liệu\n    allocated_amount REAL DEFAULT 0,\n    spent_amount REAL DEFAULT 0,\n    remaining_amount REAL DEFAULT 0,\n    \n    -- Quản lý version (điều chỉnh dự toán)\n    version INTEGER DEFAULT 1,  -- Dự toán gốc = 1, điều chỉnh lần 1 = 2...\n    parent_id TEXT,  -- Link đến version trước đó\n    adjustment_reason TEXT,\n    adjustment_date TEXT,\n    \n    -- Theo dõi workflow\n    status TEXT DEFAULT 'DRAFT',  -- 'DRAFT', 'APPROVED', 'EXECUTING', 'CLOSED'\n    approved_by TEXT,\n    approved_date TEXT,\n    \n    -- Metadata\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT DEFAULT CURRENT_TIMESTAMP,\n    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,\n    \n    FOREIGN KEY (company_id) REFERENCES companies(id),\n    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),\n    FOREIGN KEY (parent_id) REFERENCES budget_estimates(id)\n)"
+  },
+  {
+    "name": "budget_allocations",
+    "sql": "CREATE TABLE budget_allocations (\n    id TEXT PRIMARY KEY,\n    budget_estimate_id TEXT NOT NULL,\n    \n    -- Phân bổ cho\n    department_code TEXT,  -- Mã phòng ban/bộ phận\n    department_name TEXT,\n    project_code TEXT,     -- Hoặc dự án cụ thể\n    \n    -- Số liệu\n    allocated_amount REAL NOT NULL,\n    spent_amount REAL DEFAULT 0,\n    remaining_amount REAL,\n    \n    -- Thời gian hiệu lực\n    effective_from TEXT,\n    effective_to TEXT,\n    \n    -- Metadata\n    notes TEXT,\n    created_by TEXT,\n    created_at TEXT DEFAULT CURRENT_TIMESTAMP,\n    \n    FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id) ON DELETE CASCADE\n)"
+  },
+  {
+    "name": "users",
+    "sql": "CREATE TABLE users (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                username TEXT UNIQUE,\n                password TEXT,\n                fullname TEXT,\n                role TEXT,\n                status TEXT DEFAULT 'Active',\n                last_login TEXT,\n                is_admin INTEGER DEFAULT 0,\n                company_id TEXT DEFAULT '1'\n            )"
+  },
+  {
+    "name": "companies",
+    "sql": "CREATE TABLE companies (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                address TEXT,\n                tax_code TEXT,\n                phone TEXT,\n                email TEXT,\n                website TEXT,\n                logo TEXT,\n                created_at TEXT DEFAULT CURRENT_TIMESTAMP,\n                updated_at TEXT DEFAULT CURRENT_TIMESTAMP\n            )"
+  },
+  {
+    "name": "allowance_types",
+    "sql": "CREATE TABLE allowance_types (\n        id TEXT PRIMARY KEY,\n        code TEXT UNIQUE NOT NULL,\n        name TEXT NOT NULL,\n        calculation_type TEXT,\n        default_value REAL,\n        is_taxable INTEGER DEFAULT 1,\n        is_insurance INTEGER DEFAULT 1,\n        description TEXT,\n        created_at TEXT\n    )"
+  },
+  {
+    "name": "employee_allowances",
+    "sql": "CREATE TABLE employee_allowances (\n        id INTEGER PRIMARY KEY AUTOINCREMENT,\n        employee_id TEXT,\n        allowance_type_id TEXT,\n        value REAL DEFAULT 0,\n        start_date TEXT,\n        end_date TEXT,\n        note TEXT,\n        created_at TEXT,\n        FOREIGN KEY (employee_id) REFERENCES employees(id),\n        FOREIGN KEY (allowance_type_id) REFERENCES allowance_types(id)\n    )"
+  }
+]

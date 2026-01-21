@@ -1,0 +1,358 @@
+import { useEffect, useState } from 'react';
+import { Header } from './components/Header';
+import { Dashboard } from './components/Dashboard';
+import { Ribbon, type RibbonAction } from './components/Ribbon';
+
+import { Sidebar } from './components/Sidebar';
+import { Reports } from './components/Reports';
+import { CashModule } from './components/CashModule';
+import { TaxModule } from './components/TaxModule';
+import { AssetModule } from './components/AssetModule';
+import { DebtManagementModule } from './components/DebtManagementModule'; // HCSN Debt Management
+import { SystemModule } from './components/SystemModule';
+import { HRModule } from './components/HRModule';
+import { RevenueModule } from './components/RevenueModule';
+import { ExpenseModule } from './components/ExpenseModule';
+import { InventoryModule } from './components/InventoryModule';
+import { ContractModule } from './components/ContractModule';
+import { ProjectModule } from './components/ProjectModule';
+import { DimensionModule } from './components/DimensionModule';
+import FundSourceModule from './components/FundSourceModule';
+import { GeneralModuleV2 as GeneralModule } from './components/GeneralModuleV2';
+import { Footer } from './components/Footer';
+import { VirtualAuditHealthCheck } from './components/AuditModal';
+import { MacroSequence } from './components/MacroSequence';
+import { RightSidebar } from './components/RightSidebar';
+import { KeyboardShortcutsPanelWrapper } from './components/KeyboardShortcutsPanel';
+import api from './api';
+
+function App() {
+  // Load state from localStorage on init
+  const savedState = JSON.parse(localStorage.getItem('app_navigation_state') || '{}');
+
+  const [activeTab, setActiveTab] = useState(savedState.activeTab || 'dashboard');
+  const [navigationData, setNavigationData] = useState<any>(null);
+  const [dashboardView, setDashboardView] = useState(savedState.dashboardView || 'dashboard');
+  const [generalView, setGeneralView] = useState(savedState.generalView || 'voucher');
+  const [reportView, setReportView] = useState(savedState.reportView || 'balance_sheet');
+  const [revenueView, setRevenueView] = useState(savedState.revenueView || 'receipt');
+  const [cashView, setCashView] = useState(savedState.cashView || 'list');
+  const [loanView, setLoanView] = useState(savedState.loanView || 'temp_advances');
+  const [taxView, setTaxView] = useState(savedState.taxView || 'vat');
+  const [expenseView, setExpenseView] = useState(savedState.expenseView || 'voucher');
+  const [inventoryView, setInventoryView] = useState(savedState.inventoryView || 'receipt');
+  const [assetView, setAssetView] = useState(savedState.assetView || 'list');
+  const [hrView, setHrView] = useState(savedState.hrView || 'employees');
+  const [contractView, setContractView] = useState(savedState.contractView || 'sales');
+  const [projectView, setProjectView] = useState(savedState.projectView || 'list');
+  const [dimView, setDimView] = useState(savedState.dimView || 'list');
+  const [sysView, setSysView] = useState(savedState.sysView || 'params');
+  const [fundView, setFundView] = useState(savedState.fundView || 'list');
+  const [printSignal, setPrintSignal] = useState(0);
+
+  // Sync state to localStorage
+  useEffect(() => {
+    const state = {
+      activeTab, dashboardView, generalView, reportView, revenueView, cashView,
+      loanView, taxView, expenseView, inventoryView, assetView, hrView,
+      contractView, projectView, dimView, sysView, fundView
+    };
+    localStorage.setItem('app_navigation_state', JSON.stringify(state));
+  }, [activeTab, dashboardView, generalView, reportView, revenueView, cashView,
+    loanView, taxView, expenseView, inventoryView, assetView, hrView,
+    contractView, projectView, dimView, sysView, fundView]);
+
+  // Page Header State (title, icon, and actions to be shown in Ribbon)
+  const [pageHeader, setPageHeader] = useState<{ title?: string; icon?: string; actions?: RibbonAction[]; onDelete?: () => void }>({});
+
+  const resetHeader = () => setPageHeader({});
+
+  // Global Overlay Modals
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showMacroModal, setShowMacroModal] = useState(false);
+
+  // Mobile Sidebar State
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const autoLoginEnabled = import.meta.env.VITE_DISABLE_AUTO_LOGIN !== 'true';
+    const autoLoginUser = import.meta.env.VITE_AUTOLOGIN_USERNAME || 'admin';
+    const autoLoginPassword = import.meta.env.VITE_AUTOLOGIN_PASSWORD || 'admin';
+
+    if (!autoLoginEnabled) return;
+
+    const autoLogin = async () => {
+      try {
+        // Auto login for MVP to get token
+        const response = await api.post('/login', { username: autoLoginUser, password: autoLoginPassword });
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          console.log('Auto-login successful');
+        }
+      } catch (error) {
+        console.error('Auto-login failed', error);
+      }
+    };
+    autoLogin();
+  }, []);
+
+  const handleNavigate = (viewId: string, data?: any) => {
+    setPrintSignal(0); // Synchronously reset print signal
+    setNavigationData(data);
+
+    // Global Modals (No tab change)
+    if (viewId === 'audit') {
+      setShowAuditModal(true);
+      return;
+    }
+    if (viewId === 'closing_macro') {
+      setShowMacroModal(true);
+      return;
+    }
+
+    if (viewId === 'dashboard') {
+      setActiveTab('dashboard');
+      setDashboardView('dashboard');
+      return;
+    }
+    if (viewId === 'overdue_inv') {
+      setActiveTab('dashboard');
+      setDashboardView('overdue_inv');
+      return;
+    }
+    if (viewId === 'incomplete_docs') {
+      setActiveTab('dashboard');
+      setDashboardView('incomplete_docs');
+      return;
+    }
+
+    const generalViews = new Set([
+      'voucher',
+      'voucher_list',
+      'closing',
+      'check',
+      'allocation',
+      'revaluation',
+      'locking',
+      'account_list',
+      'opening_balance',
+    ]);
+
+    if (generalViews.has(viewId) || viewId.startsWith('cost_')) {
+      setActiveTab('general');
+      setGeneralView(viewId);
+      return;
+    }
+
+    const reportViews = new Set([
+      'balance_sheet_hcsn', // HCSN
+      'activity_result', // HCSN
+      'budget_settlement_regular', // HCSN
+      'budget_settlement_nonregular', // HCSN
+      'budget_settlement_capex', // HCSN
+      'budget_performance', // HCSN
+      'fund_source_report', // HCSN
+      'infrastructure_report', // HCSN
+      'balance_sheet',
+      'trial_balance',
+      'pnl',
+      'cash_flow',
+      'ledger',
+      'cash_book',
+      'inventory_summary',
+      'general_ledger',
+      'bank_book',
+      'inventory_ledger',
+      'debt_ledger',
+      'vat_in',
+      'vat_out',
+      'project_pnl',
+      'expense_dept',
+      'transaction_details',
+    ]);
+
+    if (viewId === 'project_pnl' && activeTab === 'project') {
+      setActiveTab('project');
+      setProjectView('pnl');
+      return;
+    }
+
+    if (reportViews.has(viewId)) {
+      setActiveTab('report');
+      setReportView(viewId);
+      return;
+    }
+
+    if (viewId.startsWith('revenue_')) {
+      setActiveTab('revenue');
+      setRevenueView(viewId.replace('revenue_', ''));
+      return;
+    }
+    if (viewId.startsWith('expense_')) {
+      setActiveTab('expense');
+      setExpenseView(viewId.replace('expense_', ''));
+      return;
+    }
+    if (viewId.startsWith('tax_')) {
+      setActiveTab('tax');
+      setTaxView(viewId.replace('tax_', ''));
+      return;
+    }
+    if (viewId.startsWith('inventory_')) {
+      setActiveTab('inventory');
+      setInventoryView(viewId.replace('inventory_', ''));
+      return;
+    }
+    if (viewId.startsWith('cash_')) {
+      setActiveTab('cash');
+      setCashView(viewId.replace('cash_', ''));
+      return;
+    }
+    if (viewId.startsWith('loan_')) {
+      setActiveTab('loan');
+      setLoanView(viewId.replace('loan_', ''));
+      return;
+    }
+    if (viewId.startsWith('asset_') || viewId.startsWith('infra_') || viewId.startsWith('invest_')) {
+      setActiveTab('asset');
+      setAssetView(viewId);
+      return;
+    }
+    if (viewId.startsWith('hr_')) {
+      setActiveTab('hr');
+      setHrView(viewId.replace('hr_', ''));
+      return;
+    }
+    // Logic prefix cũ đã bao phủ trường hợp này sau khi update Sidebar
+    // Xóa block Set logic gây conflict 'tracking'
+    // Fallthrough to prefix checks below
+
+    if (viewId.startsWith('contract_')) {
+      setActiveTab('contract');
+      setContractView(viewId.replace('contract_', ''));
+      return;
+    }
+    if (viewId.startsWith('project_')) {
+      setActiveTab('project');
+      setProjectView(viewId.replace('project_', ''));
+      return;
+    }
+    if (viewId.startsWith('dim_')) {
+      setActiveTab('dimension');
+      setDimView(viewId.replace('dim_', ''));
+      return;
+    }
+    if (viewId.startsWith('sys_')) {
+      setActiveTab('system');
+      setSysView(viewId.replace('sys_', ''));
+      return;
+    }
+    if (viewId.startsWith('fund_')) {
+      setActiveTab('fund');
+      setFundView(viewId.replace('fund_', ''));
+      return;
+    }
+
+    // Fallback for legacy prefixes if any
+    if (viewId.startsWith('sales_')) { setActiveTab('revenue'); setRevenueView(viewId.replace('sales_', '')); return; }
+    if (viewId.startsWith('purchase_')) { setActiveTab('expense'); setExpenseView(viewId.replace('purchase_', '')); return; }
+  };
+
+  return (
+    <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 overflow-hidden h-screen flex flex-col group/design-root">
+      <Header />
+      <Ribbon
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          resetHeader(); // Reset header on tab change
+          setNavigationData(null); // Clear navigation data
+          setGeneralView('voucher');
+          setRevenueView('receipt');
+          setCashView('list');
+          setLoanView('temp_advances');
+          setTaxView('vat');
+          setExpenseView('voucher');
+          setInventoryView('receipt');
+          setAssetView('list');
+          setHrView('employees');
+          setContractView('sales');
+          setProjectView('list');
+          setDimView('list');
+          setSysView('params');
+          setFundView('list');
+          setDashboardView('dashboard');
+          setPrintSignal(0);
+        }}
+        onPrint={() => setPrintSignal(s => s + 1)}
+        onAudit={() => handleNavigate('audit')}
+        onRunMacro={() => setShowMacroModal(true)}
+        onDelete={pageHeader.onDelete}
+        title={pageHeader.title}
+        icon={pageHeader.icon}
+        actions={pageHeader.actions}
+      />
+
+      <div className="flex-1 flex overflow-hidden bg-slate-100 dark:bg-slate-900">
+        {/* Mobile Hamburger Menu Button */}
+        <button
+          onClick={() => setIsMobileSidebarOpen(true)}
+          className="lg:hidden fixed bottom-4 left-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all"
+          aria-label="Mở menu"
+        >
+          <span className="material-symbols-outlined">menu</span>
+        </button>
+
+        <Sidebar
+          activeTab={activeTab}
+          onNavigate={(view) => {
+            handleNavigate(view);
+            setIsMobileSidebarOpen(false); // Close sidebar after navigation on mobile
+          }}
+          isMobileOpen={isMobileSidebarOpen}
+          onMobileClose={() => setIsMobileSidebarOpen(false)}
+        />
+        <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col relative">
+          {activeTab === 'dashboard' && <Dashboard subView={dashboardView} onNavigate={handleNavigate} />}
+          {activeTab === 'general' && (
+            <GeneralModule
+              subView={generalView}
+              onCloseModal={() => setGeneralView('voucher')}
+              printSignal={printSignal}
+              onSetHeader={setPageHeader}
+              navigationData={navigationData}
+              onClearNavigation={() => setNavigationData(null)}
+            />
+          )}
+          {activeTab === 'report' && <Reports subView={reportView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'cash' && <CashModule subView={cashView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'tax' && <TaxModule subView={taxView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'revenue' && <RevenueModule subView={revenueView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'expense' && <ExpenseModule subView={expenseView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'inventory' && <InventoryModule subView={inventoryView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'asset' && <AssetModule subView={assetView} onCloseModal={() => setAssetView('list')} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'loan' && <DebtManagementModule subView={loanView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'hr' && <HRModule subView={hrView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'contract' && <ContractModule subView={contractView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'project' && <ProjectModule subView={projectView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'dimension' && <DimensionModule subView={dimView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+
+          {activeTab === 'system' && <SystemModule subView={sysView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'fund' && <FundSourceModule subView={fundView} onSetHeader={setPageHeader} />}
+        </div>
+
+        <RightSidebar />
+      </div>
+
+      {showAuditModal && <VirtualAuditHealthCheck onClose={() => setShowAuditModal(false)} onNavigate={handleNavigate} />}
+      {showMacroModal && <MacroSequence onClose={() => setShowMacroModal(false)} onNavigate={handleNavigate} />}
+
+      {/* Keyboard Shortcuts Panel - Toggle with Shift+? */}
+      <KeyboardShortcutsPanelWrapper />
+
+      <Footer />
+    </div>
+  );
+}
+
+export default App;
