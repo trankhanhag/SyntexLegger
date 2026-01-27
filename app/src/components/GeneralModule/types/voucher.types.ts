@@ -17,6 +17,8 @@ export interface VoucherLine {
     dim3?: string;
     dim4?: string;
     dim5?: string;
+    itemCode?: string;
+    subItemCode?: string;
     productCode?: string;
     quantity?: number;
     unitPrice?: number;

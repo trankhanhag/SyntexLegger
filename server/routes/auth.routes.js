@@ -7,7 +7,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const { rateLimitLogin, logAction, clearLoginAttempts, SECRET_KEY, loginAttempts } = require('../middleware');
+const { rateLimitLogin, logAction, clearLoginAttempts, SECRET_KEY, loginAttempts, validateLogin, sanitizeBody } = require('../middleware');
 
 module.exports = (db) => {
     const router = express.Router();
@@ -16,7 +16,7 @@ module.exports = (db) => {
      * POST /api/login
      * User login and token generation
      */
-    router.post('/login', rateLimitLogin, (req, res) => {
+    router.post('/login', sanitizeBody, validateLogin, rateLimitLogin, (req, res) => {
         const { username, password } = req.body;
         const sql = "SELECT * FROM users WHERE username = ?";
 
@@ -50,36 +50,6 @@ module.exports = (db) => {
                 token: token,
                 user: { username: row.username, role: row.role }
             });
-        });
-    });
-
-    /**
-     * GET /api/debug/users
-     * List all users (DEBUG ONLY - REMOVE IN PRODUCTION)
-     */
-    router.get('/debug/users', (req, res) => {
-        if (process.env.NODE_ENV === 'production') {
-            return res.status(404).json({ error: 'Not found' });
-        }
-        db.all("SELECT id, username, role, status FROM users", [], (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json(rows);
-        });
-    });
-
-    /**
-     * GET /api/debug/check-password
-     * Check password hash (DEBUG ONLY - REMOVE IN PRODUCTION)
-     */
-    router.get('/debug/check-password', (req, res) => {
-        if (process.env.NODE_ENV === 'production') {
-            return res.status(404).json({ error: 'Not found' });
-        }
-        db.get("SELECT username, password FROM users WHERE username = 'admin'", [], (err, row) => {
-            if (err || !row) return res.status(404).json({ error: 'User not found' });
-            const testPassword = 'admin';
-            const isValid = bcrypt.compareSync(testPassword, row.password);
-            res.json({ username: row.username, hash_starts: row.password.substring(0, 20), test_result: isValid });
         });
     });
 

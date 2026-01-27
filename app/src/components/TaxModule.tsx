@@ -5,6 +5,9 @@ import { taxService, masterDataService } from '../api';
 import { TaxDeclarationForm } from './TaxDeclarationForm';
 import { TaxHealthReport } from './AuditModal';
 import { formatDateVN } from '../utils/dateUtils';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 interface TaxModuleProps {
     subView?: string;
@@ -143,9 +146,8 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
         loadData();
     }, [view, vatType, period]);
 
-    useEffect(() => {
-        if (printSignal > 0) window.print();
-    }, [printSignal]);
+    // Print handler
+    useSimplePrint(printSignal, 'Thuế', { allowBrowserPrint: true });
 
     useEffect(() => {
         if (onSetHeader) {
@@ -241,6 +243,26 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
         { field: 'total', headerName: 'Tổng thanh toán', width: 'w-36', align: 'right', renderCell: (v: number) => <span className="font-mono font-bold">{formatNumber(v)}</span> },
         { field: 'status', headerName: 'Trạng thái', width: 'w-28', align: 'center', renderCell: (v: string) => <span className={v === 'Hợp lệ' ? 'text-green-600 font-bold' : 'text-red-500 line-through'}>{v}</span> },
     ];
+
+    // ModuleOverview for Tax module
+    if (view === 'overview') {
+        return (
+            <ModuleOverview
+                title={MODULE_CONFIGS.tax?.title || 'Quản lý Thuế'}
+                description={MODULE_CONFIGS.tax?.description || 'Quản lý thuế GTGT, TNCN, TNDN và hóa đơn điện tử'}
+                icon={MODULE_CONFIGS.tax?.icon || 'policy'}
+                iconColor={MODULE_CONFIGS.tax?.iconColor || 'red'}
+                workflow={MODULE_CONFIGS.tax?.workflow || []}
+                features={MODULE_CONFIGS.tax?.features || []}
+                stats={[
+                    { icon: 'receipt_long', label: 'Thuế GTGT', value: '-', color: 'blue' },
+                    { icon: 'person_pin', label: 'Thuế TNCN', value: '-', color: 'amber' },
+                    { icon: 'business', label: 'Thuế TNDN', value: '-', color: 'green' },
+                    { icon: 'description', label: 'Hóa đơn', value: '-', color: 'purple' },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden relative">

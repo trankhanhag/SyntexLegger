@@ -5,16 +5,18 @@ import { type RibbonAction } from './Ribbon';
 import { toInputMonthValue } from '../utils/dateUtils';
 import InsuranceReportView from './InsuranceReportView';
 import { FormModal } from './FormModal';
-
-// Mock data removed
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 interface HRModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (view: string) => void;
 }
 
-export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', printSignal = 0, onSetHeader }) => {
+export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', printSignal = 0, onSetHeader, onNavigate: _onNavigate }) => {
     const [view, setView] = useState(subView);
     const [employees, setEmployees] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -126,11 +128,8 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
         if (subView) setView(subView);
     }, [subView]);
 
-    useEffect(() => {
-        if (printSignal > 0) {
-            window.print();
-        }
-    }, [printSignal]);
+    // Print handler
+    useSimplePrint(printSignal, 'Nhân sự', { allowBrowserPrint: true });
 
     useEffect(() => {
         if (onSetHeader) {
@@ -282,6 +281,26 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
         { field: 'is_insurance', headerName: 'Đóng BH', width: 'w-20', align: 'center', renderCell: (v: number) => <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${v ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>{v ? 'Có' : 'Không'}</span> },
         { field: 'description', headerName: 'Mô tả', width: 'w-40' },
     ];
+
+    // Show ModuleOverview when no specific subView or 'overview'
+    if (view === 'overview' || view === '' || !view) {
+        return (
+            <ModuleOverview
+                title={MODULE_CONFIGS.hr.title}
+                description={MODULE_CONFIGS.hr.description}
+                icon={MODULE_CONFIGS.hr.icon}
+                iconColor={MODULE_CONFIGS.hr.iconColor}
+                workflow={MODULE_CONFIGS.hr.workflow}
+                features={MODULE_CONFIGS.hr.features}
+                stats={[
+                    { icon: 'badge', label: 'Tổng nhân viên', value: employees.length || '-', color: 'blue' },
+                    { icon: 'schedule', label: 'Kỳ hiện tại', value: period, color: 'green' },
+                    { icon: 'paid', label: 'Tính lương', value: 'Sẵn sàng', color: 'amber' },
+                    { icon: 'health_and_safety', label: 'BHXH', value: 'Đã cập nhật', color: 'green' },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="relative h-full w-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">

@@ -17,7 +17,9 @@ const COLUMN_MAPPING = {
     credit_acc: ['tk có', 'tk co', 'credit_acc', 'có', 'credit', 'tài khoản có'],
     amount: ['số tiền', 'so tien', 'amount', 'tiền', 'giá trị'],
     partner_code: ['mã đối tượng', 'ma doi tuong', 'partner_code', 'đối tượng', 'mã kh'],
-    dim1: ['mã hàng', 'ma hang', 'dim1', 'mã sp', 'sản phẩm']
+    dim1: ['mã hàng', 'ma hang', 'dim1', 'mã sp', 'sản phẩm'],
+    item_code: ['mục', 'muc', 'item_code', 'mã mục'],
+    sub_item_code: ['tiểu mục', 'tieu muc', 'sub_item_code', 'mã tiểu mục']
 };
 
 export interface StagingItem {
@@ -31,6 +33,8 @@ export interface StagingItem {
     amount: number;
     partner_code?: string;
     dim1?: string;
+    item_code?: string;
+    sub_item_code?: string;
     status: 'valid' | 'warning' | 'error';
     errors: string[];
 }
@@ -194,6 +198,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             amount: parseAmount(getValue('amount')),
             partner_code: String(getValue('partner_code') || '').trim(),
             dim1: String(getValue('dim1') || '').trim(),
+            item_code: String(getValue('item_code') || '').trim(),
+            sub_item_code: String(getValue('sub_item_code') || '').trim(),
             status: 'valid',
             errors: []
         };
@@ -247,7 +253,9 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             creditAcc: item.credit_acc,
             amount: item.amount,
             partnerCode: item.partner_code,
-            dim1: item.dim1
+            dim1: item.dim1,
+            itemCode: item.item_code,
+            subItemCode: item.sub_item_code
         }));
 
         onImport(lines);
@@ -352,6 +360,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                                         <th className="px-2 py-2">Ngày</th>
                                         <th className="px-2 py-2">TK Nợ</th>
                                         <th className="px-2 py-2">TK Có</th>
+                                        <th className="px-2 py-2">Mục</th>
+                                        <th className="px-2 py-2">Tiểu mục</th>
                                         <th className="px-2 py-2 text-right">Số tiền</th>
                                         <th className="px-2 py-2">Trạng thái</th>
                                     </tr>
@@ -367,6 +377,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                                             <td className="px-2 py-1.5">{item.doc_date}</td>
                                             <td className="px-2 py-1.5 font-mono">{item.debit_acc}</td>
                                             <td className="px-2 py-1.5 font-mono">{item.credit_acc}</td>
+                                            <td className="px-2 py-1.5 font-mono">{item.item_code}</td>
+                                            <td className="px-2 py-1.5 font-mono">{item.sub_item_code}</td>
                                             <td className="px-2 py-1.5 text-right font-mono">{formatCurrency(item.amount)}</td>
                                             <td className="px-2 py-1.5">
                                                 {item.status === 'valid' ? (

@@ -989,6 +989,90 @@ function getFundSources(db) {
     }
 }
 
+/**
+ * GET /api/hcsn/budget-estimates
+ * Lấy danh sách dự toán HCSN
+ */
+function getBudgetEstimates(db) {
+    return (req, res) => {
+        const { fiscal_year, chapter_code, budget_type, fund_source_id } = req.query;
+
+        let sql = 'SELECT * FROM budget_estimates WHERE 1=1';
+        const params = [];
+
+        if (fiscal_year) {
+            sql += ' AND fiscal_year = ?';
+            params.push(parseInt(fiscal_year));
+        }
+
+        if (chapter_code) {
+            sql += ' AND chapter_code = ?';
+            params.push(chapter_code);
+        }
+
+        if (budget_type) {
+            sql += ' AND budget_type = ?';
+            params.push(budget_type);
+        }
+
+        if (fund_source_id) {
+            sql += ' AND fund_source_id = ?';
+            params.push(fund_source_id);
+        }
+
+        sql += ' ORDER BY item_code ASC';
+
+        db.all(sql, params, (err, rows) => {
+            if (err) {
+                console.error('Get budget estimates error:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            res.json(rows);
+        });
+    };
+}
+
+/**
+ * GET /api/hcsn/budget-allocations
+ * Lấy danh sách phân bổ dự toán
+ */
+function getBudgetAllocations(db) {
+    return (req, res) => {
+        const { budget_estimate_id, department_code, project_code } = req.query;
+
+        let sql = `SELECT ba.*, be.item_code, be.item_name, be.fiscal_year, be.budget_type 
+                   FROM budget_allocations ba
+                   JOIN budget_estimates be ON ba.budget_estimate_id = be.id
+                   WHERE 1=1`;
+        const params = [];
+
+        if (budget_estimate_id) {
+            sql += ' AND ba.budget_estimate_id = ?';
+            params.push(budget_estimate_id);
+        }
+
+        if (department_code) {
+            sql += ' AND ba.department_code = ?';
+            params.push(department_code);
+        }
+
+        if (project_code) {
+            sql += ' AND ba.project_code = ?';
+            params.push(project_code);
+        }
+
+        sql += ' ORDER BY be.item_code ASC, ba.department_code ASC';
+
+        db.all(sql, params, (err, rows) => {
+            if (err) {
+                console.error('Get budget allocations error:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            res.json(rows);
+        });
+    };
+}
+
 function updateInventoryCard(db, material_id, fund_source_id, fiscal_year, warehouse, qty, amount, type) {
     const selectSql = `SELECT * FROM inventory_cards 
                       WHERE material_id = ? AND fiscal_year = ? AND warehouse = ?
@@ -1074,5 +1158,7 @@ module.exports = {
     updateTransfer,
     getInventorySummary,
     getInventoryCards,
-    getFundSources
+    getFundSources,
+    getBudgetEstimates,
+    getBudgetAllocations
 };

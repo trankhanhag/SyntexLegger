@@ -4,9 +4,13 @@
  */
 
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../database');
 
-const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key';
+if (!process.env.JWT_SECRET) {
+    console.warn('[SECURITY WARNING] JWT_SECRET environment variable is not set. Using a randomly generated secret. Set JWT_SECRET in production for persistent sessions.');
+}
+const SECRET_KEY = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 const LOGIN_WINDOW_MS = Number.parseInt(process.env.LOGIN_WINDOW_MS || '900000', 10);
 const LOGIN_MAX_ATTEMPTS = Number.parseInt(process.env.LOGIN_MAX_ATTEMPTS || '10', 10);
 const loginAttempts = new Map();
@@ -22,16 +26,12 @@ const verifyToken = (req, res, next) => {
 
     jwt.verify(token, SECRET_KEY, (err, decoded) => {
         if (err) {
-            console.error(`[AUTH ERROR] Verify failed: ${err.message}`);
             return res.status(401).send({ auth: false, message: 'Failed to authenticate token.' });
         }
 
-        console.log(`[AUTH DEBUG] Token decoded: id=${decoded.id} (${typeof decoded.id})`);
         db.get("SELECT id, username, role, status, company_id FROM users WHERE id = ?", [decoded.id], (dbErr, user) => {
-            console.log(`[AUTH DEBUG] User lookup for id=${decoded.id}: user=${JSON.stringify(user)}, error=${dbErr}`);
             if (dbErr) {
-                console.error('[AUTH ERROR] Auth lookup failed:', dbErr);
-                return res.status(401).json({ error: 'Auth lookup failed.', details: dbErr.message });
+                return res.status(401).json({ error: 'Auth lookup failed.' });
             }
             if (!user) return res.status(401).json({ auth: false, message: 'User not found.' });
             if (user.status && user.status !== 'Active') {

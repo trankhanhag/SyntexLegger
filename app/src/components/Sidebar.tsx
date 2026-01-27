@@ -24,23 +24,28 @@ const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'incomplete_docs', icon: 'error_outline', label: 'Chứng từ lỗi', count: 70 },
     ],
     'general': [
-        // === NGHIỆP VỤ ===
-        { id: 'voucher', icon: 'receipt_long', label: 'Nghiệp vụ khác', section: 'NGHIỆP VỤ', count: 99 },
-        { id: 'voucher_list', icon: 'format_list_bulleted', label: 'Bảng kê chứng từ', section: 'NGHIỆP VỤ', count: 75 },
+        // === DỰ TOÁN & NGÂN SÁCH ===
+        { id: 'fund_list', icon: 'account_balance', label: 'Nguồn kinh phí', section: 'DỰ TOÁN & NGÂN SÁCH', count: 100 },
+        { id: 'fund_budget', icon: 'edit_note', label: 'Lập dự toán', section: 'DỰ TOÁN & NGÂN SÁCH', count: 95 },
+        { id: 'fund_allocation', icon: 'call_split', label: 'Phân bổ dự toán', section: 'DỰ TOÁN & NGÂN SÁCH', count: 90 },
+        { id: 'fund_adjustment', icon: 'tune', label: 'Điều chỉnh dự toán', section: 'DỰ TOÁN & NGÂN SÁCH', count: 80 },
+        { id: 'fund_off_balance', icon: 'visibility_off', label: 'TK Ngoài bảng (008)', section: 'DỰ TOÁN & NGÂN SÁCH', count: 70 },
+
+        // === CHỨNG TỪ TỔNG HỢP ===
+        { id: 'voucher_list', icon: 'format_list_bulleted', label: 'Danh sách chứng từ', section: 'CHỨNG TỪ TỔNG HỢP', count: 100 },
 
         // === QUY TRÌNH CUỐI KỲ ===
-        { id: 'allocation', icon: 'percent', label: 'Phân bổ chi trả trước', section: 'QUY TRÌNH CUỐI KỲ', count: 80 },
-        { id: 'revaluation', icon: 'currency_exchange', label: 'Đánh giá lại ngoại tệ', section: 'QUY TRÌNH CUỐI KỲ', count: 60 },
-        { id: 'closing', icon: 'published_with_changes', label: 'Kết chuyển cuối kỳ', section: 'QUY TRÌNH CUỐI KỲ', count: 90 },
-        { id: 'check', icon: 'fact_check', label: 'Kiểm tra đối chiếu', section: 'QUY TRÌNH CUỐI KỲ', count: 85 },
-        { id: 'locking', icon: 'lock_clock', label: 'Khóa sổ kỳ kế toán', section: 'QUY TRÌNH CUỐI KỲ', count: 50 },
+        { id: 'allocation', icon: 'percent', label: '1. Phân bổ chi phí', section: 'QUY TRÌNH CUỐI KỲ', count: 60 },
+        { id: 'revaluation', icon: 'currency_exchange', label: '2. Đánh giá lại Đ/G', section: 'QUY TRÌNH CUỐI KỲ', count: 50 },
+        { id: 'check', icon: 'fact_check', label: '3. Kiểm tra đối chiếu', section: 'QUY TRÌNH CUỐI KỲ', count: 80 },
+        { id: 'closing', icon: 'published_with_changes', label: '4. Kết chuyển cuối kỳ', section: 'QUY TRÌNH CUỐI KỲ', count: 90 },
+        { id: 'locking', icon: 'lock', label: '5. Khóa sổ kế toán', section: 'QUY TRÌNH CUỐI KỲ', count: 70 },
 
         // === DANH MỤC & THIẾT LẬP ===
-        { id: 'account_list', icon: 'account_tree', label: 'Hệ thống Tài khoản', section: 'DANH MỤC & THIẾT LẬP', count: 95 },
-        { id: 'opening_balance', icon: 'account_balance_wallet', label: 'Số dư đầu kỳ', section: 'DANH MỤC & THIẾT LẬP', count: 100 },
-        { id: 'cost_item', icon: 'category', label: 'Khoản mục chi', section: 'DANH MỤC & THIẾT LẬP', count: 45 },
-        { id: 'cost_revenue', icon: 'trending_up', label: 'Khoản mục thu', section: 'DANH MỤC & THIẾT LẬP', count: 40 },
-        { id: 'cost_settings', icon: 'settings', label: 'Thiết lập định mức', section: 'DANH MỤC & THIẾT LẬP', count: 35 },
+        { id: 'account_list', icon: 'account_tree', label: 'Hệ thống Tài khoản', section: 'DANH MỤC & THIẾT LẬP', count: 60 },
+        { id: 'opening_balance', icon: 'account_balance_wallet', label: 'Số dư đầu kỳ', section: 'DANH MỤC & THIẾT LẬP', count: 50 },
+        { id: 'cost_item', icon: 'category', label: 'Khoản mục Chi phí', section: 'DANH MỤC & THIẾT LẬP', count: 40 },
+        { id: 'cost_revenue', icon: 'trending_up', label: 'Khoản mục Thu', section: 'DANH MỤC & THIẾT LẬP', count: 35 },
     ],
     'report': [  // Keep as 'report' (singular) to match activeTab
         // === BÁO CÁO TÀI CHÍNH HCSN (TT 24/2024) ===
@@ -71,6 +76,7 @@ const MENU_MAP: Record<string, MenuItem[]> = {
 
         // === BÁO CÁO KHÁC ===
         { id: 'transaction_details', icon: 'list_alt', label: 'Chi tiết Bút toán', section: 'KHÁC', count: 65 },
+        { id: 'custom_report', icon: 'dashboard_customize', label: 'Báo cáo Tùy biến', section: 'KHÁC', count: 60 },
 
         // === LOẠI BỎ: Báo cáo DN không dùng cho HCSN ===
         // REMOVED: balance_sheet (DN)
@@ -191,6 +197,13 @@ const MENU_MAP: Record<string, MenuItem[]> = {
         // REMOVED: asset_decrease → asset_fixed_decrease
         // REMOVED: asset_ccdc → Tích hợp vào TSCĐ
     ],
+    'treasury': [
+        { id: 'treasury', icon: 'dashboard', label: 'Tổng quan', count: 100 }, // Dashboard
+        { id: 'treasury_import', icon: 'download', label: 'Nhận số liệu KBNN', count: 95 },
+        { id: 'treasury_payment_order', icon: 'receipt_long', label: 'Lệnh chi tiền', count: 90 },
+        { id: 'treasury_reconcile', icon: 'compare', label: 'Đối chiếu số dư', count: 85 },
+        { id: 'treasury_history', icon: 'history', label: 'Lịch sử giao dịch', count: 70 },
+    ],
     'hr': [
         // === HỒ SƠ CÁN BỘ ===
         { id: 'hr_employees', icon: 'person_add', label: 'Cán bộ - Viên chức', section: 'HỒ SƠ CÁN BỘ', count: 95 },
@@ -207,16 +220,7 @@ const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'hr_report_salary', icon: 'summarize', label: 'Bảng thanh toán lương', section: 'BÁO CÁO', count: 60 },
         { id: 'hr_report_insurance', icon: 'description', label: 'Báo cáo Bảo hiểm', section: 'BÁO CÁO', count: 55 },
     ],
-    'fund': [
-        // === QUẢN LÝ NGÂN SÁCH ===
-        { id: 'fund_list', icon: 'account_balance', label: 'Nguồn kinh phí', section: 'QUẢN LÝ NGÂN SÁCH', count: 100 },
-        { id: 'fund_budget', icon: 'edit_note', label: 'Lập dự toán', section: 'QUẢN LÝ NGÂN SÁCH', count: 95 },
-        { id: 'fund_allocation', icon: 'call_split', label: 'Phân bổ dự toán', section: 'QUẢN LÝ NGÂN SÁCH', count: 90 },
-        { id: 'fund_adjustment', icon: 'tune', label: 'Điều chỉnh dự toán', section: 'QUẢN LÝ NGÂN SÁCH', count: 80 },
 
-        // === THEO DÕI KHÁC ===
-        { id: 'fund_off_balance', icon: 'visibility_off', label: 'TK Ngoài bảng (008)', section: 'THEO DÕI KHÁC', count: 60 },
-    ],
     'contract': [
         // === HỢP ĐỒNG ===
         { id: 'contract_sales', icon: 'contract', label: 'Hợp đồng Bán ra', section: 'HỢP ĐỒNG', count: 90 },
@@ -243,12 +247,18 @@ const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'dim_group', icon: 'group_work', label: 'Nhóm Mã thống kê', count: 60 },
     ],
     'system': [
-        { id: 'sys_params', icon: 'settings', label: 'Tham số hệ thống', count: 90 },
-        { id: 'sys_users', icon: 'manage_accounts', label: 'Quản lý người dùng', count: 85 },
-        { id: 'sys_perms', icon: 'security', label: 'Phân quyền', count: 80 },
-        { id: 'sys_backup', icon: 'backup', label: 'Sao lưu dữ liệu', count: 70 },
-        { id: 'sys_logs', icon: 'history', label: 'Nhật ký truy cập', count: 50 },
+        // === QUẢN TRỊ ===
+        { id: 'sys_params', icon: 'settings', label: 'Tham số hệ thống', section: 'QUẢN TRỊ', count: 90 },
+        { id: 'sys_users', icon: 'manage_accounts', label: 'Quản lý người dùng', section: 'QUẢN TRỊ', count: 85 },
+        { id: 'sys_perms', icon: 'security', label: 'Phân quyền', section: 'QUẢN TRỊ', count: 80 },
+        { id: 'sys_backup', icon: 'backup', label: 'Sao lưu dữ liệu', section: 'QUẢN TRỊ', count: 70 },
+
+        // === KIỂM SOÁT (TT 24/2024) ===
+        { id: 'sys_audit_trail', icon: 'history_edu', label: 'Nhật ký Kiểm toán', section: 'KIỂM SOÁT', count: 95 },
+        { id: 'sys_budget_control', icon: 'account_balance', label: 'Kiểm soát Ngân sách', section: 'KIỂM SOÁT', count: 92 },
+        { id: 'sys_logs', icon: 'history', label: 'Nhật ký truy cập', section: 'KIỂM SOÁT', count: 50 },
     ],
+
 
 };
 
@@ -297,7 +307,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onNavigate, isMobil
     if (activeTab === 'loan') title = "Công nợ \u0026 Tạm ứng HCSN"; // Updated for TT 24/2024
     if (activeTab === 'contract') title = "Quản lý Hợp đồng";
     if (activeTab === 'project') title = "Quản lý Dự án";
+    if (activeTab === 'contract') title = "Quản lý Hợp đồng";
+    if (activeTab === 'project') title = "Quản lý Dự án";
     if (activeTab === 'system') title = "Quản trị Hệ thống";
+    if (activeTab === 'treasury') title = "Kết nối Kho bạc Nhà nước";
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('vi-VN').format(amount);
@@ -315,21 +328,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onNavigate, isMobil
             )}
 
             {/* Sidebar Container */}
-            <div className={`
-                ${isCollapsed ? 'w-16' : 'w-60'} 
-                transition-all duration-300 
-                bg-white dark:bg-slate-800 
-                border-r border-border-light dark:border-border-dark 
-                flex flex-col shrink-0 relative group/sidebar z-50
-                
-                /* Desktop: Always visible */
-                lg:flex
-                
-                /* Mobile: Fixed position with slide animation */
-                fixed lg:relative
-                inset-y-0 left-0
-                ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-            `}>
+            <div
+                className={`
+                    ${isCollapsed ? 'w-16' : 'w-60'}
+                    transition-all duration-300
+                    bg-white dark:bg-slate-800
+                    border-r border-border-light dark:border-border-dark
+                    flex flex-col shrink-0 relative group/sidebar z-50
+                    no-print sidebar
+
+                    /* Desktop: Always visible */
+                    lg:flex
+
+                    /* Mobile: Fixed position with slide animation */
+                    fixed lg:relative
+                    inset-y-0 left-0
+                    ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                `}
+                data-no-print
+            >
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     className="absolute -right-3 top-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full p-0.5 text-slate-500 hover:text-blue-600 shadow-sm opacity-0 group-hover/sidebar:opacity-100 transition-opacity z-10"

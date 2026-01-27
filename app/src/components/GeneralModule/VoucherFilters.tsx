@@ -122,8 +122,9 @@ export const VoucherFilters: React.FC<VoucherFiltersProps> = ({
             <div className="flex flex-wrap items-end gap-4">
                 {/* Loại chứng từ */}
                 <div className="flex-shrink-0">
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Loại chứng từ</label>
+                    <label htmlFor="voucher-type-select" className="block text-xs font-medium text-slate-500 mb-1">Loại chứng từ</label>
                     <select
+                        id="voucher-type-select"
                         value={filter.type || 'ALL'}
                         onChange={handleTypeChange}
                         className="w-40 text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -178,12 +179,13 @@ export const VoucherFilters: React.FC<VoucherFiltersProps> = ({
 
                 {/* Search */}
                 <div className="flex-1 min-w-[200px]">
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Tìm kiếm</label>
+                    <label htmlFor="voucher-search-input" className="block text-xs font-medium text-slate-500 mb-1">Tìm kiếm</label>
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                             <span className="material-symbols-outlined text-lg">search</span>
                         </span>
                         <input
+                            id="voucher-search-input"
                             type="text"
                             value={filter.search || ''}
                             onChange={handleSearchChange}

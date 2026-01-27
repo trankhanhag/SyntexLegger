@@ -166,6 +166,7 @@ function createVoucher(db) {
             payee_name, payee_tax_code, payee_address,
             expense_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code, sub_item_code,
             payment_method, bank_account, account_code, notes
         } = req.body;
 
@@ -184,6 +185,7 @@ function createVoucher(db) {
              payee_name, payee_tax_code, payee_address,
              expense_type, category_code, category_name,
              amount, fund_source_id, budget_estimate_id,
+             item_code, sub_item_code,
              payment_method, bank_account, account_code,
              notes, created_by, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -193,6 +195,7 @@ function createVoucher(db) {
             payee_name, payee_tax_code, payee_address,
             expense_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code || null, sub_item_code || null,
             payment_method || 'CASH', bank_account, account_code || '611',
             notes, req.user?.username, now, now
         ], function (err) {
@@ -220,6 +223,7 @@ function updateVoucher(db) {
             voucher_date, payee_name, payee_tax_code, payee_address,
             expense_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code, sub_item_code,
             payment_method, bank_account, account_code, notes
         } = req.body;
 
@@ -234,6 +238,8 @@ function updateVoucher(db) {
             amount = COALESCE(?, amount),
             fund_source_id = COALESCE(?, fund_source_id),
             budget_estimate_id = COALESCE(?, budget_estimate_id),
+            item_code = COALESCE(?, item_code),
+            sub_item_code = COALESCE(?, sub_item_code),
             payment_method = COALESCE(?, payment_method),
             bank_account = COALESCE(?, bank_account),
             account_code = COALESCE(?, account_code),
@@ -245,6 +251,7 @@ function updateVoucher(db) {
             voucher_date, payee_name, payee_tax_code, payee_address,
             expense_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code, sub_item_code,
             payment_method, bank_account, account_code, notes,
             new Date().toISOString(), id
         ], function (err) {

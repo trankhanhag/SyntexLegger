@@ -5,14 +5,18 @@ import { FormModal } from './FormModal';
 import { debtService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { toInputDateValue } from '../utils/dateUtils';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 interface DebtManagementModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (view: string) => void;
 }
 
-export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subView = 'temp_advances', printSignal = 0, onSetHeader }) => {
+export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subView = 'temp_advances', printSignal = 0, onSetHeader, onNavigate: _onNavigate }) => {
     const [view, setView] = useState(subView);
     const [showForm, setShowForm] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -32,11 +36,8 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
         fetchData();
     }, [view]);
 
-    useEffect(() => {
-        if (printSignal > 0) {
-            window.print();
-        }
-    }, [printSignal]);
+    // Print handler
+    useSimplePrint(printSignal, 'Công nợ', { allowBrowserPrint: true });
 
     const fetchData = async () => {
         setLoading(true);
@@ -283,6 +284,26 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
             default: return [];
         }
     };
+
+    // Show ModuleOverview when view is 'overview' or empty
+    if (view === 'overview' || view === '' || !view) {
+        return (
+            <ModuleOverview
+                title={MODULE_CONFIGS.debt.title}
+                description={MODULE_CONFIGS.debt.description}
+                icon={MODULE_CONFIGS.debt.icon}
+                iconColor={MODULE_CONFIGS.debt.iconColor}
+                workflow={MODULE_CONFIGS.debt.workflow}
+                features={MODULE_CONFIGS.debt.features}
+                stats={[
+                    { icon: 'savings', label: 'Tạm ứng (141)', value: tempAdvances.length || '-', color: 'blue' },
+                    { icon: 'account_balance', label: 'Ứng trước NS (161)', value: budgetAdvances.length || 0, color: 'green' },
+                    { icon: 'credit_score', label: 'Phải thu', value: receivables.length || 0, color: 'amber' },
+                    { icon: 'credit_card', label: 'Phải trả', value: payables.length || 0, color: 'purple' },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden relative">

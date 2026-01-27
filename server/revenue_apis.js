@@ -171,6 +171,7 @@ function createReceipt(db) {
             payer_name, payer_id_card, payer_address,
             revenue_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code, sub_item_code,
             payment_method, bank_account, account_code, notes,
             document_type
         } = req.body;
@@ -190,6 +191,7 @@ function createReceipt(db) {
              payer_name, payer_id_card, payer_address,
              revenue_type, category_code, category_name,
              amount, fund_source_id, budget_estimate_id,
+             item_code, sub_item_code,
              payment_method, bank_account, account_code,
              notes, document_type, created_by, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -199,6 +201,7 @@ function createReceipt(db) {
             payer_name, payer_id_card, payer_address,
             revenue_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code || null, sub_item_code || null,
             payment_method || 'CASH', bank_account, account_code || '511',
             notes, document_type || 'RECEIPT', req.user?.username, now, now
         ], function (err) {
@@ -226,6 +229,7 @@ function updateReceipt(db) {
             receipt_date, payer_name, payer_id_card, payer_address,
             revenue_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code, sub_item_code,
             payment_method, bank_account, account_code, notes
         } = req.body;
 
@@ -240,6 +244,8 @@ function updateReceipt(db) {
             amount = COALESCE(?, amount),
             fund_source_id = COALESCE(?, fund_source_id),
             budget_estimate_id = COALESCE(?, budget_estimate_id),
+            item_code = COALESCE(?, item_code),
+            sub_item_code = COALESCE(?, sub_item_code),
             payment_method = COALESCE(?, payment_method),
             bank_account = COALESCE(?, bank_account),
             account_code = COALESCE(?, account_code),
@@ -251,6 +257,7 @@ function updateReceipt(db) {
             receipt_date, payer_name, payer_id_card, payer_address,
             revenue_type, category_code, category_name,
             amount, fund_source_id, budget_estimate_id,
+            item_code, sub_item_code,
             payment_method, bank_account, account_code, notes,
             new Date().toISOString(), id
         ], function (err) {

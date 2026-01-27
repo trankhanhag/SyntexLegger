@@ -12,7 +12,19 @@ const assetRoutes = require('./asset.routes');
 const hrRoutes = require('./hr.routes');
 const reportRoutes = require('./report.routes');
 const commercialRoutes = require('./commercial.routes');
+const revenueRoutes = require('./revenue.routes');
+const expenseRoutes = require('./expense.routes');
+const debtRoutes = require('./debt.routes');
+const hcsnRoutes = require('./hcsn.routes');
 const voucherRoutes = require('./voucher.routes');
+const treasuryRoutes = require('./treasury.routes');
+const auditRoutes = require('./audit.routes');
+const checklistRoutes = require('./checklist.routes');
+const xmlExportRoutes = require('./xml-export.routes');
+const openingBalanceRoutes = require('./opening-balance.routes');
+const budgetControlRoutes = require('./budget-control.routes');
+const closingRoutes = require('./closing.routes');
+const customReportRoutes = require('./custom-report.routes');
 
 /**
  * Register all routes with Express app
@@ -47,10 +59,45 @@ const registerRoutes = (app, db) => {
     // Commercial Routes (Sales, Purchase, Contracts, Projects)
     app.use('/api', commercialRoutes(db));
 
+    // Revenue & Expense Routes (HCSN)
+    app.use('/api', revenueRoutes(db));
+    app.use('/api', expenseRoutes(db));
+
+    // Debt & Advance Routes (HCSN)
+    app.use('/api', debtRoutes(db));
+    app.use('/api', hcsnRoutes(db));
+
     // Voucher Routes (General Vouchers, Staging)
     app.use('/api', voucherRoutes(db));
 
-    console.log('[ROUTES] Registered: auth, system, master, dashboard, allocation, asset, hr, report, commercial, voucher');
+    // Treasury Routes (KBNN Integration)
+    app.use('/api/treasury', treasuryRoutes(db));
+
+    // Audit Routes (Health Check)
+    app.use('/api', auditRoutes(db));
+
+    // Checklist Routes
+    app.use('/api', checklistRoutes(db));
+
+    // XML Export Routes (KBNN DVC)
+    app.use('/api', xmlExportRoutes(db));
+
+    // Opening Balance Routes
+    app.use('/api', openingBalanceRoutes(db));
+
+    // Budget Control Routes (TT 24/2024 - Budget Management)
+    app.use('/api', budgetControlRoutes(db));
+
+    // Closing Routes (Macros)
+    app.use('/api', closingRoutes(db));
+
+    // Custom Report Generator Routes
+    const knex = require('../knex_db');
+    app.set('db', db); // Legacy SQLite3 instance
+    app.set('knex', knex); // Knex instance for new modules
+    app.use('/api/reports/custom', customReportRoutes);
+
+    console.log('[ROUTES] Registered: auth, system, master, dashboard, allocation, asset, hr, report, commercial, voucher, treasury, audit, checklist, xml-export, opening-balance, budget-control, closing, custom-report');
 };
 
 module.exports = {
@@ -64,5 +111,10 @@ module.exports = {
     hrRoutes,
     reportRoutes,
     commercialRoutes,
-    voucherRoutes
+    voucherRoutes,
+    treasuryRoutes,
+    auditRoutes,
+    budgetControlRoutes,
+    closingRoutes,
+    customReportRoutes
 };

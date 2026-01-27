@@ -26,6 +26,7 @@ export interface VoucherActionsProps {
     onPrint?: () => void;
     onExport?: () => void;
     onImport?: () => void;
+    onRefresh?: () => void;
     disabled?: boolean;
 }
 
@@ -39,6 +40,7 @@ export const VoucherActions: React.FC<VoucherActionsProps> = ({
     onPrint,
     onExport,
     onImport,
+    onRefresh,
     disabled = false
 }) => {
     // Default actions nếu không có custom actions
@@ -97,6 +99,13 @@ export const VoucherActions: React.FC<VoucherActionsProps> = ({
             icon: 'upload',
             onClick: onImport || (() => { }),
             hidden: !onImport
+        },
+        {
+            id: 'refresh',
+            label: 'Làm mới',
+            icon: 'refresh',
+            onClick: onRefresh || (() => { }),
+            hidden: !onRefresh
         }
     ];
 

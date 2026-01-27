@@ -1,11 +1,14 @@
 /**
  * VoucherTableRow Component
  * SyntexHCSN - Dòng trong bảng danh sách chứng từ
+ *
+ * Updated: Using unified styles and Badge components
  */
 
 import React from 'react';
 import type { Voucher } from './types/voucher.types';
-import { formatCurrency, formatDateVN, getVoucherTypeName, getVoucherTypeColor } from './utils/voucher.utils';
+import { formatDateVN, getVoucherTypeName, getVoucherTypeColor } from './utils/voucher.utils';
+import { formatNumber } from '../../utils/format';
 
 export interface VoucherTableRowProps {
     voucher: Voucher;
@@ -55,41 +58,27 @@ export const VoucherTableRow: React.FC<VoucherTableRowProps> = ({
     };
 
     const statusBadge = () => {
-        if (voucher.status === 'draft' || !voucher.status) {
-            return (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-                    Draft
-                </span>
-            );
-        }
-        if (voucher.status === 'posted') {
-            return (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-                    Posted
-                </span>
-            );
-        }
-        if (voucher.status === 'cancelled') {
-            return (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                    Hủy
-                </span>
-            );
-        }
-        return null;
+        const status = voucher.status || 'draft';
+        const config: Record<string, { label: string; className: string }> = {
+            draft: { label: 'Nháp', className: 'badge badge-draft' },
+            posted: { label: 'Đã ghi sổ', className: 'badge badge-posted' },
+            cancelled: { label: 'Đã hủy', className: 'badge badge-cancelled' },
+        };
+        const { label, className } = config[status] || config.draft;
+        return <span className={className}>{label}</span>;
     };
 
     return (
         <tr
             onClick={handleClick}
-            className={`group cursor-pointer transition-colors
-                ${selected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}
+            className={`table-row group cursor-pointer
+                ${selected ? 'table-row-selected' : ''}
                 ${locked ? 'opacity-60' : ''}
             `}
         >
             {/* Checkbox */}
             {showCheckbox && (
-                <td className="px-3 py-2 w-10">
+                <td className="table-cell w-10">
                     <input
                         type="checkbox"
                         checked={selected}
@@ -102,50 +91,48 @@ export const VoucherTableRow: React.FC<VoucherTableRowProps> = ({
             {/* Lock indicator */}
             {locked && (
                 <td className="px-1 py-2 w-6">
-                    <span className="material-symbols-outlined text-sm text-slate-400" title="Đã khóa sổ">
+                    <span className="material-symbols-outlined icon-sm text-slate-400" title="Đã khóa sổ">
                         lock
                     </span>
                 </td>
             )}
 
             {/* Date */}
-            <td className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 w-28">
+            <td className="table-cell text-slate-600 dark:text-slate-400 w-28">
                 {voucher.doc_date ? formatDateVN(voucher.doc_date) : '-'}
             </td>
 
             {/* Type badge */}
-            <td className="px-3 py-2 w-32">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getVoucherTypeColor(voucher.type)}`}>
+            <td className="table-cell w-32">
+                <span className={`badge ${getVoucherTypeColor(voucher.type)}`}>
                     {getVoucherTypeName(voucher.type)}
                 </span>
             </td>
 
             {/* Status */}
-            <td className="px-3 py-2 w-24 text-center">
+            <td className="table-cell-center w-24">
                 {statusBadge()}
             </td>
 
             {/* Doc No */}
-            <td className="px-3 py-2 w-32">
+            <td className="table-cell w-32">
                 <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
                     {voucher.doc_no}
                 </span>
             </td>
 
             {/* Description */}
-            <td className="px-3 py-2 text-sm text-slate-700 dark:text-slate-300 max-w-xs truncate">
+            <td className="table-cell max-w-xs truncate">
                 {voucher.description || '-'}
             </td>
 
             {/* Amount */}
-            <td className="px-3 py-2 text-right w-36">
-                <span className="font-bold text-purple-600 dark:text-purple-400 font-mono">
-                    {formatCurrency(voucher.total_amount)}
-                </span>
+            <td className="table-cell-number-bold text-purple-600 dark:text-purple-400 w-36">
+                {formatNumber(voucher.total_amount)}
             </td>
 
             {/* Actions */}
-            <td className="px-3 py-2 w-28">
+            <td className="table-cell w-28">
                 <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                         onClick={handleEdit}
@@ -157,7 +144,7 @@ export const VoucherTableRow: React.FC<VoucherTableRowProps> = ({
                             }`}
                         title="Sửa"
                     >
-                        <span className="material-symbols-outlined text-lg">edit</span>
+                        <span className="material-symbols-outlined icon-md">edit</span>
                     </button>
 
                     <button
@@ -165,7 +152,7 @@ export const VoucherTableRow: React.FC<VoucherTableRowProps> = ({
                         className="p-1 rounded text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                         title="Nhân bản"
                     >
-                        <span className="material-symbols-outlined text-lg">content_copy</span>
+                        <span className="material-symbols-outlined icon-md">content_copy</span>
                     </button>
 
                     <button
@@ -178,7 +165,7 @@ export const VoucherTableRow: React.FC<VoucherTableRowProps> = ({
                             }`}
                         title="Xóa"
                     >
-                        <span className="material-symbols-outlined text-lg">delete</span>
+                        <span className="material-symbols-outlined icon-md">delete</span>
                     </button>
                 </div>
             </td>
@@ -203,9 +190,9 @@ export const VoucherTableHeader: React.FC<VoucherTableHeaderProps> = ({
     showLockColumn = false
 }) => {
     return (
-        <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-left">
+        <tr className="table-header">
             {showCheckbox && (
-                <th className="px-3 py-2 w-10">
+                <th className="table-header-cell w-10">
                     <input
                         type="checkbox"
                         checked={allSelected}
@@ -215,13 +202,13 @@ export const VoucherTableHeader: React.FC<VoucherTableHeaderProps> = ({
                 </th>
             )}
             {showLockColumn && <th className="px-1 py-2 w-6"></th>}
-            <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-28">Ngày</th>
-            <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-32">Loại</th>
-            <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24 text-center">Trạng thái</th>
-            <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-32">Số CT</th>
-            <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Diễn giải</th>
-            <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-36 text-right">Số tiền</th>
-            <th className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-28 text-center">Thao tác</th>
+            <th className="table-header-cell w-28">Ngày</th>
+            <th className="table-header-cell w-32">Loại</th>
+            <th className="table-header-cell-center w-24">Trạng thái</th>
+            <th className="table-header-cell w-32">Số CT</th>
+            <th className="table-header-cell">Diễn giải</th>
+            <th className="table-header-cell-right w-36">Số tiền</th>
+            <th className="table-header-cell-center w-28">Thao tác</th>
         </tr>
     );
 };

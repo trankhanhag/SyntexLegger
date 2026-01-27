@@ -100,20 +100,31 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     const [scratchpadData, setScratchpadData] = useState<Record<string, string>>({}); // Key: `${RowID}:${ColID}`
 
     // Selection & Error State
-    const [selectedPos, setSelectedPos] = useState<{ rIdx: number, cIdx: number } | null>(null);
+    // Selection Selection State
+    // Selection Selection State
+    const [activeCell, setActiveCell] = useState<{ rIdx: number, cIdx: number } | null>(null);
+    const [selectionRanges, setSelectionRanges] = useState<{ start: { rIdx: number, cIdx: number }, end: { rIdx: number, cIdx: number } }[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
     const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
 
-    // Trigger onSelectionChange when selectedPos updates
+    // Trigger onSelectionChange when activeCell updates
     useEffect(() => {
         const handler = onRowClick || onSelectionChange;
         if (!handler) return;
-        if (selectedPos) {
-            const row = tableRows[selectedPos.rIdx];
+        if (activeCell) {
+            const row = tableRows[activeCell.rIdx];
             handler(row?.type === 'real' ? row.data : null);
         } else {
             handler(null);
         }
-    }, [selectedPos, tableRows, onRowClick, onSelectionChange]);
+    }, [activeCell, tableRows, onRowClick, onSelectionChange]);
+
+    // Global Mouse Up Config
+    useEffect(() => {
+        const handleGlobalMouseUp = () => setIsDragging(false);
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, []);
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, rIdx: number, cIdx: number } | null>(null);
@@ -219,6 +230,101 @@ export const SmartTable: React.FC<SmartTableProps> = ({
             i = Math.floor(i / 26) - 1;
         }
         return label;
+    };
+
+    // --- Selection Handlers ---
+    // --- Selection Handlers ---
+    const handleCellMouseDown = (rIdx: number, cIdx: number, e: React.MouseEvent) => {
+        if (e.button !== 0) return; // Right click handled by ContextMenu
+        const pos = { rIdx, cIdx };
+        setIsDragging(true);
+        setActiveCell(pos);
+
+        if (e.ctrlKey || e.metaKey) {
+            // Add new range
+            setSelectionRanges(prev => [...prev, { start: pos, end: pos }]);
+        } else if (e.shiftKey) {
+            // Extend the last range
+            setSelectionRanges(prev => {
+                if (prev.length === 0) return [{ start: activeCell || pos, end: pos }];
+                const next = [...prev];
+                const lastIdx = next.length - 1;
+                // Keep 'start', update 'end'
+                next[lastIdx] = { ...next[lastIdx], end: pos };
+                return next;
+            });
+        } else {
+            // Reset to single range
+            setSelectionRanges([{ start: pos, end: pos }]);
+        }
+    };
+
+    const handleCellMouseEnter = (rIdx: number, cIdx: number) => {
+        if (isDragging) {
+            setSelectionRanges(prev => {
+                if (prev.length === 0) return prev;
+                const next = [...prev];
+                const lastIdx = next.length - 1;
+                next[lastIdx] = { ...next[lastIdx], end: { rIdx, cIdx } };
+                return next;
+            });
+        }
+    };
+
+    const handleColumnHeaderClick = (cIdx: number, e?: React.MouseEvent) => {
+        if (tableRows.length === 0) return;
+        const start = { rIdx: 0, cIdx };
+        const end = { rIdx: tableRows.length - 1, cIdx };
+        const newRange = { start, end };
+        setActiveCell(start);
+
+        if (e?.ctrlKey || e?.metaKey) {
+            setSelectionRanges(prev => [...prev, newRange]);
+        } else {
+            setSelectionRanges([newRange]);
+        }
+    };
+
+    const getSelectionStats = () => {
+        if (selectionRanges.length === 0) return null;
+
+        let sum = 0;
+        let count = 0;
+        let numCount = 0;
+        const visited = new Set<string>();
+
+        selectionRanges.forEach(range => {
+            const rStart = Math.min(range.start.rIdx, range.end.rIdx);
+            const rEnd = Math.max(range.start.rIdx, range.end.rIdx);
+            const cStart = Math.min(range.start.cIdx, range.end.cIdx);
+            const cEnd = Math.max(range.start.cIdx, range.end.cIdx);
+
+            for (let r = rStart; r <= rEnd; r++) {
+                for (let c = cStart; c <= cEnd; c++) {
+                    const key = `${r}-${c}`;
+                    if (visited.has(key)) continue;
+                    visited.add(key);
+
+                    const val = getCellValue(r, c);
+                    if (val !== null && val !== undefined && val !== '') {
+                        count++;
+                        const num = parseNumericValue(val);
+                        // Strict check for numeric string to avoid summing dates/texts that might parse partly
+                        const isNumericType = !isNaN(parseFloat(String(val).replace(/[^0-9.-]/g, '')));
+                        if (isNumericType) {
+                            sum += num;
+                            numCount++;
+                        }
+                    }
+                }
+            }
+        });
+
+        // If only 1 cell selected total, hide stats usually? Or show?
+        // Excel shows count: 1. Let's show if count > 0.
+        if (count <= 1) return null;
+
+        return { sum, count, numCount, average: numCount ? sum / numCount : 0 };
     };
 
     // --- Context Menu Handlers ---
@@ -419,25 +525,46 @@ export const SmartTable: React.FC<SmartTableProps> = ({
 
     // --- Input Masking Handlers ---
     const formatNumberDisplay = (value: string | number, localeOverride?: string, decimals = 2) => {
-        if (!value && value !== 0) return '';
+        if (value === null || value === undefined || value === '') return '';
         const locale = localeOverride || localStorage.getItem('decimalFormat') || 'vi-VN';
 
-        // Robust numeric parsing: remove all non-numeric chars except dot and comma
-        // This is still a bit naive but better than just replacing comma
-        const cleanValue = String(value).replace(/[^0-9.,-]/g, '');
-
-        // Handle swap of . and , based on locale
         let num: number;
-        if (locale === 'vi-VN') {
-            // vi-VN: 1.234.567,89 -> change . to nothing and , to . for JS parseFloat
-            num = parseFloat(cleanValue.replace(/\./g, '').replace(/,/g, '.'));
+        if (typeof value === 'number') {
+            num = value;
         } else {
-            // en-US: 1,234,567.89 -> change , to nothing
-            num = parseFloat(cleanValue.replace(/,/g, ''));
+            const str = String(value).trim();
+            if (!str) return '';
+
+            // Robust numeric parsing: remove all non-numeric chars except dot and comma
+            const cleanValue = str.replace(/[^0-9.,-]/g, '');
+
+            // Handle swap of . and , based on locale
+            if (locale === 'vi-VN') {
+                // If it has a comma, it's definitely using VN decimal format
+                if (cleanValue.includes(',')) {
+                    num = parseFloat(cleanValue.replace(/\./g, '').replace(/,/g, '.'));
+                } else {
+                    // No comma. Dots are tricky. If dotCount > 1, they are thousands.
+                    // If dotCount == 1, it could be decimal from backend. 
+                    const dotCount = (cleanValue.match(/\./g) || []).length;
+                    if (dotCount > 1) {
+                        num = parseFloat(cleanValue.replace(/\./g, ''));
+                    } else {
+                        // One dot or no dot -> use standard parseFloat
+                        num = parseFloat(cleanValue);
+                    }
+                }
+            } else {
+                // en-US: 1,234,567.89 -> change , to nothing
+                num = parseFloat(cleanValue.replace(/,/g, ''));
+            }
         }
 
-        if (isNaN(num)) return String(value);
-        return new Intl.NumberFormat(locale, { maximumFractionDigits: decimals }).format(num);
+        if (isNaN(num) || !isFinite(num)) return String(value);
+        return new Intl.NumberFormat(locale, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: decimals
+        }).format(num);
     };
 
     const isTraceable = (val: any): val is TraceableValue => {
@@ -465,8 +592,58 @@ export const SmartTable: React.FC<SmartTableProps> = ({
         if (isTraceable(raw)) return String(raw.value);
         return String(raw);
     };
-
     // --- Formula Engine ---
+
+    // Robust number parsing with float detection (Component Level Helper)
+    const parseNumericValue = (val: any): number => {
+        if (val === null || val === undefined || val === '') return 0;
+
+        // Unwrap TraceableValue if needed
+        const raw = (val && typeof val === 'object' && 'value' in val) ? val.value : val;
+
+        if (typeof raw === 'number') return isFinite(raw) ? raw : 0;
+
+        const str = String(raw).trim();
+        if (!str) return 0;
+
+        const locale = localStorage.getItem('decimalFormat') || 'vi-VN';
+        const cleanValue = str.replace(/[^0-9.,-]/g, '');
+
+        if (locale === 'vi-VN') {
+            if (cleanValue.includes(',')) {
+                // Has comma -> VN format (1.234,56)
+                const num = parseFloat(cleanValue.replace(/\./g, '').replace(/,/g, '.'));
+                return isFinite(num) ? num : 0;
+            } else {
+                // No comma. If more than 1 dot, they are thousands separators.
+                const dotCount = (cleanValue.match(/\./g) || []).length;
+                if (dotCount > 1) {
+                    const num = parseFloat(cleanValue.replace(/\./g, ''));
+                    return isFinite(num) ? num : 0;
+                } else if (dotCount === 1) {
+                    // Single dot. Ambiguity: "125.000" (125k) vs "125.000" (from backend 125.00)
+                    // Heuristic: If it has 3 decimal places, it's likely a thousand separator in VI context.
+                    // HOWEVER, backend floats often have trailing zeros.
+                    // Let's check the length after the dot. 
+                    const parts = cleanValue.split('.');
+                    if (parts[1].length === 3 && parseInt(parts[0]) !== 0) {
+                        // Likely 125.000 -> 125000
+                        const numValue = parseFloat(cleanValue.replace(/\./g, ''));
+                        return isFinite(numValue) ? numValue : 0;
+                    }
+                    // Default to standard float
+                    const num = parseFloat(cleanValue);
+                    return isFinite(num) ? num : 0;
+                } else {
+                    const num = parseFloat(cleanValue);
+                    return isFinite(num) ? num : 0;
+                }
+            }
+        } else {
+            const num = parseFloat(cleanValue.replace(/,/g, ''));
+            return isFinite(num) ? num : 0;
+        }
+    };
     const colLetterToIndex = (letter: string) => {
         let column = 0;
         const length = letter.length;
@@ -737,8 +914,22 @@ export const SmartTable: React.FC<SmartTableProps> = ({
         }
 
         // Boundary Checks
+        // Boundary Checks
         if (newRIdx >= 0 && newRIdx < tableRows.length && newCIdx >= 0 && newCIdx < tableCols.length) {
-            setSelectedPos({ rIdx: newRIdx, cIdx: newCIdx });
+            const pos = { rIdx: newRIdx, cIdx: newCIdx };
+            setActiveCell(pos);
+            if (e.shiftKey) {
+                // Extend last range
+                setSelectionRanges(prev => {
+                    const current = prev.length > 0 ? [...prev] : [{ start: activeCell || pos, end: pos }];
+                    const lastIdx = current.length - 1;
+                    current[lastIdx] = { ...current[lastIdx], end: pos };
+                    return current;
+                });
+            } else {
+                // Move selection, clear others
+                setSelectionRanges([{ start: pos, end: pos }]);
+            }
         }
     };
 
@@ -769,11 +960,11 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     };
 
     // Traceability Display Logic
-    const rawSelectedValue = selectedPos ? getRawValue(selectedPos.rIdx, selectedPos.cIdx) : null;
+    const rawSelectedValue = activeCell ? getRawValue(activeCell.rIdx, activeCell.cIdx) : null;
     const isSelectedTraceable = isTraceable(rawSelectedValue);
 
-    const selectedValue = selectedPos ? getCellDisplayValue(selectedPos.rIdx, selectedPos.cIdx) : '';
-    const selectedLabel = selectedPos ? `${getColumnLabel(selectedPos.cIdx)}${selectedPos.rIdx + 1}` : '';
+    const selectedValue = activeCell ? getCellDisplayValue(activeCell.rIdx, activeCell.cIdx) : '';
+    const selectedLabel = activeCell ? `${getColumnLabel(activeCell.cIdx)}${activeCell.rIdx + 1}` : '';
 
 
     if (loading) return <div className="p-4 text-center">Loading...</div>;
@@ -796,9 +987,9 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                     <input
                         className={`flex-1 min-w-0 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${isSelectedTraceable ? 'text-blue-600 font-bold' : ''}`}
                         placeholder="Chọn ô để nhập giá trị hoặc công thức..."
-                        disabled={!selectedPos || isSelectedTraceable} // Make traceable read-only for now
+                        disabled={!activeCell || isSelectedTraceable} // Make traceable read-only for now
                         value={isSelectedTraceable ? `=${rawSelectedValue.formula}` : selectedValue}
-                        onChange={(e) => selectedPos && setCellValue(selectedPos.rIdx, selectedPos.cIdx, e.target.value)}
+                        onChange={(e) => activeCell && setCellValue(activeCell.rIdx, activeCell.cIdx, e.target.value)}
                     />
 
                     {/* Traceability Action */}
@@ -833,8 +1024,9 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                     className={`first-letter:border-r border-b border-border-light dark:border-border-dark px-2 py-2 font-semibold whitespace-nowrap 
                                         ${col.type === 'draft' ? 'bg-orange-50 dark:bg-orange-900/20 text-slate-500 w-24 text-center min-w-[80px]' :
                                             `bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ${col.def?.width || 'w-32'}`}
-                                        relative group text-center`} // Force text-center for headers
-                                    onContextMenu={(e) => handleContextMenu(e, -1, cIdx)} // Row -1 = Header, but triggering col insert
+                                        relative group text-center cursor-pointer select-none hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors`} // Force text-center for headers
+                                    onContextMenu={(e) => handleContextMenu(e, -1, cIdx)} // Row -1 = Header
+                                    onClick={(e) => handleColumnHeaderClick(cIdx, e)}
                                 >
                                     <div className="flex items-center justify-center gap-1 w-full"> {/* justify-center */}
                                         <div className="flex flex-col items-center leading-none w-full"> {/* items-center */}
@@ -1031,7 +1223,21 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                         )}
                                     </td>
                                     {tableCols.map((col, cIdx) => {
-                                        const isSelected = selectedPos?.rIdx === rIdx && selectedPos.cIdx === cIdx;
+                                        const isActive = activeCell?.rIdx === rIdx && activeCell.cIdx === cIdx;
+
+                                        // Check Range(s)
+                                        let isInRange = false;
+                                        for (const range of selectionRanges) {
+                                            const rMin = Math.min(range.start.rIdx, range.end.rIdx);
+                                            const rMax = Math.max(range.start.rIdx, range.end.rIdx);
+                                            const cMin = Math.min(range.start.cIdx, range.end.cIdx);
+                                            const cMax = Math.max(range.start.cIdx, range.end.cIdx);
+                                            if (rIdx >= rMin && rIdx <= rMax && cIdx >= cMin && cIdx <= cMax) {
+                                                isInRange = true;
+                                                break;
+                                            }
+                                        }
+
                                         const errorKey = `ERR-${row.id}-${col.id}`;
                                         const errorMsg = cellErrors[errorKey];
                                         const displayVal = getCellDisplayValue(rIdx, cIdx);
@@ -1046,15 +1252,21 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                         if (!align && col.def?.type === 'number') align = 'right';
 
                                         const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
-                                        // cellClass += alignClass; // Removed from td
 
-                                        if (isSelected) cellClass += " ring-2 ring-green-500 z-10";
+                                        // Selection Styling
+                                        if (isActive) {
+                                            cellClass += " ring-2 ring-green-600 z-10 bg-white dark:bg-slate-900"; // Active cell gets highlight
+                                        } else if (isInRange) {
+                                            cellClass += " bg-blue-50 dark:bg-blue-900/40 mix-blend-multiply"; // Range gets tint
+                                        }
+
                                         if (errorMsg) cellClass += " bg-red-50 dark:bg-red-900/20";
 
                                         return (
                                             <td
                                                 key={col.id}
-                                                onClick={() => setSelectedPos({ rIdx, cIdx })}
+                                                onMouseDown={(e) => handleCellMouseDown(rIdx, cIdx, e)}
+                                                onMouseEnter={() => handleCellMouseEnter(rIdx, cIdx)}
                                                 onDoubleClick={() => {
                                                     const raw = getRawValue(rIdx, cIdx);
                                                     if (isTraceable(raw) && raw.source?.type === 'link') {
@@ -1068,9 +1280,9 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                                 title={errorMsg || (isTraceable(getRawValue(rIdx, cIdx)) ? 'Double-click để xem nguồn' : undefined)}
                                             >
                                                 {errorMsg && <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-bl triangle-error z-20"></div>}
-                                                {isSelected ? (
+                                                {isActive ? (
                                                     <input
-                                                        ref={(el) => { if (isSelected) el?.focus(); }}
+                                                        ref={(el) => { if (isActive) el?.focus(); }}
                                                         readOnly={
                                                             !!(String(displayVal).startsWith('=') ||
                                                                 (lockedUntil && row.type === 'real' && row.data?.[dateField] <= lockedUntil))
@@ -1100,7 +1312,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                                         placeholder={col.type === 'real' && col.def?.type === 'date' ? 'DD/MM/YYYY' : ''}
                                                     />
                                                 ) : (
-                                                    <div className={`w-full h-full px-2 py-1.5 text-sm ${alignClass} truncate ${col.def?.fontClass || ''} ${col.type === 'draft' || row.type === 'draft' ? 'font-mono text-slate-600 dark:text-slate-400' : ''}`}>
+                                                    <div className={`w-full h-full px-2 py-1.5 text-sm ${alignClass} truncate ${col.def?.fontClass || ''} ${col.type === 'draft' || row.type === 'draft' ? 'font-mono text-slate-600 dark:text-slate-400' : ''} select-none`}>
                                                         {col.def?.renderCell && row.type === 'real' ? col.def.renderCell(getCellValue(rIdx, cIdx), row.data) : displayVal}
                                                     </div>
                                                 )}
@@ -1121,9 +1333,12 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                         if (col.type !== 'real' || !col.def || col.def.type !== 'number') {
                                             return <td key={col.id} className="border-r border-slate-200 dark:border-slate-700"></td>;
                                         }
+
+
+
                                         const total = tableRows
                                             .filter(r => r.type === 'real')
-                                            .reduce((sum, r) => sum + (Number(r.data?.[col.id]) || 0), 0);
+                                            .reduce((sum, r) => sum + parseNumericValue(r.data?.[col.id]), 0);
 
                                         const align = col.def.align === 'center' ? 'text-center' : col.def.align === 'left' ? 'text-left' : 'text-right';
 
@@ -1143,7 +1358,10 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                     if (col.type !== 'real' || !col.def || col.def.type !== 'number') {
                                         return <td key={col.id} className="border-r border-slate-200 dark:border-slate-700"></td>;
                                     }
-                                    const total = data.reduce((sum, item) => sum + (Number(item[col.id]) || 0), 0);
+
+
+
+                                    const total = data.reduce((sum, item) => sum + parseNumericValue(item[col.id]), 0);
 
                                     const align = col.def.align === 'center' ? 'text-center' : col.def.align === 'left' ? 'text-left' : 'text-right';
 
@@ -1229,6 +1447,21 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                     </button>
                 </div>
             )}
+
+            {/* Status Bar for Selection - Excel Style */}
+            <div className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 px-4 py-1 flex items-center justify-end gap-6 text-xs font-semibold text-slate-600 dark:text-slate-400 select-none h-8 shrink-0">
+                {(() => {
+                    const stats = getSelectionStats();
+                    if (!stats) return <span className="opacity-0">Ready</span>;
+                    return (
+                        <>
+                            {stats.numCount > 0 && <span>Average: {formatNumberDisplay(stats.average, undefined, 2)}</span>}
+                            <span>Count: {stats.count}</span>
+                            {stats.numCount > 0 && <span>Sum: {formatNumberDisplay(stats.sum)}</span>}
+                        </>
+                    );
+                })()}
+            </div>
         </div>
     );
 };

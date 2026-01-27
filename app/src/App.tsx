@@ -17,8 +17,10 @@ import { InventoryModule } from './components/InventoryModule';
 import { ContractModule } from './components/ContractModule';
 import { ProjectModule } from './components/ProjectModule';
 import { DimensionModule } from './components/DimensionModule';
+import { TreasuryDashboard } from './components/Treasury/TreasuryDashboard';
 import FundSourceModule from './components/FundSourceModule';
 import { GeneralModuleV2 as GeneralModule } from './components/GeneralModuleV2';
+
 import { Footer } from './components/Footer';
 import { VirtualAuditHealthCheck } from './components/AuditModal';
 import { MacroSequence } from './components/MacroSequence';
@@ -33,7 +35,7 @@ function App() {
   const [activeTab, setActiveTab] = useState(savedState.activeTab || 'dashboard');
   const [navigationData, setNavigationData] = useState<any>(null);
   const [dashboardView, setDashboardView] = useState(savedState.dashboardView || 'dashboard');
-  const [generalView, setGeneralView] = useState(savedState.generalView || 'voucher');
+  const [generalView, setGeneralView] = useState(savedState.generalView || 'voucher_list');
   const [reportView, setReportView] = useState(savedState.reportView || 'balance_sheet');
   const [revenueView, setRevenueView] = useState(savedState.revenueView || 'receipt');
   const [cashView, setCashView] = useState(savedState.cashView || 'list');
@@ -45,22 +47,25 @@ function App() {
   const [hrView, setHrView] = useState(savedState.hrView || 'employees');
   const [contractView, setContractView] = useState(savedState.contractView || 'sales');
   const [projectView, setProjectView] = useState(savedState.projectView || 'list');
-  const [dimView, setDimView] = useState(savedState.dimView || 'list');
+  const [dimView, setDimView] = useState(savedState.dimView || 'overview');
   const [sysView, setSysView] = useState(savedState.sysView || 'params');
   const [fundView, setFundView] = useState(savedState.fundView || 'list');
+  const [treasuryView, setTreasuryView] = useState(savedState.treasuryView || 'dashboard');
   const [printSignal, setPrintSignal] = useState(0);
+  const [exportSignal, setExportSignal] = useState(0);
+  const [importSignal, setImportSignal] = useState(0);
 
   // Sync state to localStorage
   useEffect(() => {
     const state = {
       activeTab, dashboardView, generalView, reportView, revenueView, cashView,
       loanView, taxView, expenseView, inventoryView, assetView, hrView,
-      contractView, projectView, dimView, sysView, fundView
+      contractView, projectView, dimView, sysView, fundView, treasuryView
     };
     localStorage.setItem('app_navigation_state', JSON.stringify(state));
   }, [activeTab, dashboardView, generalView, reportView, revenueView, cashView,
     loanView, taxView, expenseView, inventoryView, assetView, hrView,
-    contractView, projectView, dimView, sysView, fundView]);
+    contractView, projectView, dimView, sysView, fundView, treasuryView]);
 
   // Page Header State (title, icon, and actions to be shown in Ribbon)
   const [pageHeader, setPageHeader] = useState<{ title?: string; icon?: string; actions?: RibbonAction[]; onDelete?: () => void }>({});
@@ -169,6 +174,7 @@ function App() {
       'project_pnl',
       'expense_dept',
       'transaction_details',
+      'custom_report', // Custom Report Generator
     ]);
 
     if (viewId === 'project_pnl' && activeTab === 'project') {
@@ -242,14 +248,29 @@ function App() {
       setDimView(viewId.replace('dim_', ''));
       return;
     }
+
+
     if (viewId.startsWith('sys_')) {
       setActiveTab('system');
       setSysView(viewId.replace('sys_', ''));
       return;
     }
     if (viewId.startsWith('fund_')) {
-      setActiveTab('fund');
-      setFundView(viewId.replace('fund_', ''));
+      setActiveTab('general');
+      setGeneralView(viewId);
+      return;
+    }
+
+    if (viewId.startsWith('treasury_') || viewId === 'treasury') {
+      setActiveTab('treasury');
+      setTreasuryView(viewId === 'treasury' ? 'dashboard' : viewId.replace('treasury_', ''));
+      return;
+    }
+
+    // General Accounting Views
+    if (['voucher', 'voucher_list', 'check', 'closing', 'allocation', 'revaluation', 'locking', 'account_list', 'cost_item', 'opening_balance'].includes(viewId)) {
+      setActiveTab('general');
+      setGeneralView(viewId === 'voucher' ? 'voucher_list' : viewId);
       return;
     }
 
@@ -267,24 +288,28 @@ function App() {
           setActiveTab(tab);
           resetHeader(); // Reset header on tab change
           setNavigationData(null); // Clear navigation data
-          setGeneralView('voucher');
-          setRevenueView('receipt');
-          setCashView('list');
-          setLoanView('temp_advances');
-          setTaxView('vat');
-          setExpenseView('voucher');
-          setInventoryView('receipt');
-          setAssetView('list');
-          setHrView('employees');
-          setContractView('sales');
-          setProjectView('list');
-          setDimView('list');
-          setSysView('params');
-          setFundView('list');
+          setGeneralView('overview');
+          setReportView('overview');
+          setRevenueView('overview');
+          setCashView('overview');
+          setLoanView('overview');
+          setTaxView('overview');
+          setExpenseView('overview');
+          setInventoryView('overview');
+          setAssetView('overview');
+          setHrView('overview');
+          setContractView('overview');
+          setProjectView('overview');
+          setDimView('overview');
+          setSysView('overview');
+          setFundView('overview');
+          setTreasuryView('overview');
           setDashboardView('dashboard');
           setPrintSignal(0);
         }}
         onPrint={() => setPrintSignal(s => s + 1)}
+        onExport={() => setExportSignal(s => s + 1)}
+        onImport={() => setImportSignal(s => s + 1)}
         onAudit={() => handleNavigate('audit')}
         onRunMacro={() => setShowMacroModal(true)}
         onDelete={pageHeader.onDelete}
@@ -317,28 +342,34 @@ function App() {
           {activeTab === 'general' && (
             <GeneralModule
               subView={generalView}
-              onCloseModal={() => setGeneralView('voucher')}
+              onCloseModal={() => setGeneralView('voucher_list')}
               printSignal={printSignal}
+              exportSignal={exportSignal}
+              importSignal={importSignal}
               onSetHeader={setPageHeader}
+              onNavigate={handleNavigate}
               navigationData={navigationData}
               onClearNavigation={() => setNavigationData(null)}
             />
           )}
-          {activeTab === 'report' && <Reports subView={reportView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'cash' && <CashModule subView={cashView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'report' && <Reports subView={reportView} printSignal={printSignal} exportSignal={exportSignal} importSignal={importSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'cash' && <CashModule subView={cashView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
           {activeTab === 'tax' && <TaxModule subView={taxView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
-          {activeTab === 'revenue' && <RevenueModule subView={revenueView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'expense' && <ExpenseModule subView={expenseView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'inventory' && <InventoryModule subView={inventoryView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'asset' && <AssetModule subView={assetView} onCloseModal={() => setAssetView('list')} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'loan' && <DebtManagementModule subView={loanView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'hr' && <HRModule subView={hrView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'contract' && <ContractModule subView={contractView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'project' && <ProjectModule subView={projectView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'dimension' && <DimensionModule subView={dimView} printSignal={printSignal} onSetHeader={setPageHeader} />}
+          {activeTab === 'revenue' && <RevenueModule subView={revenueView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'expense' && <ExpenseModule subView={expenseView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'inventory' && <InventoryModule subView={inventoryView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'asset' && <AssetModule subView={assetView} onCloseModal={() => setAssetView('list')} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'loan' && <DebtManagementModule subView={loanView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'hr' && <HRModule subView={hrView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'contract' && <ContractModule subView={contractView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'project' && <ProjectModule subView={projectView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'dimension' && <DimensionModule subView={dimView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
 
-          {activeTab === 'system' && <SystemModule subView={sysView} printSignal={printSignal} onSetHeader={setPageHeader} />}
-          {activeTab === 'fund' && <FundSourceModule subView={fundView} onSetHeader={setPageHeader} />}
+          {activeTab === 'system' && <SystemModule subView={sysView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+
+
+          {activeTab === 'fund' && <FundSourceModule subView={fundView} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'treasury' && <TreasuryDashboard subView={treasuryView} onNavigate={handleNavigate} />}
         </div>
 
         <RightSidebar />

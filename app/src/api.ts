@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -58,6 +58,7 @@ export const masterDataService = {
     getAccounts: () => api.get('/accounts'),
     getPartners: () => api.get('/partners'),
     saveAccounts: (accounts: any[]) => api.post('/master/accounts', { accounts }),
+    savePartners: (partners: any[]) => api.post('/master/partners', { partners }),
     getAccountBalances: () => api.get('/accounts/balances'),
     getAccountBalance: (code: string) => api.get(`/accounts/balance/${code}`),
     getCashBalances: () => api.get('/balances'), // Updated to match server endpoint
@@ -66,6 +67,7 @@ export const masterDataService = {
     deleteAccount: (code: string) => api.delete(`/accounts/${code}`),
     deletePartner: (id: string) => api.delete(`/partners/${id}`),
     getProducts: () => api.get('/products'),
+    saveProducts: (products: any[]) => api.post('/master/products', { products }),
     getFundSources: () => api.get('/hcsn/fund-sources'),
 };
 
@@ -87,6 +89,185 @@ export const openingBalanceService = {
 
 export const auditService = {
     healthCheck: () => api.get('/audit/health-check'),
+
+    // Audit Trail
+    getAuditTrail: (params?: {
+        entity_type?: string;
+        entity_id?: string;
+        doc_no?: string;
+        action?: string;
+        username?: string;
+        from_date?: string;
+        to_date?: string;
+        fiscal_year?: number;
+        fiscal_period?: number;
+        limit?: number;
+        offset?: number;
+    }) => api.get('/audit/trail', { params }),
+    getEntityHistory: (entityType: string, entityId: string) =>
+        api.get(`/audit/trail/${entityType}/${entityId}`),
+    getStatistics: (params?: { fiscal_year?: number; from_date?: string; to_date?: string }) =>
+        api.get('/audit/statistics', { params }),
+    verifyAuditIntegrity: (auditId: string) => api.post(`/audit/verify/${auditId}`),
+    exportAuditTrail: (params?: {
+        format?: 'json' | 'csv';
+        entity_type?: string;
+        from_date?: string;
+        to_date?: string;
+        fiscal_year?: number;
+    }) => api.get('/audit/export', { params, responseType: params?.format === 'csv' ? 'blob' : 'json' }),
+    getComplianceReport: (params?: { fiscal_year?: number }) =>
+        api.get('/audit/report/compliance', { params }),
+
+    // Anomalies
+    getAnomalies: (params?: {
+        anomaly_type?: string;
+        severity?: string;
+        status?: string;
+        from_date?: string;
+        to_date?: string;
+        fiscal_year?: number;
+        limit?: number;
+    }) => api.get('/audit/anomalies', { params }),
+    getAnomalySummary: (params?: { fiscal_year?: number }) =>
+        api.get('/audit/anomalies/summary', { params }),
+    resolveAnomaly: (anomalyId: string, data: { resolution_notes: string; status?: string }) =>
+        api.post(`/audit/anomalies/${anomalyId}/resolve`, data),
+    acknowledgeAnomaly: (anomalyId: string, data?: { notes?: string }) =>
+        api.post(`/audit/anomalies/${anomalyId}/acknowledge`, data),
+    runAnomalyDetection: (data?: { fiscal_year?: number }) =>
+        api.post('/audit/run-detection', data),
+
+    // Reconciliation
+    getReconciliations: (params?: {
+        recon_type?: string;
+        fiscal_year?: number;
+        fiscal_period?: number;
+        status?: string;
+        limit?: number;
+    }) => api.get('/audit/reconciliations', { params }),
+    createReconciliation: (data: any) => api.post('/audit/reconciliations', data),
+    approveReconciliation: (id: string, data?: { notes?: string }) =>
+        api.put(`/audit/reconciliations/${id}/approve`, data),
+
+    // Sessions
+    getSessions: (params?: { is_active?: boolean; user_id?: string; limit?: number }) =>
+        api.get('/audit/sessions', { params }),
+};
+
+// ========================================
+// BUDGET CONTROL SERVICE (TT 24/2024)
+// Hệ thống Kiểm soát Ngân sách
+// ========================================
+export const budgetControlService = {
+    // Budget Periods
+    getPeriods: (params?: { fiscal_year?: number; company_id?: string }) =>
+        api.get('/budget-control/periods', { params }),
+    getPeriod: (periodId: string) => api.get(`/budget-control/periods/${periodId}`),
+    lockPeriod: (periodId: string, data: { reason?: string }) =>
+        api.post(`/budget-control/periods/${periodId}/lock`, data),
+    unlockPeriod: (periodId: string, data: { reason: string }) =>
+        api.post(`/budget-control/periods/${periodId}/unlock`, data),
+    updatePeriodThresholds: (periodId: string, data: {
+        warning_threshold?: number;
+        block_threshold?: number;
+        allow_override?: boolean;
+    }) => api.put(`/budget-control/periods/${periodId}/thresholds`, data),
+
+    // Budget Availability
+    checkAvailability: (params: {
+        budget_estimate_id?: string;
+        fund_source_id?: string;
+        fiscal_year?: number;
+        item_code?: string;
+    }) => api.get('/budget-control/availability', { params }),
+    checkSpending: (data: {
+        budget_estimate_id?: string;
+        fund_source_id?: string;
+        amount: number;
+        fiscal_year?: number;
+        item_code?: string;
+        company_id?: string;
+    }) => api.post('/budget-control/check-spending', data),
+
+    // Spending Authorization
+    getAuthorizations: (params?: {
+        status?: string;
+        fiscal_year?: number;
+        requested_by?: string;
+        limit?: number;
+    }) => api.get('/budget-control/authorizations', { params }),
+    getPendingAuthorizations: (params?: { fiscal_year?: number; limit?: number }) =>
+        api.get('/budget-control/authorizations/pending', { params }),
+    createAuthorization: (data: {
+        request_type?: string;
+        department_code?: string;
+        budget_estimate_id?: string;
+        fund_source_id?: string;
+        fiscal_year?: number;
+        requested_amount: number;
+        purpose: string;
+        justification?: string;
+        supporting_docs?: string[];
+        voucher_id?: string;
+        doc_no?: string;
+    }) => api.post('/budget-control/authorizations', data),
+    approveAuthorization: (id: string, data?: { approved_amount?: number; approval_notes?: string }) =>
+        api.post(`/budget-control/authorizations/${id}/approve`, data),
+    rejectAuthorization: (id: string, data: { rejection_reason: string }) =>
+        api.post(`/budget-control/authorizations/${id}/reject`, data),
+
+    // Budget Transactions
+    getTransactions: (params?: {
+        budget_estimate_id?: string;
+        fund_source_id?: string;
+        transaction_type?: string;
+        fiscal_year?: number;
+        fiscal_period?: number;
+        from_date?: string;
+        to_date?: string;
+        limit?: number;
+    }) => api.get('/budget-control/transactions', { params }),
+    recordTransaction: (data: {
+        budget_estimate_id: string;
+        fund_source_id?: string;
+        transaction_type: string;
+        transaction_date?: string;
+        voucher_id?: string;
+        doc_no?: string;
+        description?: string;
+        amount: number;
+        authorization_id?: string;
+        fiscal_year?: number;
+        fiscal_period?: number;
+        department_code?: string;
+        project_code?: string;
+        account_code?: string;
+    }) => api.post('/budget-control/transactions', data),
+
+    // Budget Alerts
+    getAlerts: (params?: { fiscal_year?: number; severity?: string; limit?: number }) =>
+        api.get('/budget-control/alerts', { params }),
+    getAlertSummary: (params?: { fiscal_year?: number }) =>
+        api.get('/budget-control/alerts/summary', { params }),
+    acknowledgeAlert: (id: string, data?: { notes?: string }) =>
+        api.post(`/budget-control/alerts/${id}/acknowledge`, data),
+    resolveAlert: (id: string, data: { resolution_notes: string }) =>
+        api.post(`/budget-control/alerts/${id}/resolve`, data),
+
+    // Budget Reports
+    getUtilizationReport: (params?: { fiscal_year?: number; fund_source_id?: string; chapter_code?: string }) =>
+        api.get('/budget-control/report/utilization', { params }),
+    getVarianceReport: (params?: { fiscal_year?: number; chapter_code?: string }) =>
+        api.get('/budget-control/report/variance', { params }),
+    getDashboard: (params?: { fiscal_year?: number }) =>
+        api.get('/budget-control/dashboard', { params }),
+
+    // Workflow Rules
+    getWorkflowRules: (params?: { rule_type?: string; is_active?: number }) =>
+        api.get('/budget-control/workflow-rules', { params }),
+    updateWorkflowRule: (id: string, data: any) =>
+        api.put(`/budget-control/workflow-rules/${id}`, data),
 };
 
 export const bankService = {
@@ -127,6 +308,13 @@ export const assetService = {
     disposeAsset: (data: any) => api.post('/assets/dispose', data),
     deleteAsset: (id: string) => api.delete(`/assets/${id}`),
     deleteCCDC: (id: string) => api.delete(`/ccdc/${id}`),
+
+    // Allocation History (Chi phí trả trước)
+    getAllocationHistory: (params?: { period?: string, item_id?: string }) => api.get('/allocation-history', { params }),
+    checkAllocationDuplicate: (period: string, item_id: string) => api.get('/allocation-history/check-duplicate', { params: { period, item_id } }),
+    recordAllocation: (data: { period: string, item_id: string, item_type?: string, item_name: string, amount: number, target_account: string, voucher_id?: string }) =>
+        api.post('/allocation-history', data),
+    getAllocationSummary: () => api.get('/allocation-history/summary'),
 
     // HCSN - Fixed Assets Extended
     getFixedAssets: (params?: any) => api.get('/assets/fixed', { params }),
@@ -179,6 +367,7 @@ export const reportService = {
     getCashFlow: (params: any) => api.get('/reports/cash-flow', { params }),
     // NEW REPORTS
     getGeneralLedger: (params: any) => api.get('/reports/general-ledger', { params }),
+    getGeneralJournal: (params: any) => api.get('/reports/general-journal', { params }),
     getBankBook: (params: any) => api.get('/reports/bank-book', { params }),
     getInventoryLedger: (params: any) => api.get('/reports/inventory-ledger', { params }),
     getDebtLedger: (params: any) => api.get('/reports/debt-ledger', { params }),
@@ -360,7 +549,9 @@ export const reminderService = {
 export const hcsnService = {
     getFundSources: () => api.get('/hcsn/fund-sources'),
     getBudgetEstimates: (params?: any) => api.get('/hcsn/budget-estimates', { params }),
-    // Additional methods if needed
+    getOffBalanceLogs: (params?: any) => api.get('/hcsn/off-balance/logs', { params }),
+    createOffBalanceLog: (data: any) => api.post('/hcsn/off-balance/logs', data),
+    getOffBalanceSummary: () => api.get('/hcsn/off-balance/summary'),
 };
 
 // ========================================
@@ -394,6 +585,79 @@ export const debtService = {
 
     // Báo cáo
     getAgingReport: (type: 'receivables' | 'payables') => api.get('/debt/aging-report', { params: { type } }),
+};
+
+export const treasuryService = {
+    testConnection: () => api.get('/treasury/connection-test'),
+    getBudgetAllocation: (params: { fiscalYear: string, budgetType: string }) => api.get('/treasury/budget/allocation', { params }),
+    getBudgetExecution: (params: { fiscalYear: string, fromDate: string, toDate: string }) => api.get('/treasury/budget/execution', { params }),
+    importTransactions: (params: { fromDate: string, toDate: string }) => api.get('/treasury/transactions/import', { params }),
+    saveImportedTransactions: (data: { fromDate: string, toDate: string }) => api.post('/treasury/transactions/import-save', data),
+    saveImportedData: (data: any[]) => api.post('/treasury/transactions/import-batch', { transactions: data }),
+    reconcile: (data: { fromDate: string, toDate: string }) => api.post('/treasury/reconciliation', data),
+    submitPaymentOrder: (data: any) => api.post('/treasury/payment-orders', data),
+    getPaymentOrderStatus: (id: string) => api.get(`/treasury/payment-orders/${id}/status`),
+    getReconciliationDetail: (fiscalMonth: string) => api.get('/treasury/reconciliation/detail', { params: { fiscalMonth } }),
+    handleReconciliationAction: (data: { itemId: string, action: string, note?: string }) => api.post('/treasury/reconciliation/action', data),
+};
+
+export const xmlExportService = {
+    getDocumentTypes: () => api.get('/xml-export/document-types'),
+    getVouchers: (params: { fromDate?: string; toDate?: string; type?: string }) => api.post('/xml-export/vouchers', params),
+    preview: (payload: { documentType: string; data: any }) => api.post('/xml-export/preview', payload),
+    download: (payload: { documents: { type: string; data: any }[] }) =>
+        api.post('/xml-export/download', payload, { responseType: 'blob' }),
+    getHistory: () => api.get('/xml-export/history'),
+};
+
+// ========================================
+// CUSTOM REPORT SERVICE - Báo cáo tùy biến
+// Import Excel templates và generate reports
+// ========================================
+export const customReportService = {
+    // Template analysis
+    analyzeTemplate: (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/reports/custom/analyze-template', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+
+    // AI Enhancement (optional)
+    aiEnhance: (data: { unmappedFields: any[]; templateHash: string }) =>
+        api.post('/reports/custom/ai-enhance', data),
+    getAIStatus: () => api.get('/reports/custom/ai-status'),
+
+    // Templates CRUD
+    getTemplates: () => api.get('/reports/custom/templates'),
+    getTemplate: (id: string) => api.get(`/reports/custom/templates/${id}`),
+    saveTemplate: (data: {
+        name: string;
+        description?: string;
+        parsedTemplate: any;
+        fieldMappings: any[];
+        aggregationRules?: any[];
+        filename?: string;
+        fileSize?: number;
+        isShared?: boolean;
+    }) => api.post('/reports/custom/templates', data),
+    deleteTemplate: (id: string) => api.delete(`/reports/custom/templates/${id}`),
+    updateMappings: (id: string, fieldMappings: any[]) =>
+        api.post(`/reports/custom/update-mappings/${id}`, { fieldMappings }),
+
+    // Report generation
+    generateReport: (templateId: string, params: { filters?: any; outputFormat?: 'json' | 'excel' }) =>
+        api.post(`/reports/custom/generate/${templateId}`, params, {
+            responseType: params.outputFormat === 'excel' ? 'arraybuffer' : 'json'
+        }),
+    previewReport: (data: { fieldMappings: any[]; filters?: any }) =>
+        api.post('/reports/custom/preview', data),
+
+    // Schema & Logs
+    getSchemaInfo: () => api.get('/reports/custom/schema-info'),
+    getGenerationLogs: (params?: { limit?: number }) =>
+        api.get('/reports/custom/generation-logs', { params }),
 };
 
 export default api;

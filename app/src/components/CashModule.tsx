@@ -4,9 +4,10 @@ import { SmartTable, type ColumnDef } from './SmartTable';
 import { type RibbonAction } from './Ribbon';
 import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
-import { toVietnameseWords } from '../utils/numberToWords';
-import { formatDateVNLong, toInputDateValue } from '../utils/dateUtils';
+import { toInputDateValue } from '../utils/dateUtils';
 import { PrintPreviewModal } from './PrintTemplates';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
 
 interface CashData {
     cash: number;
@@ -18,6 +19,7 @@ interface CashModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (viewId: string, data?: any) => void;
 }
 
 const VoucherDetailRow = React.memo(({
@@ -64,6 +66,24 @@ const VoucherDetailRow = React.memo(({
             <td className="px-2 py-1">
                 <input
                     type="text"
+                    defaultValue={line.itemCode || ''}
+                    onBlur={(e) => onChange(idx, 'itemCode', e.target.value)}
+                    className="w-full bg-transparent border-none outline-none focus:ring-0 text-[13px] font-mono py-1"
+                    placeholder="Mục"
+                />
+            </td>
+            <td className="px-2 py-1">
+                <input
+                    type="text"
+                    defaultValue={line.subItemCode || ''}
+                    onBlur={(e) => onChange(idx, 'subItemCode', e.target.value)}
+                    className="w-full bg-transparent border-none outline-none focus:ring-0 text-[13px] font-mono py-1"
+                    placeholder="Tiểu mục"
+                />
+            </td>
+            <td className="px-2 py-1">
+                <input
+                    type="text"
                     defaultValue={line.debitAcc || ''}
                     onBlur={(e) => onChange(idx, 'debitAcc', e.target.value)}
                     className="w-full bg-transparent border-none outline-none focus:ring-0 text-[13px] font-bold text-blue-600 py-1 uppercase"
@@ -83,8 +103,6 @@ const VoucherDetailRow = React.memo(({
                     value={localAmount}
                     onFocus={(e) => {
                         e.target.select();
-                        // Optional: strip formatting on focus for easier editing? 
-                        // For now, keep formatting, it's standard in many VN accounting apps to verify reading.
                     }}
                     onChange={(e) => setLocalAmount(e.target.value)}
                     onBlur={(e) => {
@@ -112,24 +130,17 @@ const VoucherDetailRow = React.memo(({
         </tr>
     );
 }, (prev, next) => {
-    // Memoization check: Only re-render if identity (id) or values actually change
-    // Since we handle inputs locally via defaultValue/onBlur (uncontrolled-ish pattern), 
-    // we strictly avoid re-render unless structure changes to prevent focus loss.
-    // However, if we want to support external updates (like loading), we need to check props.
-    // The useEffect inside handles the sync, so re-rendering is safe IF we don't destroy DOM.
-    // Returning true means "do not re-render".
-
-    // If lines are equal (reference equality), no re-render needed?
-    // Actually, create a deep comparison for safety.
     return prev.idx === next.idx &&
         prev.line._id === next.line._id &&
         prev.line.amount === next.line.amount &&
         prev.line.description === next.line.description &&
+        prev.line.itemCode === next.line.itemCode &&
+        prev.line.subItemCode === next.line.subItemCode &&
         prev.line.debitAcc === next.line.debitAcc &&
         prev.line.creditAcc === next.line.creditAcc;
 });
 
-export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printSignal = 0, onSetHeader }) => {
+export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printSignal = 0, onSetHeader, onNavigate }) => {
     const [data, setData] = useState<CashData | null>(null);
     const [loading, setLoading] = useState(true);
     const [bankStaging, setBankStaging] = useState<any[]>([]);
@@ -139,6 +150,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
     const [selectedRow, setSelectedRow] = useState<any>(null);
+    const [printRecord, setPrintRecord] = useState<any>(null); // Record to print
 
     const [voucher, setVoucher] = useState({
         objectName: '',
@@ -149,8 +161,8 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
         docDate: toInputDateValue(),
         postDate: toInputDateValue(),
         lines: [
-            { _id: '1', description: 'Tiền hàng hóa đơn 001', debitAcc: subView === 'receipt' ? '1111' : '331', creditAcc: subView === 'receipt' ? '131' : '1111', amount: 50000000 },
-            { _id: '2', description: 'Tiền thuế GTGT hóa đơn 001', debitAcc: subView === 'receipt' ? '1111' : '133', creditAcc: subView === 'receipt' ? '3331' : '1111', amount: 5000000 },
+            { _id: '1', description: 'Tiền hàng hóa đơn 001', debitAcc: subView === 'receipt' ? '1111' : '331', creditAcc: subView === 'receipt' ? '131' : '1111', amount: 50000000, itemCode: '', subItemCode: '' },
+            { _id: '2', description: 'Tiền thuế GTGT hóa đơn 001', debitAcc: subView === 'receipt' ? '1111' : '133', creditAcc: subView === 'receipt' ? '3331' : '1111', amount: 5000000, itemCode: '', subItemCode: '' },
         ]
     });
 
@@ -178,13 +190,17 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                             description: l.description || '',
                             debitAcc: l.debit_account || l.account_code || '',
                             creditAcc: l.credit_account || '',
-                            amount: l.amount || 0
+                            amount: l.amount || 0,
+                            itemCode: l.item_code || l.itemCode || '',
+                            subItemCode: l.sub_item_code || l.subItemCode || ''
                         })) : [{
                             _id: Math.random().toString(36).substr(2, 9),
                             description: selectedRow.description,
                             debitAcc: selectedRow.debit_amount > 0 ? (selectedRow.account_code || '') : (selectedRow.reciprocal_acc || ''),
                             creditAcc: selectedRow.debit_amount > 0 ? (selectedRow.reciprocal_acc || '') : (selectedRow.account_code || ''),
-                            amount: Math.abs(selectedRow.amount || selectedRow.debit_amount || selectedRow.credit_amount || 0)
+                            amount: Math.abs(selectedRow.amount || selectedRow.debit_amount || selectedRow.credit_amount || 0),
+                            itemCode: selectedRow.item_code || selectedRow.itemCode || '',
+                            subItemCode: selectedRow.sub_item_code || selectedRow.subItemCode || ''
                         }]
                     });
                 } else {
@@ -206,7 +222,9 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                                     description: l.description || fullData.description || '',
                                     debitAcc: l.debit_account || l.account_code || '',
                                     creditAcc: l.credit_account || '',
-                                    amount: l.amount || 0
+                                    amount: l.amount || 0,
+                                    itemCode: l.item_code || l.itemCode || '',
+                                    subItemCode: l.sub_item_code || l.subItemCode || ''
                                 }))
                             });
 
@@ -220,7 +238,9 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                                         description: fullData.description,
                                         debitAcc: fullData.debit_account || fullData.account_code || '',
                                         creditAcc: fullData.credit_account || '',
-                                        amount: Math.abs(fullData.amount || 0)
+                                        amount: Math.abs(fullData.amount || 0),
+                                        itemCode: fullData.item_code || fullData.itemCode || '',
+                                        subItemCode: fullData.sub_item_code || fullData.subItemCode || ''
                                     }]
                                 }));
                             }
@@ -258,13 +278,17 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                                     description: l.description || '',
                                     debitAcc: l.debit_account || l.account_code || '',
                                     creditAcc: l.credit_account || '',
-                                    amount: l.amount || 0
+                                    amount: l.amount || 0,
+                                    itemCode: l.item_code || l.itemCode || '',
+                                    subItemCode: l.sub_item_code || l.subItemCode || ''
                                 })) : [{
                                     _id: Math.random().toString(36).substr(2, 9),
                                     description: selectedRow.description,
                                     debitAcc: fallbackDebit || selectedRow.debit_account || '',
                                     creditAcc: fallbackCredit || selectedRow.credit_account || '',
-                                    amount: Math.abs(selectedRow.amount || selectedRow.debit_amount || selectedRow.credit_amount || 0)
+                                    amount: Math.abs(selectedRow.amount || selectedRow.debit_amount || selectedRow.credit_amount || 0),
+                                    itemCode: selectedRow.item_code || selectedRow.itemCode || '',
+                                    subItemCode: selectedRow.sub_item_code || selectedRow.subItemCode || ''
                                 }]
                             });
                         })
@@ -283,22 +307,61 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                         description: subView === 'receipt' ? 'Thu tiền...' : 'Chi tiền...',
                         debitAcc: (subView === 'receipt') ? '1111' : (subView === 'bank_in' ? '1121' : ''),
                         creditAcc: (subView === 'payment') ? '1111' : (subView === 'bank_out' ? '1121' : ''),
-                        amount: 0
+                        amount: 0,
+                        itemCode: '',
+                        subItemCode: ''
                     }]
                 }));
             }
         }
     }, [showVoucherModal]);
 
+    // Handle print signal from Ribbon
     useEffect(() => {
         if (printSignal > 0) {
-            if (showVoucherModal) {
-                setShowPrintPreview(true);
-            } else {
-                window.print();
+            // Only allow printing for voucher views (receipt, payment, bank_in, bank_out)
+            const printableViews = ['receipt', 'payment', 'bank_in', 'bank_out'];
+            if (!printableViews.includes(subView)) {
+                alert('Chức năng in chỉ áp dụng cho Phiếu thu, Phiếu chi và các giao dịch Ngân hàng.');
+                return;
             }
+
+            // If viewing a voucher detail, print that voucher
+            if (showVoucherModal && voucher) {
+                // Convert voucher state to print record format
+                const totalAmount = voucher.lines.reduce((sum, l) => sum + (l.amount || 0), 0);
+                const record = {
+                    voucher_no: voucher.docNo,
+                    voucher_date: voucher.docDate,
+                    doc_no: voucher.docNo,
+                    date: voucher.docDate,
+                    payee_name: voucher.personName,
+                    payer_name: voucher.personName,
+                    address: voucher.address,
+                    description: voucher.reason,
+                    reason: voucher.reason,
+                    amount: totalAmount,
+                    total_amount: totalAmount,
+                    debit_account: voucher.lines[0]?.debitAcc || '',
+                    credit_account: voucher.lines[0]?.creditAcc || '',
+                    lines: voucher.lines,
+                };
+                setPrintRecord(record);
+                setShowPrintPreview(true);
+                return;
+            }
+
+            // If a row is selected from list, print that
+            if (selectedRow) {
+                setPrintRecord(selectedRow);
+                setShowPrintPreview(true);
+                return;
+            }
+
+            // No selection - show message
+            alert('Vui lòng chọn một phiếu từ danh sách hoặc mở chi tiết phiếu để in.');
         }
-    }, [printSignal, showVoucherModal]);
+    }, [printSignal, showVoucherModal, selectedRow, subView, voucher]);
 
     const loadBalances = async () => {
         try {
@@ -549,8 +612,26 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
     return (
         <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
 
+            {/* Module Overview - Default Landing Page */}
+            {(subView === 'overview' || subView === '' || !subView) && (
+                <ModuleOverview
+                    title={MODULE_CONFIGS.cash.title}
+                    description={MODULE_CONFIGS.cash.description}
+                    icon={MODULE_CONFIGS.cash.icon}
+                    iconColor={MODULE_CONFIGS.cash.iconColor}
+                    workflow={MODULE_CONFIGS.cash.workflow}
+                    features={MODULE_CONFIGS.cash.features}
+                    onNavigate={onNavigate}
+                    stats={[
+                        { icon: 'payments', label: 'Tiền mặt (111)', value: formatNumber(data?.cash || 0), color: 'green' },
+                        { icon: 'account_balance', label: 'Tiền gửi (112)', value: formatNumber(data?.bank || 0), color: 'blue' },
+                        { icon: 'receipt_long', label: 'Phát sinh tháng', value: (data?.history || []).length, color: 'amber' },
+                        { icon: 'check_circle', label: 'Trạng thái', value: 'Sẵn sàng', color: 'green' },
+                    ]}
+                />
+            )}
 
-            <div className={`flex-1 flex flex-col overflow-hidden`}>
+            <div className={`flex-1 flex flex-col overflow-hidden ${(subView === 'overview' || subView === '' || !subView) ? 'hidden' : ''}`}>
                 {/* Top Summary Section Table (Only in generic list) */}
                 {subView === 'list' && (
                     <div className="px-6 py-4 bg-white dark:bg-slate-800 border-b border-border-light dark:border-border-dark shrink-0">
@@ -701,11 +782,14 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                     )}
                 </div>
                 {/* Print Preview Modal - HCSN Standard */}
-                {showPrintPreview && selectedRow && (
+                {showPrintPreview && printRecord && (
                     <PrintPreviewModal
-                        record={selectedRow}
-                        view={subView === 'receipt' ? 'CASH_RECEIPT' : 'CASH_PAYMENT'} // bank_in/bank_out fallback to payment template or specific later
-                        onClose={() => setShowPrintPreview(false)}
+                        record={printRecord}
+                        view={subView === 'receipt' || subView === 'bank_in' ? 'CASH_RECEIPT' : 'CASH_PAYMENT'}
+                        onClose={() => {
+                            setShowPrintPreview(false);
+                            setPrintRecord(null);
+                        }}
                         companyInfo={companyInfo}
                     />
                 )}
@@ -807,7 +891,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                                             Chi tiết hạch toán
                                         </h3>
                                         <button
-                                            onClick={() => setVoucher({ ...voucher, lines: [...voucher.lines, { _id: Math.random().toString(36).substr(2, 9), description: voucher.reason, debitAcc: '', creditAcc: '', amount: 0 }] })}
+                                            onClick={() => setVoucher({ ...voucher, lines: [...voucher.lines, { _id: Math.random().toString(36).substr(2, 9), description: voucher.reason, debitAcc: '', creditAcc: '', amount: 0, itemCode: '', subItemCode: '' }] })}
                                             className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-full transition-colors"
                                         >
                                             <span className="material-symbols-outlined text-[16px]">add</span>
@@ -821,6 +905,8 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                                                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-10">#</th>
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Diễn giải</th>
+                                                    <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-20">Mục</th>
+                                                    <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">Tiểu mục</th>
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">TK Nợ</th>
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">TK Có</th>
                                                     <th className="px-3 py-2 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-36">Số tiền</th>
@@ -840,7 +926,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                                             </tbody>
                                             <tfoot>
                                                 <tr className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700">
-                                                    <td colSpan={4} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Tổng cộng:</td>
+                                                    <td colSpan={6} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Tổng cộng:</td>
                                                     <td className="px-4 py-3 text-right text-sm font-mono font-black text-blue-600">
                                                         {formatNumber(voucher.lines.reduce((sum, l) => sum + l.amount, 0))}
                                                     </td>
@@ -864,173 +950,6 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                 </div >
             )}
 
-            {/* Professional Print Preview for Phiếu thu */}
-            {
-                showPrintPreview && (
-                    <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 lg:p-10 no-print">
-                        <div className="bg-white dark:bg-slate-900 w-full max-w-5xl h-full rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
-                            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800">
-                                <h3 className="font-bold flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-blue-600">print_connect</span>
-                                    Xem trước bản in {subView.includes('receipt') || subView.includes('bank_in') ? 'Phiếu thu/Báo có' : 'Phiếu chi/Báo nợ'}
-                                </h3>
-                                <button
-                                    onClick={() => setShowPrintPreview(false)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                                >
-                                    <span className="material-symbols-outlined">close</span>
-                                </button>
-                            </div>
-
-                            <div className="flex-1 overflow-auto p-12 bg-slate-200 dark:bg-slate-950 flex justify-center custom-scrollbar">
-                                {/* The Actual Printed Page - Makeup */}
-                                <div className="bg-white text-slate-900 w-[21cm] min-h-[29.7cm] p-16 shadow-2xl relative printable-area font-serif">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <div>
-                                            <h2 className="font-bold text-sm uppercase">{companyInfo.name}</h2>
-                                            <p className="text-xs">Địa chỉ: {companyInfo.address}</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <h2 className="font-bold text-xs uppercase">Mẫu số C40-BB</h2>
-                                            <p className="text-[10px] italic leading-tight">(Ban hành theo Thông tư số 24/2024/TT-BTC<br />Ngày 17/04/2024 của Bộ Tài chính)</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="text-center my-10">
-                                        <h1 className="text-3xl font-extrabold uppercase tracking-widest">
-                                            {subView === 'receipt' ? 'PHIẾU THU' :
-                                                subView === 'payment' ? 'PHIẾU CHI' :
-                                                    subView === 'bank_in' ? 'GIẤY BÁO CÓ' : 'GIẤY BÁO NỢ'}
-                                        </h1>
-                                        <p className="italic text-sm">{formatDateVNLong(voucher.docDate)}</p>
-                                        <p className="text-sm">Số: {voucher.docNo}</p>
-                                    </div>
-
-                                    <div className="flex justify-end mb-4">
-                                        <div className="text-sm w-40 border border-slate-200 p-2">
-                                            <p>Quyển số: .........</p>
-                                            <p className="font-bold border-b border-slate-100 mb-1 pb-1">Hạch toán:</p>
-                                            {voucher.lines.slice(0, 5).map((l, i) => (
-                                                <div key={i} className="flex justify-between text-[10px] font-mono leading-tight">
-                                                    <span>N/C: {l.debitAcc}/{l.creditAcc}</span>
-                                                </div>
-                                            ))}
-                                            {voucher.lines.length > 5 && <p className="text-[10px]">...</p>}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3 text-base leading-relaxed">
-                                        <div className="flex">
-                                            <span className="shrink-0">{subView === 'receipt' || subView === 'bank_in' ? 'Họ và tên người nộp tiền' : 'Họ và tên người nhận tiền'}:</span>
-                                            <span className="flex-1 border-b border-dotted border-slate-400 ml-2 font-bold px-2 uppercase">{voucher.personName}</span>
-                                        </div>
-                                        <div className="flex">
-                                            <span className="shrink-0">Địa chỉ:</span>
-                                            <span className="flex-1 border-b border-dotted border-slate-400 ml-2 px-2">{voucher.address}</span>
-                                        </div>
-                                        <div className="flex">
-                                            <span className="shrink-0">{subView === 'receipt' || subView === 'bank_in' ? 'Lý do nộp' : 'Lý do chi'}:</span>
-                                            <span className="flex-1 border-b border-dotted border-slate-400 ml-2 px-2 font-medium">{voucher.reason}</span>
-                                        </div>
-                                        <div className="flex">
-                                            <span className="shrink-0">Số tiền:</span>
-                                            <span className="flex-1 border-b border-dotted border-slate-400 ml-2 font-bold px-2 italic text-lg tracking-wider">
-                                                {formatNumber(voucher.lines.reduce((sum, l) => sum + l.amount, 0))} VNĐ
-                                            </span>
-                                        </div>
-                                        <div className="flex">
-                                            <span className="shrink-0">Bằng chữ:</span>
-                                            <span className="flex-1 border-b border-dotted border-slate-400 ml-2 px-2 italic font-bold">
-                                                {toVietnameseWords(voucher.lines.reduce((sum, l) => sum + l.amount, 0))}
-                                            </span>
-                                        </div>
-                                        <div className="flex">
-                                            <span className="shrink-0">Kèm theo:</span>
-                                            <span className="flex-1 border-b border-dotted border-slate-400 ml-2 px-2">.........</span>
-                                            <span className="shrink-0 ml-4 italic text-sm">chứng từ gốc.</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Accounting Details Breakdown in Print */}
-                                    {voucher.lines.length > 1 && (
-                                        <div className="mt-8 border-t border-slate-300 pt-4">
-                                            <p className="text-xs font-bold italic mb-2">Chi tiết hạch toán:</p>
-                                            <table className="w-full text-[10px] border-collapse border border-slate-400">
-                                                <thead>
-                                                    <tr className="bg-slate-50">
-                                                        <th className="border border-slate-400 px-2 py-1 text-left uppercase">Diễn giải</th>
-                                                        <th className="border border-slate-400 px-2 py-1 w-16 uppercase">TK Nợ</th>
-                                                        <th className="border border-slate-400 px-2 py-1 w-16 uppercase">TK Có</th>
-                                                        <th className="border border-slate-400 px-2 py-1 text-right w-24 uppercase">Số tiền</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {voucher.lines.map((l, i) => (
-                                                        <tr key={i}>
-                                                            <td className="border border-slate-400 px-2 py-1">{l.description}</td>
-                                                            <td className="border border-slate-400 px-2 py-1 text-center font-bold">{l.debitAcc}</td>
-                                                            <td className="border border-slate-400 px-2 py-1 text-center font-bold">{l.creditAcc}</td>
-                                                            <td className="border border-slate-400 px-2 py-1 text-right font-mono">{formatNumber(l.amount)}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                                <tfoot>
-                                                    <tr>
-                                                        <td colSpan={3} className="border border-slate-400 px-2 py-1 text-right font-bold uppercase">Tổng cộng chi tiết:</td>
-                                                        <td className="border border-slate-400 px-2 py-1 text-right font-mono font-bold">
-                                                            {formatNumber(voucher.lines.reduce((sum, l) => sum + l.amount, 0))}
-                                                        </td>
-                                                    </tr>
-                                                </tfoot>
-                                            </table>
-                                        </div>
-                                    )}
-
-                                    <div className="mt-16 grid grid-cols-5 text-center text-[10px] font-bold gap-2 leading-tight">
-                                        <div>
-                                            <p className="uppercase">Giám đốc</p>
-                                            <p className="italic font-normal">(Ký, họ tên, đóng dấu)</p>
-                                        </div>
-                                        <div>
-                                            <p className="uppercase">Kế toán trưởng</p>
-                                            <p className="italic font-normal">(Ký, họ tên)</p>
-                                        </div>
-                                        <div>
-                                            <p className="uppercase">Thủ quỹ</p>
-                                            <p className="italic font-normal">(Ký, họ tên)</p>
-                                        </div>
-                                        <div>
-                                            <p className="uppercase">{subView === 'receipt' || subView === 'bank_in' ? 'Người nộp tiền' : 'Người nhận tiền'}</p>
-                                            <p className="italic font-normal">(Ký, họ tên)</p>
-                                        </div>
-                                        <div>
-                                            <p className="uppercase">Người lập biểu</p>
-                                            <p className="italic font-normal">(Ký, họ tên)</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-2 text-[10px] italic pt-12">
-                                        <p>Đã nhận đủ số tiền (viết bằng chữ): ............................................................................................</p>
-                                        <p className="mt-2">+ Tỷ giá ngoại tệ (vàng bạc, đá quý): ........................................................................................</p>
-                                        <p>+ Số tiền quy đổi: ..........................................................................................................................</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex justify-end gap-3 no-print">
-                                <button onClick={() => setShowPrintPreview(false)} className="px-6 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold">Đóng</button>
-                                <button
-                                    className="px-8 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-500/30 flex items-center gap-2"
-                                    onClick={() => window.print()}
-                                >
-                                    <span className="material-symbols-outlined text-[18px]">print</span>
-                                    In phiếu ngay
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
         </div >
     );
 };

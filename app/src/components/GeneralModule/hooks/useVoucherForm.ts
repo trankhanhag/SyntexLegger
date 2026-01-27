@@ -18,6 +18,8 @@ const EMPTY_LINE: VoucherLine = {
     partnerCode: '',
     dim1: '',
     dim2: '',
+    itemCode: '',
+    subItemCode: '',
     quantity: 0,
     unitPrice: 0,
     currency: 'VND',
@@ -252,14 +254,28 @@ export function useVoucherForm(options: UseVoucherFormOptions = {}): UseVoucherF
 
         try {
             // Calculate total
-            const total = voucher.lines.reduce((sum, line) => sum + (line.amount || 0), 0);
+            const total = (voucher.lines || []).reduce((sum, line) => sum + (line.amount || 0), 0);
+            const items = (voucher.lines || []).map(line => ({
+                ...line,
+                debit_acc: line.debitAcc ?? (line as any).debit_acc,
+                credit_acc: line.creditAcc ?? (line as any).credit_acc,
+                partner_code: line.partnerCode ?? (line as any).partner_code,
+                project_code: line.projectCode ?? (line as any).project_code,
+                contract_code: line.contractCode ?? (line as any).contract_code,
+                item_code: line.itemCode ?? (line as any).item_code,
+                sub_item_code: line.subItemCode ?? (line as any).sub_item_code
+            }));
+
             const dataToSave = {
                 ...voucher,
-                total_amount: total
+                total_amount: total,
+                items
             };
+            delete (dataToSave as Partial<Voucher>).lines;
 
             const response = await voucherService.save(dataToSave);
-            const savedVoucher = response.data;
+            const savedId = response?.data?.id || voucher.id;
+            const savedVoucher = { ...voucher, id: savedId, total_amount: total };
 
             // Update state with saved data (including server-generated IDs)
             setVoucherState(savedVoucher);

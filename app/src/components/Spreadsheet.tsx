@@ -22,6 +22,8 @@ interface Transaction {
     credit_acc?: string;
     amount?: number;
     partner_code?: string;
+    item_code?: string;
+    sub_item_code?: string;
     is_valid: boolean;
     error_log?: string;
 }
@@ -163,7 +165,9 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
                     debitAcc: r.debit_acc || '',
                     creditAcc: r.credit_acc || '',
                     amount: Number(r.amount) || 0,
-                    partnerCode: r.partner_code || ''
+                    partnerCode: r.partner_code || '',
+                    itemCode: r.item_code || '',
+                    subItemCode: r.sub_item_code || ''
                 }));
 
                 const totalAmount = lines.reduce((sum, l) => sum + (l.amount || 0), 0);
@@ -207,6 +211,8 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
         { field: 'description', headerName: 'Diễn giải', width: 'min-w-[300px]', editable: true },
         { field: 'debit_acc', headerName: 'TK Nợ', width: 'w-20', align: 'center', editable: true, dataListId: 'account-list' },
         { field: 'credit_acc', headerName: 'TK Có', width: 'w-20', align: 'center', editable: true, dataListId: 'account-list' },
+        { field: 'item_code', headerName: 'Mục', width: 'w-20', align: 'center', editable: true },
+        { field: 'sub_item_code', headerName: 'Tiểu mục', width: 'w-24', align: 'center', editable: true },
         { field: 'amount', headerName: 'Số tiền', width: 'w-32', align: 'right', editable: true, type: 'number' },
         { field: 'partner_code', headerName: 'Đối tượng', width: 'w-40', editable: true },
         { field: 'error_log', headerName: 'Ghi chú', width: 'w-40', editable: false } // Readonly
@@ -223,6 +229,8 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
             credit_acc: rowData.credit_acc,
             amount: Number(rowData.amount),
             partner_code: rowData.partner_code,
+            item_code: rowData.item_code,
+            sub_item_code: rowData.sub_item_code,
             is_valid: true // Assuming it's valid if user commits, or backend validates
         };
 

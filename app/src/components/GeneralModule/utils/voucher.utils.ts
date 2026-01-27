@@ -1,29 +1,31 @@
 /**
  * Voucher Utility Functions
  * SyntexHCSN - Helper functions for voucher operations
+ *
+ * NOTE: Number/Currency formatting is re-exported from central utils/format.ts
+ * for consistency across the application.
  */
 
 import type { Voucher, VoucherLine } from '../types/voucher.types';
+import {
+    formatNumber as centralFormatNumber,
+    formatCurrency as centralFormatCurrency
+} from '../../../utils/format';
 
 /**
  * Format số tiền theo chuẩn Việt Nam
+ * @deprecated Use formatCurrency from utils/format.ts directly
  */
-export function formatCurrency(amount: number, currency: string = 'VND'): string {
-    return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: currency,
-        maximumFractionDigits: currency === 'VND' ? 0 : 2
-    }).format(amount);
+export function formatCurrency(amount: number, _currency: string = 'VND'): string {
+    return centralFormatCurrency(amount, false);
 }
 
 /**
  * Format số với separator hàng nghìn
+ * @deprecated Use formatNumber from utils/format.ts directly
  */
 export function formatNumber(num: number, decimals: number = 0): string {
-    return new Intl.NumberFormat('vi-VN', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-    }).format(num);
+    return centralFormatNumber(num, decimals);
 }
 
 /**

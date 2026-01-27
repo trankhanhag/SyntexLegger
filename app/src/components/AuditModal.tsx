@@ -14,44 +14,26 @@ const Modal = ({ title, onClose, children }: { title: string, onClose: () => voi
 export const TaxHealthReport = ({ onClose, isModal = false, onNavigate }: { onClose?: () => void, isModal?: boolean, onNavigate?: (viewId: string) => void }) => {
     const [loading, setLoading] = React.useState(true);
     const [result, setResult] = React.useState<any>(null);
+    const [error, setError] = React.useState<string | null>(null);
+
+    const runAudit = React.useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await auditService.healthCheck();
+            setResult(res.data);
+        } catch (err) {
+            console.error("Audit failed:", err);
+            setResult(null);
+            setError('Không thể tải dữ liệu kiểm tra. Vui lòng thử lại.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
     React.useEffect(() => {
-        const runAudit = async () => {
-            try {
-                const res = await auditService.healthCheck();
-                setResult(res.data);
-            } catch (err) {
-                console.error("Audit failed:", err);
-                // Mock data for fallback/demo if API fails
-                setResult({
-                    score: 50,
-                    anomalies: [
-                        {
-                            type: 'Hóa đơn rủi ro',
-                            severity: 'critical',
-                            message: 'Phát hiện 5 chứng từ giao dịch với nhà cung cấp chưa có MST hoặc MST không hợp lệ.',
-                            target: 'purchase_inbound'
-                        },
-                        {
-                            type: 'Âm kho',
-                            severity: 'warning',
-                            message: 'Tài khoản kho 1561 đang bị âm 551.000 VND.',
-                            target: 'inventory_summary'
-                        },
-                        {
-                            type: 'Lệch chứng từ',
-                            severity: 'critical',
-                            message: 'Có 3 chứng từ có tổng tiền không khớp với chi tiết hạch toán.',
-                            target: 'voucher_list'
-                        }
-                    ]
-                });
-            } finally {
-                setLoading(false);
-            }
-        };
         runAudit();
-    }, []);
+    }, [runAudit]);
 
     const getScoreColor = (score: number) => {
         if (score >= 90) return 'text-green-600';
@@ -91,39 +73,66 @@ export const TaxHealthReport = ({ onClose, isModal = false, onNavigate }: { onCl
         </div>
     );
 
+    if (error) {
+        return (
+            <div className={`flex flex-col items-center justify-center space-y-4 ${isModal ? 'p-16' : 'p-10 h-full'}`}>
+                <span className="material-symbols-outlined text-4xl text-red-500">error</span>
+                <p className="text-slate-600 font-medium">{error}</p>
+                <button
+                    onClick={runAudit}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-bold"
+                >
+                    Thử lại
+                </button>
+            </div>
+        );
+    }
+
+    if (!result) {
+        return (
+            <div className={`flex flex-col items-center justify-center space-y-4 ${isModal ? 'p-16' : 'p-10 h-full'}`}>
+                <span className="material-symbols-outlined text-4xl text-slate-400">warning</span>
+                <p className="text-slate-500">Không có dữ liệu kiểm tra để hiển thị.</p>
+            </div>
+        );
+    }
+
+    const anomalies = result.anomalies || [];
+    const displayScore = anomalies.length === 0 ? 100 : (Number(result.score) || 0);
+
     return (
         <div className={`space-y-8 ${isModal ? 'max-h-[70vh]' : 'h-full overflow-y-auto p-8'}`}>
             {/* Dashboard Header */}
             <div className="flex items-center gap-10 p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-inner">
                 <div className="relative flex-shrink-0">
-                    <svg className="w-32 h-32 transform -rotate-90">
-                        <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-200 dark:text-slate-800" />
-                        <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={364} strokeDashoffset={364 - (364 * result.score / 100)} className={`${getScoreColor(result.score)} transition-all duration-1000 ease-out`} />
+                    <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 128 128">
+                        <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-200 dark:text-slate-800" />
+                        <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={352} strokeDashoffset={String(352 - (352 * displayScore / 100))} strokeLinecap="round" className={`${getScoreColor(displayScore)} transition-all duration-1000 ease-out`} />
                     </svg>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-slate-800 dark:text-white">
-                        <div className={`text-4xl font-black ${getScoreColor(result.score)}`}>{result.score}</div>
-                        <div className="text-[10px] font-bold uppercase text-slate-500">Điểm sức khỏe</div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-slate-800 dark:text-white flex flex-col items-center justify-center">
+                        <div className={`text-4xl font-black leading-none mb-1 ${getScoreColor(displayScore)}`}>{displayScore}</div>
+                        <div className="text-[10px] font-bold uppercase text-slate-500 leading-none">Điểm</div>
                     </div>
                 </div>
 
                 <div className="flex-1 space-y-3">
-                    <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Của bạn đang ở mức {result.score >= 80 ? 'An Toàn' : result.score >= 50 ? 'Trung Bình' : 'Rủi Ro Cao'}</h3>
+                    <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Của bạn đang ở mức {displayScore >= 80 ? 'An Toàn' : displayScore >= 50 ? 'Trung Bình' : 'Rủi Ro Cao'}</h3>
                     <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed italic">
                         Dựa trên phân tích dữ liệu Sổ cái và đối soát hóa đơn điện tử.
-                        Bạn có <span className="font-bold text-red-600">{result.anomalies.filter((a: any) => a.severity === 'critical').length} lỗi nghiêm trọng</span> cần xử lý ngay để tránh bị phạt.
+                        Bạn có <span className="font-bold text-red-600">{anomalies.filter((a: any) => a.severity === 'critical').length} lỗi nghiêm trọng</span> cần xử lý ngay để tránh bị phạt.
                     </p>
                     <div className="flex gap-4 pt-2">
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold border-r border-slate-300 dark:border-slate-700 pr-4">
                             <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                            {result.anomalies.filter((a: any) => a.severity === 'critical').length} Critical
+                            {anomalies.filter((a: any) => a.severity === 'critical').length} Critical
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold border-r border-slate-300 dark:border-slate-700 pr-4">
                             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                            {result.anomalies.filter((a: any) => a.severity === 'warning').length} Warning
+                            {anomalies.filter((a: any) => a.severity === 'warning').length} Warning
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold">
                             <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                            {result.anomalies.filter((a: any) => a.severity === 'info').length} Info
+                            {anomalies.filter((a: any) => a.severity === 'info').length} Info
                         </div>
                     </div>
                 </div>
@@ -136,14 +145,14 @@ export const TaxHealthReport = ({ onClose, isModal = false, onNavigate }: { onCl
                     Chi tiết các sai sót và rủi ro phát hiện
                 </h4>
 
-                {result.anomalies.length === 0 ? (
+                {anomalies.length === 0 ? (
                     <div className="p-10 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                         <span className="material-symbols-outlined text-green-500 text-5xl mb-2">verified</span>
                         <p className="text-slate-500 font-bold">Tuyệt vời! Hệ thống chưa phát hiện sai sót trọng yếu nào.</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {result.anomalies.map((anom: any, idx: number) => (
+                        {anomalies.map((anom: any, idx: number) => (
                             <div key={idx} className={`p-4 rounded-xl border-l-4 bg-white dark:bg-slate-800/50 shadow-sm flex justify-between items-center group hover:shadow-md transition-all ${anom.severity === 'critical' ? 'border-red-500' : anom.severity === 'warning' ? 'border-amber-500' : 'border-blue-500'}`}>
                                 <div className="flex gap-4 items-start">
                                     <div className={`mt-1 p-2 rounded-lg ${anom.severity === 'critical' ? 'bg-red-50 text-red-600' : anom.severity === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>

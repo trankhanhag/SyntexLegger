@@ -7,6 +7,17 @@ import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
 // toVietnameseWords is used in PrintPreviewModal
 import { PrintPreviewModal } from './PrintTemplates';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+
+
+// --- SHARED MODAL COMPONENT ---
+const Modal = ({ title, onClose, widthClass = "max-w-4xl", children }: { title: string, onClose: () => void, widthClass?: string, children: React.ReactNode }) => (
+    <FormModal title={title} onClose={onClose} sizeClass={widthClass} icon="inventory_2" bodyClass="bg-white dark:bg-slate-900">
+        {children}
+    </FormModal>
+);
+
 
 
 const SupplierFormModal = ({ onClose }: { onClose: () => void }) => {
@@ -614,9 +625,10 @@ interface ExpenseModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (viewId: string, data?: any) => void;
 }
 
-export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher', printSignal = 0, onSetHeader }) => {
+export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher', printSignal = 0, onSetHeader, onNavigate }) => {
     const [view, setView] = useState(subView);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
     const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -670,17 +682,21 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
         setSelectedRow(null);
     }, [view, refreshSignal]);
 
+    // Handle print signal from Ribbon
     useEffect(() => {
         if (printSignal > 0) {
-            if (['order', 'inbound', 'service', 'return', 'payment'].includes(view)) {
-                if (!selectedRow) {
-                    alert("Vui lòng chọn một bản ghi để in!");
-                } else {
-                    setShowPrintPreview(true);
-                }
-            } else {
-                window.print();
+            const printableViews = ['order', 'inbound', 'service', 'return', 'payment'];
+            if (!printableViews.includes(view)) {
+                alert('Chức năng in chỉ áp dụng cho: Đề xuất mua sắm, Phiếu nhập hàng, Dịch vụ, Trả hàng, và Thanh toán.');
+                return;
             }
+
+            if (!selectedRow) {
+                alert('Vui lòng chọn một bản ghi từ danh sách trước khi in.');
+                return;
+            }
+
+            setShowPrintPreview(true);
         }
     }, [printSignal, view, selectedRow]);
 
@@ -804,129 +820,145 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
     return (
         <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
 
-            {/* Action Bar - Tabs cho Chi sự nghiệp HCSN */}
-            <div className="px-6 py-3 bg-white/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 backdrop-blur-md z-10">
-                <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-lg">
-                    {[
-                        { key: 'voucher', label: 'Phiếu chi' },
-                        { key: 'payment', label: 'Ủy nhiệm chi' },
-                        { key: 'reduction', label: 'Giảm trừ' },
-                        { key: 'categories', label: 'Khoản mục chi' },
-                        { key: 'payee', label: 'Đối tượng' },
-                        { key: 'report', label: 'Báo cáo' },
-                        { key: 'budget', label: 'Dự toán' },
-                    ].map(tab => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setView(tab.key)}
-                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${view === tab.key ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+            {/* Module Overview - Default Landing Page */}
+            {(view === 'overview' || view === 'expense_overview') && (
+                <ModuleOverview
+                    title={MODULE_CONFIGS.expense.title}
+                    description={MODULE_CONFIGS.expense.description}
+                    icon={MODULE_CONFIGS.expense.icon}
+                    iconColor={MODULE_CONFIGS.expense.iconColor}
+                    workflow={MODULE_CONFIGS.expense.workflow}
+                    features={MODULE_CONFIGS.expense.features}
+                    onNavigate={onNavigate}
+                    stats={[
+                        { icon: 'shopping_cart', label: 'Lệnh chi tháng', value: '-', color: 'amber' },
+                        { icon: 'payments', label: 'Tổng chi tháng', value: '-', color: 'red' },
+                        { icon: 'approval', label: 'Chờ duyệt', value: '-', color: 'purple' },
+                        { icon: 'account_balance', label: 'Tồn quỹ', value: '-', color: 'green' },
+                    ]}
+                />
+            )}
+
+            <div className={`${(view === 'overview' || view === 'expense_overview') ? 'hidden' : 'contents'}`}>
+                {/* Action Bar - Tabs cho Chi sự nghiệp HCSN */}
+                <div className="px-6 py-3 bg-white/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 backdrop-blur-md z-10">
+                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-lg">
+                        {[
+                            { key: 'voucher', label: 'Phiếu chi' },
+                            { key: 'payment', label: 'Ủy nhiệm chi' },
+                            { key: 'reduction', label: 'Giảm trừ' },
+                            { key: 'categories', label: 'Khoản mục chi' },
+                            { key: 'payee', label: 'Đối tượng' },
+                            { key: 'report', label: 'Báo cáo' },
+                            { key: 'budget', label: 'Dự toán' },
+                        ].map(tab => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setView(tab.key)}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${view === tab.key ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    {selectedRow && (
+                        <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800 animate-in slide-in-from-right-4">
+                            <span className="material-symbols-outlined text-blue-600 text-[18px]">check_circle</span>
+                            <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300">Đã chọn: {selectedRow.doc_no || selectedRow.docNo || selectedRow.id}</span>
+                            <button onClick={() => setSelectedRow(null)} className="material-symbols-outlined text-blue-400 hover:text-blue-600 text-[16px] ml-1">cancel</button>
+                        </div>
+                    )}
                 </div>
-                {selectedRow && (
-                    <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800 animate-in slide-in-from-right-4">
-                        <span className="material-symbols-outlined text-blue-600 text-[18px]">check_circle</span>
-                        <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300">Đã chọn: {selectedRow.doc_no || selectedRow.docNo || selectedRow.id}</span>
-                        <button onClick={() => setSelectedRow(null)} className="material-symbols-outlined text-blue-400 hover:text-blue-600 text-[16px] ml-1">cancel</button>
-                    </div>
-                )}
+                <div className="flex-1 overflow-hidden relative">
+                    {loading && (
+                        <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 flex items-center justify-center z-10 transition-opacity">
+                            <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
+
+                    {/* Phiếu chi */}
+                    {view === 'voucher' && <ExpenseVoucherList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
+                    {/* Ủy nhiệm chi & Payment cũ */}
+                    {view === 'payment' && (
+                        <SmartTable data={data} columns={paymentCols} keyField="id" minRows={15} onSelectionChange={setSelectedRow} showTotalRow={false} />
+                    )}
+
+                    {/* Giảm trừ chi */}
+                    {view === 'reduction' && <ExpenseReductionList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
+
+                    {/* Khoản mục chi */}
+                    {view === 'categories' && <ExpenseCategoryList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
+                    {/* Đối tượng chi */}
+                    {(view === 'payee' || view === 'partner' || view === 'supplier') && <SupplierList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
+
+                    {/* Báo cáo */}
+                    {view === 'report' && <ExpenseReportView />}
+                    {/* Dự toán */}
+                    {view === 'budget' && <BudgetComparisonView />}
+                    {/* Vật tư / Hàng hóa nếu có */}
+                    {(view === 'items' || view === 'item') && <ItemList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
+
+
+
+                    {showSupplierModal && (
+                        <SupplierFormModal onClose={() => setShowSupplierModal(false)} />
+                    )}
+
+                    {showItemModal && (
+                        <ItemFormModal onClose={() => setShowItemModal(false)} />
+                    )}
+                    {showExpenseModal && (
+                        <ExpenseFormModal
+                            onClose={() => { setShowExpenseModal(false); setRefreshSignal(s => s + 1); }}
+                            documentType={view === 'voucher' ? 'VOUCHER' : (view === 'payment' ? 'PAYMENT' : 'REDUCTION')}
+                            initialData={selectedRow}
+                        />
+                    )}
+                </div>
+
+                {/* Footer Summary Bar */}
+                {
+                    !['items', 'item', 'supplier', 'partner'].includes(view) && (
+                        <div className="px-6 py-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-10 shrink-0">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tiền hàng chưa thuế</span>
+                                <span className="text-sm font-bold font-mono text-slate-700 dark:text-slate-200 text-right">
+                                    {formatNumber(data.reduce((sum, r) => sum + (r.amount || 0), 0))}
+                                </span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Thuế GTGT</span>
+                                <span className="text-sm font-bold font-mono text-slate-700 dark:text-slate-200 text-right">
+                                    {formatNumber(data.reduce((sum, r) => sum + (r.tax || 0), 0))}
+                                </span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest text-right">Tổng cộng</span>
+                                <span className="text-xl font-black text-blue-600 font-mono text-right">
+                                    {formatNumber(data.reduce((sum, r) => sum + (r.total || r.amount || 0), 0))}
+                                </span>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Print Preview Modal */}
+                {
+                    showPrintPreview && selectedRow && (
+                        <PrintPreviewModal
+                            record={selectedRow}
+                            view={view === 'voucher' || view === 'payment' ? 'CASH_PAYMENT' : 'CASH_PAYMENT'}
+                            onClose={() => setShowPrintPreview(false)}
+                            companyInfo={companyInfo}
+                        />
+                    )
+                }
             </div>
-            <div className="flex-1 overflow-hidden relative">
-                {loading && (
-                    <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 flex items-center justify-center z-10 transition-opacity">
-                        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                )}
-
-                {/* Phiếu chi */}
-                {view === 'voucher' && <ExpenseVoucherList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
-                {/* Ủy nhiệm chi & Payment cũ */}
-                {view === 'payment' && (
-                    <SmartTable data={data} columns={paymentCols} keyField="id" minRows={15} onSelectionChange={setSelectedRow} showTotalRow={false} />
-                )}
-
-                {/* Giảm trừ chi */}
-                {view === 'reduction' && <ExpenseReductionList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
-
-                {/* Khoản mục chi */}
-                {view === 'categories' && <ExpenseCategoryList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
-                {/* Đối tượng chi */}
-                {(view === 'payee' || view === 'partner' || view === 'supplier') && <SupplierList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
-
-                {/* Báo cáo */}
-                {view === 'report' && <ExpenseReportView />}
-                {/* Dự toán */}
-                {view === 'budget' && <BudgetComparisonView />}
-                {/* Vật tư / Hàng hóa nếu có */}
-                {(view === 'items' || view === 'item') && <ItemList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
-
-
-
-                {showSupplierModal && (
-                    <SupplierFormModal onClose={() => setShowSupplierModal(false)} />
-                )}
-
-                {showItemModal && (
-                    <ItemFormModal onClose={() => setShowItemModal(false)} />
-                )}
-                {showExpenseModal && (
-                    <ExpenseFormModal
-                        onClose={() => { setShowExpenseModal(false); setRefreshSignal(s => s + 1); }}
-                        documentType={view === 'voucher' ? 'VOUCHER' : (view === 'payment' ? 'PAYMENT' : 'REDUCTION')}
-                        initialData={selectedRow}
-                    />
-                )}
-            </div>
-
-            {/* Footer Summary Bar */}
-            {
-                !['items', 'item', 'supplier', 'partner'].includes(view) && (
-                    <div className="px-6 py-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-10 shrink-0">
-                        <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tiền hàng chưa thuế</span>
-                            <span className="text-sm font-bold font-mono text-slate-700 dark:text-slate-200 text-right">
-                                {formatNumber(data.reduce((sum, r) => sum + (r.amount || 0), 0))}
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Thuế GTGT</span>
-                            <span className="text-sm font-bold font-mono text-slate-700 dark:text-slate-200 text-right">
-                                {formatNumber(data.reduce((sum, r) => sum + (r.tax || 0), 0))}
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest text-right">Tổng cộng</span>
-                            <span className="text-xl font-black text-blue-600 font-mono text-right">
-                                {formatNumber(data.reduce((sum, r) => sum + (r.total || r.amount || 0), 0))}
-                            </span>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Print Preview Modal */}
-            {
-                showPrintPreview && selectedRow && (
-                    <PrintPreviewModal
-                        record={selectedRow}
-                        view={view === 'voucher' || view === 'payment' ? 'CASH_PAYMENT' : 'CASH_PAYMENT'}
-                        onClose={() => setShowPrintPreview(false)}
-                        companyInfo={companyInfo}
-                    />
-                )
-            }
-        </div >
+        </div>
     );
 };
 
 // --- SUB-COMPONENTS ---
-const Modal = ({ title, onClose, widthClass = "max-w-4xl", children }: { title: string, onClose: () => void, widthClass?: string, children: React.ReactNode }) => (
-    <FormModal title={title} onClose={onClose} sizeClass={widthClass} icon="inventory_2" bodyClass="bg-white dark:bg-slate-900">
-        {children}
-    </FormModal>
-);
 
 const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () => void, documentType: string, initialData?: any }) => {
     const [formData, setFormData] = useState({
@@ -942,6 +974,8 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
         amount: initialData?.amount || 0,
         fund_source_id: initialData?.fund_source_id || '',
         budget_estimate_id: initialData?.budget_estimate_id || '',
+        item_code: initialData?.item_code || '',
+        sub_item_code: initialData?.sub_item_code || '',
         payment_method: initialData?.payment_method || 'CASH',
         bank_account: initialData?.bank_account || '',
         account_code: initialData?.account_code || '611',
@@ -985,8 +1019,14 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
         }
     };
 
+    const getTitle = () => {
+        if (documentType === 'VOUCHER') return initialData ? 'Sửa Phiếu chi' : 'Lập Phiếu chi mới';
+        if (documentType === 'PAYMENT') return initialData ? 'Sửa Ủy nhiệm chi' : 'Lập Ủy nhiệm chi mới';
+        return initialData ? 'Sửa Phiếu giảm trừ phí' : 'Lập Phiếu giảm trừ phí';
+    };
+
     return (
-        <Modal title={initialData ? (documentType === 'VOUCHER' ? 'Sửa Phiếu chi' : (documentType === 'PAYMENT' ? 'Sửa Ủy nhiệm chi' : 'Sửa Phiếu giảm trừ phí')) : (documentType === 'VOUCHER' ? 'Lập Phiếu chi mới' : (documentType === 'PAYMENT' ? 'Lập Ủy nhiệm chi mới' : 'Lập Phiếu giảm trừ phí'))} onClose={onClose}>
+        <Modal title={getTitle()} onClose={onClose}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -1070,6 +1110,27 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
                     </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <label className="form-label">Mục</label>
+                        <input
+                            className="form-input font-mono"
+                            value={formData.item_code}
+                            onChange={e => setFormData({ ...formData, item_code: e.target.value })}
+                            placeholder="Ví dụ: 6050"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="form-label">Tiểu mục</label>
+                        <input
+                            className="form-input font-mono"
+                            value={formData.sub_item_code}
+                            onChange={e => setFormData({ ...formData, sub_item_code: e.target.value })}
+                            placeholder="Ví dụ: 6051"
+                        />
+                    </div>
+                </div>
+
                 <div className="space-y-2">
                     <label className="form-label">Nội dung chi</label>
                     <textarea
@@ -1091,11 +1152,3 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
         </Modal>
     );
 };
-
-
-
-
-
-
-
-

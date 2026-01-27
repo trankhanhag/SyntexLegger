@@ -5,14 +5,18 @@ import { type RibbonAction } from './Ribbon';
 import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
 import { toInputDateValue } from '../utils/dateUtils';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 interface ContractModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (view: string) => void;
 }
 
-export const ContractModule: React.FC<ContractModuleProps> = ({ subView = 'sales', printSignal = 0, onSetHeader }) => {
+export const ContractModule: React.FC<ContractModuleProps> = ({ subView = 'sales', printSignal = 0, onSetHeader, onNavigate: _onNavigate }) => {
     const [view, setView] = useState(subView);
     const [showModal, setShowModal] = useState(false);
     const [contracts, setContracts] = useState<any[]>([]);
@@ -92,11 +96,8 @@ export const ContractModule: React.FC<ContractModuleProps> = ({ subView = 'sales
         fetchData();
     }, [view]);
 
-    useEffect(() => {
-        if (printSignal > 0) {
-            window.print();
-        }
-    }, [printSignal]);
+    // Print handler
+    useSimplePrint(printSignal, 'Hợp đồng', { allowBrowserPrint: true });
 
     const formatNumber = (num: number) => new Intl.NumberFormat('vi-VN').format(num);
 
@@ -136,6 +137,26 @@ export const ContractModule: React.FC<ContractModuleProps> = ({ subView = 'sales
         { field: 'date', headerName: 'Ngày ký', width: 'w-32', align: 'center', type: 'date' },
         { field: 'value', headerName: 'Giá trị tăng/giảm', width: 'w-36', align: 'right', renderCell: (v: number) => <span className="font-mono font-bold text-purple-600">{formatNumber(v)}</span> },
     ];
+
+    // Show ModuleOverview when view is 'overview' or empty
+    if (view === 'overview' || view === '' || !view) {
+        return (
+            <ModuleOverview
+                title={MODULE_CONFIGS.contract.title}
+                description={MODULE_CONFIGS.contract.description}
+                icon={MODULE_CONFIGS.contract.icon}
+                iconColor={MODULE_CONFIGS.contract.iconColor}
+                workflow={MODULE_CONFIGS.contract.workflow}
+                features={MODULE_CONFIGS.contract.features}
+                stats={[
+                    { icon: 'handshake', label: 'Tổng hợp đồng', value: contracts.length || '-', color: 'blue' },
+                    { icon: 'sell', label: 'Bán ra', value: contracts.filter((c: any) => c.type === 'SALES').length || 0, color: 'green' },
+                    { icon: 'shopping_cart', label: 'Mua vào', value: contracts.filter((c: any) => c.type === 'PURCHASE').length || 0, color: 'amber' },
+                    { icon: 'check_circle', label: 'Trạng thái', value: 'Sẵn sàng', color: 'green' },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="relative h-full w-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">

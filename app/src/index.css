@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    --print-safe-gap: 6mm;
+    /* Prevent content from hugging printer hard-margins */
+}
+
 @layer base {
     html {
         font-size: 13px;
@@ -68,6 +73,204 @@
     .form-button-primary {
         @apply px-6 py-1.5 rounded-lg font-semibold text-[13px] bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-colors;
     }
+
+    .form-button-danger {
+        @apply px-6 py-1.5 rounded-lg font-semibold text-[13px] bg-red-600 text-white shadow-lg shadow-red-500/20 hover:bg-red-700 transition-colors;
+    }
+
+    /* ============================================
+     * TYPOGRAPHY - Unified Text Sizes
+     * ============================================ */
+    .text-tiny {
+        @apply text-[10px];
+    }
+
+    .text-label {
+        @apply text-[11px] font-bold text-slate-500 uppercase tracking-wider;
+    }
+
+    .text-body {
+        @apply text-[13px] text-slate-700 dark:text-slate-300;
+    }
+
+    .text-heading {
+        @apply text-base font-bold text-slate-800 dark:text-white;
+    }
+
+    .text-title {
+        @apply text-lg font-bold text-slate-800 dark:text-white;
+    }
+
+    /* ============================================
+     * BADGES - Status & Tag Indicators
+     * ============================================ */
+    .badge {
+        @apply px-2 py-0.5 rounded text-[10px] font-bold uppercase inline-flex items-center gap-1;
+    }
+
+    .badge-sm {
+        @apply px-1.5 py-0.5 rounded text-[9px] font-bold uppercase;
+    }
+
+    .badge-lg {
+        @apply px-3 py-1 rounded-lg text-[11px] font-bold uppercase;
+    }
+
+    /* Status Badges */
+    .badge-draft {
+        @apply bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400;
+    }
+
+    .badge-posted,
+    .badge-success {
+        @apply bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400;
+    }
+
+    .badge-cancelled,
+    .badge-error {
+        @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400;
+    }
+
+    .badge-warning {
+        @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400;
+    }
+
+    .badge-info {
+        @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400;
+    }
+
+    .badge-neutral {
+        @apply bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400;
+    }
+
+    /* ============================================
+     * TABLES - Unified Table Styles
+     * ============================================ */
+    .table-header {
+        @apply bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700;
+    }
+
+    .table-header-cell {
+        @apply px-3 py-2 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-left;
+    }
+
+    .table-header-cell-right {
+        @apply table-header-cell text-right;
+    }
+
+    .table-header-cell-center {
+        @apply table-header-cell text-center;
+    }
+
+    .table-row {
+        @apply border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors;
+    }
+
+    .table-row-selected {
+        @apply bg-blue-50 dark:bg-blue-900/20;
+    }
+
+    .table-cell {
+        @apply px-3 py-2 text-[13px] text-slate-700 dark:text-slate-300;
+    }
+
+    .table-cell-right {
+        @apply table-cell text-right;
+    }
+
+    .table-cell-center {
+        @apply table-cell text-center;
+    }
+
+    .table-cell-number {
+        @apply table-cell text-right font-mono;
+    }
+
+    .table-cell-number-bold {
+        @apply table-cell-number font-bold;
+    }
+
+    /* Number Colors for Accounting */
+    .text-debit {
+        @apply text-blue-600 dark:text-blue-400;
+    }
+
+    .text-credit {
+        @apply text-green-600 dark:text-green-400;
+    }
+
+    .text-negative {
+        @apply text-red-600 dark:text-red-400;
+    }
+
+    .text-positive {
+        @apply text-green-600 dark:text-green-400;
+    }
+
+    /* ============================================
+     * CARDS & PANELS
+     * ============================================ */
+    .card {
+        @apply bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-4;
+    }
+
+    .card-header {
+        @apply flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800;
+    }
+
+    .panel {
+        @apply bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700;
+    }
+
+    /* ============================================
+     * ICON SIZES - Material Symbols
+     * ============================================ */
+    .icon-sm {
+        @apply text-[16px];
+    }
+
+    .icon-md {
+        @apply text-[20px];
+    }
+
+    .icon-lg {
+        @apply text-[24px];
+    }
+
+    .icon-xl {
+        @apply text-[32px];
+    }
+
+    /* ============================================
+     * SECTION SPACING
+     * ============================================ */
+    .section-gap {
+        @apply space-y-4;
+    }
+
+    .section-gap-lg {
+        @apply space-y-6;
+    }
+
+    .form-group {
+        @apply space-y-1.5;
+    }
+
+    .form-row {
+        @apply grid gap-4;
+    }
+
+    .form-row-2 {
+        @apply grid grid-cols-2 gap-4;
+    }
+
+    .form-row-3 {
+        @apply grid grid-cols-3 gap-4;
+    }
+
+    .form-row-4 {
+        @apply grid grid-cols-4 gap-4;
+    }
 }
 
 /* Custom scrollbar for Excel-like feel */
@@ -111,87 +314,130 @@
 
 @media print {
 
-    /* Page settings */
+    /* ============================================
+     * DEFAULT PAGE SETTINGS (A4)
+     * ============================================ */
     @page {
-        size: A4;
-        margin: 15mm 10mm;
+        size: A4 portrait;
+        margin: 0;
     }
 
-    /* Hide absolutely everything first */
-    * {
+    @page a4-landscape {
+        size: A4 landscape;
+        margin: 0;
+    }
+
+    /* A5 page support */
+    @page a5-portrait {
+        size: A5 portrait;
+        margin: 0;
+    }
+
+    @page a5-landscape {
+        size: A5 landscape;
+        margin: 0;
+    }
+
+    /* ============================================
+     * HIDE NON-PRINTABLE ELEMENTS
+     * ============================================ */
+    /* Hide sidebar, ribbon, modals backdrop, buttons */
+    body>div:not(.print-container),
+    .sidebar,
+    .ribbon,
+    .no-print,
+    button,
+    [data-no-print],
+    .modal-backdrop,
+    .fixed:not(.printable-area):not(.print-container) {
+        display: none !important;
         visibility: hidden !important;
-        background: transparent !important;
-        background-color: transparent !important;
     }
 
-    /* Reset document */
-    html,
+    /* ============================================
+     * RESET DOCUMENT FOR PRINT
+     * ============================================ */
+    html {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        height: 100%;
+    }
+
     body {
         margin: 0 !important;
         padding: 0 !important;
-        width: 210mm !important;
-        height: auto !important;
         background: white !important;
-        overflow: visible !important;
-    }
-
-    body {
         font-family: "Times New Roman", serif !important;
         font-size: 11pt !important;
         line-height: 1.4 !important;
+        color: black !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
     }
 
-    /* The printable area - make it visible and fill the page */
+    /* ============================================
+     * PRINTABLE AREA - MAIN CONTAINER
+     * ============================================ */
     .printable-area {
-        visibility: visible !important;
         display: block !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        width: 210mm !important;
-        min-height: 297mm !important;
+        visibility: visible !important;
+        position: relative !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 100vh !important;
         margin: 0 !important;
-        padding: 15mm 20mm !important;
+        padding: 0 !important;
         background: white !important;
-        background-color: white !important;
         color: black !important;
         box-sizing: border-box !important;
-        z-index: 999999 !important;
         overflow: visible !important;
         box-shadow: none !important;
         border: none !important;
+        transform: none !important;
+        left: 0 !important;
+        top: 0 !important;
     }
 
-    /* All children of printable-area must be visible */
-    .printable-area *,
-    .printable-area div,
-    .printable-area p,
-    .printable-area span,
-    .printable-area h1,
-    .printable-area h2,
-    .printable-area h3,
-    .printable-area table,
-    .printable-area thead,
-    .printable-area tbody,
-    .printable-area tfoot,
-    .printable-area tr,
-    .printable-area th,
-    .printable-area td {
-        visibility: visible !important;
-        position: static !important;
+    /* A4 specific */
+    .printable-area.print-a4 {
+        width: 100% !important;
+        padding: var(--print-padding, 10mm 15mm) !important;
+    }
+
+    /* A4 landscape */
+    .printable-area.print-a4-landscape {
+        page: a4-landscape;
+        width: 100% !important;
+        padding: var(--print-padding, 10mm 15mm) !important;
+    }
+
+    /* A5 portrait */
+    .printable-area.print-a5 {
+        page: a5-portrait;
+        width: 100% !important;
+        padding: var(--print-padding, 8mm 10mm) !important;
+    }
+
+    /* A5 landscape */
+    .printable-area.print-a5-landscape {
+        page: a5-landscape;
+        width: 100% !important;
+        padding: var(--print-padding, 8mm 10mm) !important;
+    }
+
+    /* ============================================
+     * PRINTABLE AREA CHILDREN
+     * ============================================ */
+    /* Remove the forced visibility visible rule that was breaking .invisible */
+    .printable-area * {
         color: black !important;
         font-family: "Times New Roman", serif !important;
         background: transparent !important;
+        /* Do NOT force visibility: visible here */
     }
 
-    /* Table header cells get light background */
-    .printable-area th,
-    .printable-area .bg-slate-50 {
-        background-color: #f8fafc !important;
-    }
-
-    /* Borders for tables */
     .printable-area table {
         width: 100% !important;
         border-collapse: collapse !important;
@@ -202,7 +448,19 @@
     .printable-area th,
     .printable-area td {
         border: 1px solid black !important;
-        padding: 4px 8px !important;
+        /* Standardize border */
+        padding: 4px 6px !important;
+        font-size: 10pt !important;
+        visibility: visible !important;
+        /* Force visible for table content */
+    }
+
+    .printable-area th {
+        background-color: #f0f0f0 !important;
+        /* Keep background for headers if printer supports it */
+        font-weight: bold !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 
     .printable-area tr {
@@ -213,25 +471,84 @@
         display: table-header-group !important;
     }
 
-    /* Hide buttons and no-print elements */
-    .printable-area button,
-    .printable-area .no-print,
-    button,
-    .no-print {
-        display: none !important;
+    .printable-area tfoot {
+        display: table-footer-group !important;
+    }
+
+    .printable-area .invisible {
         visibility: hidden !important;
     }
 
-    /* Page break utility */
-    .page-break {
-        page-break-before: always !important;
+    /* ============================================
+     * SIGNATURE SECTION
+     * ============================================ */
+    .print-signatures {
+        page-break-inside: avoid !important;
+        margin-top: 15mm !important;
     }
 
-    /* Color preservation */
-    .printable-area,
-    .printable-area * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+    .print-signatures>div {
+        min-height: 20mm !important;
+    }
+
+    /* ============================================
+     * PAGE BREAK UTILITIES
+     * ============================================ */
+    .page-break,
+    .page-break-before {
+        page-break-before: always !important;
+        break-before: page !important;
+    }
+
+    .page-break-after {
+        page-break-after: always !important;
+        break-after: page !important;
+    }
+
+    .page-break-avoid {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    /* ============================================
+     * PRINT CONTAINER (for modal-based print)
+     * ============================================ */
+    .print-container {
+        display: block !important;
+        visibility: visible !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        background: white !important;
+        z-index: 999999 !important;
+        overflow: visible !important;
+    }
+
+    .print-container .preview-page {
+        margin: 0 !important;
+        box-shadow: none !important;
+        max-width: none !important;
+        width: 100% !important;
+        border: none !important;
+    }
+
+    .print-container .print-preview-body {
+        display: block !important;
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 0 !important;
+    }
+
+    .print-container .preview-page:not(.printable-area) {
+        padding: 0 !important;
+    }
+
+    .print-container .print-scale-wrapper,
+    .print-container .report-scale-wrapper {
+        margin: 0 !important;
     }
 }
 
@@ -248,6 +565,18 @@
 
 .animate-fade-in {
     animation: fade-in 0.2s ease-out forwards;
+}
+
+.preview-page {
+    transition: box-shadow 0.2s ease;
+    padding: var(--print-padding, 12mm 15mm) !important;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.print-scale-wrapper,
+.report-scale-wrapper {
+    transform-origin: top left;
 }
 
 /* Accessibility: Prefers-Reduced-Motion Support */

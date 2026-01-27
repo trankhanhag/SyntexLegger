@@ -4,6 +4,11 @@ import { systemService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { formatDateTimeVN, formatDateVN } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { BudgetControlModule } from './BudgetControlModule';
+import { AuditTrailModule } from './AuditTrailModule';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 // --- MOCK DATA ---
 
@@ -13,9 +18,10 @@ interface SystemModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[] }) => void;
+    onNavigate?: (view: string, data?: any) => void;
 }
 
-export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', printSignal = 0, onSetHeader }) => {
+export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', printSignal = 0, onSetHeader, onNavigate }) => {
     const [view, setView] = useState(subView);
     const [showModal, setShowModal] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -122,11 +128,8 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
         }
     }, [view, onSetHeader, info.title, info.icon]);
 
-    useEffect(() => {
-        if (printSignal > 0) {
-            window.print();
-        }
-    }, [printSignal]);
+    // Print handler
+    useSimplePrint(printSignal, 'Hệ thống', { allowBrowserPrint: true });
 
     const userColumns: ColumnDef[] = [
         { field: 'username', headerName: 'Tên đăng nhập', width: 'w-40' },
@@ -173,6 +176,38 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
         { field: 'detail', headerName: 'Chi tiết thay đổi', width: 'flex-1' },
     ];
 
+    // ModuleOverview for System module
+    if (view === 'overview') {
+        return (
+            <ModuleOverview
+                title={MODULE_CONFIGS.system?.title || 'Quản trị Hệ thống'}
+                description={MODULE_CONFIGS.system?.description || 'Quản lý người dùng, phân quyền và cấu hình hệ thống'}
+                icon={MODULE_CONFIGS.system?.icon || 'settings'}
+                iconColor={MODULE_CONFIGS.system?.iconColor || 'purple'}
+                workflow={MODULE_CONFIGS.system?.workflow || []}
+                features={MODULE_CONFIGS.system?.features || []}
+                onNavigate={(viewId) => onNavigate && onNavigate(viewId)}
+                stats={[
+                    { icon: 'group', label: 'Người dùng', value: users.length || '-', color: 'blue' },
+                    { icon: 'security', label: 'Vai trò', value: roles.length || '-', color: 'green' },
+                    { icon: 'history', label: 'Logs', value: logs.length || '-', color: 'amber' },
+                    { icon: 'check_circle', label: 'Trạng thái', value: 'Hoạt động', color: 'green' },
+                ]}
+            />
+        );
+    }
+
+    // Handle Budget Control sub-view
+    if (view === 'budget_control') {
+        return <BudgetControlModule onSetHeader={onSetHeader} />;
+    }
+
+    // Handle Audit Trail sub-view
+    if (view === 'audit_trail') {
+        return <AuditTrailModule onSetHeader={onSetHeader} />;
+    }
+
+    // Default System layout (sidebar + content)
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
 

@@ -5,16 +5,18 @@ import { type RibbonAction } from './Ribbon';
 import { toInputDateValue } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
-
-// Mock data removed
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 interface ProjectModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (view: string) => void;
 }
 
-export const ProjectModule: React.FC<ProjectModuleProps> = ({ subView = 'list', printSignal = 0, onSetHeader }) => {
+export const ProjectModule: React.FC<ProjectModuleProps> = ({ subView = 'list', printSignal = 0, onSetHeader, onNavigate: _onNavigate }) => {
     const [view, setView] = useState(subView);
     const [showFormModal, setShowFormModal] = useState(false);
     const [showProgressModal, setShowProgressModal] = useState(false);
@@ -117,11 +119,8 @@ export const ProjectModule: React.FC<ProjectModuleProps> = ({ subView = 'list', 
         fetchData();
     }, [view, selectedProjectCode]);
 
-    useEffect(() => {
-        if (printSignal > 0) {
-            window.print();
-        }
-    }, [printSignal]);
+    // Handle print signal
+    useSimplePrint(printSignal, 'Dự án', { allowBrowserPrint: true });
 
     // --- Column Definitions ---
     const catalogColumns: ColumnDef[] = [
@@ -189,6 +188,26 @@ export const ProjectModule: React.FC<ProjectModuleProps> = ({ subView = 'list', 
         { field: 'profit', headerName: 'Lợi nhuận gộp', width: 'w-36', align: 'right', renderCell: (v: number) => <span className="font-mono text-green-600 font-bold">{formatNumber(v)}</span> },
         { field: 'margin', headerName: 'Biên lãi (%)', width: 'w-28', align: 'center', fontClass: 'font-bold text-slate-800' },
     ];
+
+    // Show ModuleOverview when view is 'overview' or empty
+    if (view === 'overview' || view === '' || !view) {
+        return (
+            <ModuleOverview
+                title={MODULE_CONFIGS.project.title}
+                description={MODULE_CONFIGS.project.description}
+                icon={MODULE_CONFIGS.project.icon}
+                iconColor={MODULE_CONFIGS.project.iconColor}
+                workflow={MODULE_CONFIGS.project.workflow}
+                features={MODULE_CONFIGS.project.features}
+                stats={[
+                    { icon: 'folder', label: 'Tổng dự án', value: projects.length || '-', color: 'blue' },
+                    { icon: 'trending_up', label: 'Đang triển khai', value: projects.filter((p: any) => p.status === 'IN_PROGRESS').length || 0, color: 'green' },
+                    { icon: 'check_circle', label: 'Hoàn thành', value: projects.filter((p: any) => p.status === 'COMPLETED').length || 0, color: 'purple' },
+                    { icon: 'schedule', label: 'Trạng thái', value: 'Sẵn sàng', color: 'green' },
+                ]}
+            />
+        );
+    }
 
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">

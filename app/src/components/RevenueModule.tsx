@@ -3,6 +3,8 @@ import { SmartTable, type ColumnDef } from './SmartTable';
 import { revenueService, masterDataService, settingsService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { PrintPreviewModal } from './PrintTemplates';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
 
 
 // ==================== RECEIPT LIST ====================
@@ -363,6 +365,8 @@ const ReceiptFormModal = ({ onClose, documentType, initialData }: { onClose: () 
         category_name: initialData?.category_name || '',
         amount: initialData?.amount || 0,
         fund_source_id: initialData?.fund_source_id || '',
+        item_code: initialData?.item_code || '',
+        sub_item_code: initialData?.sub_item_code || '',
         payment_method: initialData?.payment_method || 'CASH',
         notes: initialData?.notes || '',
         document_type: initialData?.document_type || documentType
@@ -518,6 +522,29 @@ const ReceiptFormModal = ({ onClose, documentType, initialData }: { onClose: () 
                             <option value="">-- Không liên kết --</option>
                             {fundSources.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mục</label>
+                            <input
+                                type="text"
+                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all font-mono"
+                                value={formData.item_code}
+                                onChange={e => setFormData({ ...formData, item_code: e.target.value })}
+                                placeholder="Ví dụ: 511"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tiểu mục</label>
+                            <input
+                                type="text"
+                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all font-mono"
+                                value={formData.sub_item_code}
+                                onChange={e => setFormData({ ...formData, sub_item_code: e.target.value })}
+                                placeholder="Ví dụ: 5111"
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-1">
@@ -695,10 +722,11 @@ interface RevenueModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (viewId: string, data?: any) => void;
 }
 
 // ==================== REVENUE MODULE ====================
-export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt', printSignal = 0, onSetHeader }) => {
+export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt', printSignal = 0, onSetHeader, onNavigate }) => {
     const [showPrintPreview, setShowPrintPreview] = React.useState(false);
     const [showReceiptModal, setShowReceiptModal] = React.useState(false);
     const [showCategoryModal, setShowCategoryModal] = React.useState(false); // TODO: Implement later
@@ -719,13 +747,21 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
             .catch(console.error);
     }, []);
 
+    // Handle print signal from Ribbon
     React.useEffect(() => {
-        if (printSignal > 0 && subView !== 'report' && subView !== 'budget') {
-            if (selectedRow) {
-                setShowPrintPreview(true);
-            } else {
-                alert("Vui lòng chọn một biên lai từ danh sách trước khi thực hiện In.");
+        if (printSignal > 0) {
+            // Print not available for report/budget views
+            if (subView === 'report' || subView === 'budget') {
+                alert('Chức năng in không áp dụng cho màn hình Báo cáo và Dự toán. Vui lòng sử dụng chức năng Xuất Excel.');
+                return;
             }
+
+            if (!selectedRow) {
+                alert('Vui lòng chọn một biên lai từ danh sách trước khi in.');
+                return;
+            }
+
+            setShowPrintPreview(true);
         }
     }, [printSignal, subView, selectedRow]);
 
@@ -826,7 +862,26 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
 
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
-            <div className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-900 relative">
+            {/* Module Overview - Default Landing Page */}
+            {(subView === 'overview' || subView === 'revenue_overview') && (
+                <ModuleOverview
+                    title={MODULE_CONFIGS.revenue.title}
+                    description={MODULE_CONFIGS.revenue.description}
+                    icon={MODULE_CONFIGS.revenue.icon}
+                    iconColor={MODULE_CONFIGS.revenue.iconColor}
+                    workflow={MODULE_CONFIGS.revenue.workflow}
+                    features={MODULE_CONFIGS.revenue.features}
+                    onNavigate={onNavigate}
+                    stats={[
+                        { icon: 'receipt_long', label: 'Biên lai tháng', value: '-', color: 'blue' },
+                        { icon: 'payments', label: 'Tổng thu tháng', value: '-', color: 'green' },
+                        { icon: 'group', label: 'Đối tượng mới', value: '-', color: 'amber' },
+                        { icon: 'check_circle', label: 'Trạng thái', value: 'Bình thường', color: 'green' },
+                    ]}
+                />
+            )}
+
+            <div className={`flex-1 overflow-auto bg-slate-50 dark:bg-slate-900 relative ${(subView === 'overview' || subView === 'revenue_overview') ? 'hidden' : ''}`}>
                 {subView === 'receipt' && <ReceiptList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
                 {subView === 'payment' && <PaymentList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}
                 {subView === 'reduction' && <ReductionList onSelect={setSelectedRow} refreshSignal={refreshSignal} />}

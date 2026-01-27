@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:3005/api/hcsn';
+const API_BASE = 'http://localhost:3000/api/hcsn';
 
 interface BudgetEstimate {
     id: string;
@@ -29,7 +29,7 @@ interface BudgetItem {
     allocated_amount: number;
 }
 
-const BudgetEstimateModule: React.FC<{ subView?: string, onSetHeader?: any }> = ({ subView = 'list', onSetHeader }) => {
+const BudgetEstimateModule: React.FC<{ subView?: string, onSetHeader?: any, onNavigate?: (view: string) => void }> = ({ subView = 'list', onSetHeader, onNavigate: _onNavigate }) => {
     const [budgets, setBudgets] = useState<BudgetEstimate[]>([]);
     const [loading, setLoading] = useState(false);
     const [showForm, setShowForm] = useState(false);
@@ -93,7 +93,7 @@ const BudgetEstimateModule: React.FC<{ subView?: string, onSetHeader?: any }> = 
                     icon: 'edit_note',
                     actions: [
                         { label: 'Lập dự toán', icon: 'add', onClick: () => setShowForm(true), primary: true },
-                        { label: 'Hướng dẫn', icon: 'help', onClick: () => alert('Chọn tiểu mục đã Phê duyệt để thực hiện Điều chỉnh.') }
+                        { label: 'Làm mới', icon: 'refresh', onClick: loadBudgets }
                     ]
                 });
             } else if (subView === 'adjustment') {
@@ -261,178 +261,132 @@ const BudgetEstimateModule: React.FC<{ subView?: string, onSetHeader?: any }> = 
 
     // MAIN RENDER
     const renderBudgetList = () => (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            {/* Header */}
-            <div className="mb-6 flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Dự toán Ngân sách HCSN</h1>
-                    <p className="text-gray-600 mt-1">Lập và quản lý dự toán chi tiết theo chương/tiểu mục (TT 24/2024)</p>
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
+            {/* Toolbar */}
+            <div className="px-6 py-3 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Năm:</span>
+                        <select
+                            value={fiscalYear}
+                            onChange={(e) => setFiscalYear(Number(e.target.value))}
+                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:border-slate-600 outline-none"
+                        >
+                            {[2024, 2025, 2026, 2027, 2028].map(year => (
+                                <option key={year} value={year}>{year}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Chương:</span>
+                        <select
+                            value={selectedChapter}
+                            onChange={(e) => setSelectedChapter(e.target.value)}
+                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:border-slate-600 outline-none w-64"
+                        >
+                            {CHAPTERS.map(ch => (
+                                <option key={ch.code} value={ch.code}>{ch.code} - {ch.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
-                <div className="flex gap-4 items-center">
-                    <select
-                        value={fiscalYear}
-                        onChange={(e) => setFiscalYear(Number(e.target.value))}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                    >
-                        {[2024, 2025, 2026, 2027, 2028].map(year => (
-                            <option key={year} value={year}>Năm {year}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={selectedChapter}
-                        onChange={(e) => setSelectedChapter(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                    >
-                        {CHAPTERS.map(ch => (
-                            <option key={ch.code} value={ch.code}>{ch.code} - {ch.name}</option>
-                        ))}
-                    </select>
-                    <button
-                        onClick={() => setShowForm(true)}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-lg"
-                    >
-                        + Lập dự toán
-                    </button>
+                <div className="text-sm font-bold text-blue-600">
+                    Tổng: {formatCurrency(budgets.reduce((sum, b) => sum + b.allocated_amount, 0))}
                 </div>
             </div>
 
-            {/* Summary Cards */}
-            {budgets.length > 0 && (
-                <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-blue-100 text-sm font-semibold">Tổng Dự toán</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {formatCurrency(budgets.reduce((sum, b) => sum + b.allocated_amount, 0))}
-                                </p>
-                            </div>
-                            <div className="text-5xl opacity-20">📊</div>
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-orange-100 text-sm font-semibold">Đã thực hiện</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {formatCurrency(budgets.reduce((sum, b) => sum + b.spent_amount, 0))}
-                                </p>
-                            </div>
-                            <div className="text-5xl opacity-20">💸</div>
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-green-100 text-sm font-semibold">Còn lại</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {formatCurrency(budgets.reduce((sum, b) => sum + b.remaining_amount, 0))}
-                                </p>
-                            </div>
-                            <div className="text-5xl opacity-20">✅</div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {loading ? (
-                <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    Đang tải dữ liệu...
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
                 </div>
             ) : budgets.length === 0 ? (
-                <div className="p-8 text-center text-gray-500 bg-white rounded-lg shadow">
-                    <span className="material-symbols-outlined text-4xl mb-2 text-gray-400">info</span>
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+                    <span className="material-symbols-outlined text-4xl mb-2 text-gray-300">inbox</span>
                     <p>Chưa có dự toán nào cho Chương {selectedChapter} năm {fiscalYear}</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã TM</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên tiểu mục</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Dự toán</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đã chi</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Còn lại</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tỷ lệ</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ver</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {getLatestBudgets().map((budget) => {
-                                const usagePercent = calculateUsagePercent(budget.spent_amount, budget.allocated_amount);
-                                return (
-                                    <tr key={budget.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{budget.item_code}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-700">{budget.item_name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-blue-600">
-                                            {formatCurrency(budget.allocated_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                                            {formatCurrency(budget.spent_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-green-600">
-                                            {formatCurrency(budget.remaining_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="w-full max-w-xs">
-                                                <div className="flex mb-1 items-center justify-between">
-                                                    <span className="text-xs font-semibold inline-block text-blue-600">
-                                                        {usagePercent}%
-                                                    </span>
+                <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 overflow-hidden relative">
+                    <div className="overflow-auto flex-1">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                            <thead className="bg-gray-50 dark:bg-slate-700/50 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Mã TM</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tên tiểu mục</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Dự toán</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Đã chi</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Còn lại</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Tiến độ</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ver</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                                {getLatestBudgets().map((budget) => {
+                                    const usagePercent = calculateUsagePercent(budget.spent_amount, budget.allocated_amount);
+                                    return (
+                                        <tr key={budget.id} className="hover:bg-blue-50/30 dark:hover:bg-slate-700/50 transition-colors">
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-blue-600 dark:text-white">{budget.item_code}</td>
+                                            <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300 font-medium">{budget.item_name}</td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-right font-medium text-slate-700 dark:text-slate-200">
+                                                {formatCurrency(budget.allocated_amount)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-right text-orange-600 dark:text-orange-400">
+                                                {formatCurrency(budget.spent_amount)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-right font-bold text-green-600 dark:text-green-400">
+                                                {formatCurrency(budget.remaining_amount)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap align-middle">
+                                                <div className="w-full max-w-[100px] mx-auto">
+                                                    <div className="overflow-hidden h-1.5 text-xs flex rounded-full bg-slate-200 dark:bg-slate-600">
+                                                        <div
+                                                            style={{ width: `${usagePercent}%` }}
+                                                            className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-amber-500' : 'bg-green-500'}`}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="text-[10px] text-center mt-0.5 text-slate-400">{usagePercent}%</div>
                                                 </div>
-                                                <div className="overflow-hidden h-2 text-xs flex rounded bg-blue-100">
-                                                    <div
-                                                        style={{ width: `${usagePercent}%` }}
-                                                        className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-green-500'
-                                                            }`}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                            <span className="font-semibold text-gray-700">v{budget.version}</span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            {getStatusBadge(budget.status)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                            {budget.status === 'DRAFT' && (
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-center text-sm">
+                                                <span className="font-mono text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">v{budget.version}</span>
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-center scale-90 origin-center">
+                                                {getStatusBadge(budget.status)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-center text-sm font-medium">
+                                                {budget.status === 'DRAFT' && (
+                                                    <button
+                                                        onClick={() => handleApprove(budget.id)}
+                                                        className="text-green-600 hover:text-green-800 dark:hover:text-green-400 mr-2 transition-colors"
+                                                        title="Phê duyệt"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                                    </button>
+                                                )}
+                                                {budget.status === 'APPROVED' && (
+                                                    <button
+                                                        onClick={() => handleAdjustClick(budget)}
+                                                        className="text-orange-600 hover:text-orange-800 dark:hover:text-orange-400 mr-2 transition-colors"
+                                                        title="Điều chỉnh"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                    </button>
+                                                )}
                                                 <button
-                                                    onClick={() => handleApprove(budget.id)}
-                                                    className="text-green-600 hover:text-green-900 mr-3"
-                                                    title="Phê duyệt"
+                                                    onClick={() => viewHistory(budget.item_code)}
+                                                    className="text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 transition-colors"
+                                                    title="Lịch sử"
                                                 >
-                                                    <span className="material-symbols-outlined">check_circle</span>
+                                                    <span className="material-symbols-outlined text-[18px]">history</span>
                                                 </button>
-                                            )}
-                                            {budget.status === 'APPROVED' && (
-                                                <button
-                                                    onClick={() => handleAdjustClick(budget)}
-                                                    className="text-orange-600 hover:text-orange-900 mr-3"
-                                                    title="Điều chỉnh"
-                                                >
-                                                    <span className="material-symbols-outlined">edit_note</span>
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => viewHistory(budget.item_code)}
-                                                className="text-indigo-600 hover:text-indigo-900"
-                                                title="Lịch sử phiên bản"
-                                            >
-                                                <span className="material-symbols-outlined">history</span>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
@@ -651,65 +605,65 @@ const BudgetEstimateModule: React.FC<{ subView?: string, onSetHeader?: any }> = 
     );
 
     const renderAdjustmentView = () => (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <div className="mb-6 flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Lịch sử Điều chỉnh Dự toán</h1>
-                    <p className="text-gray-600 mt-1">Theo dõi các phiên bản thay đổi ngân sách theo thời gian</p>
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
+            {/* Toolbar */}
+            <div className="px-6 py-3 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-md border border-blue-100 dark:border-blue-800">
+                    <span className="material-symbols-outlined text-sm">info</span>
+                    <span>Vào <strong>Lập dự toán</strong> chọn mục <strong>Đã duyệt</strong> để tạo điều chỉnh.</span>
                 </div>
-                <div className="flex gap-4 items-center">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-blue-600">info</span>
-                        <span className="text-sm text-blue-800">Để thực hiện điều chỉnh mới, hãy vào <strong>Lập dự toán</strong> và chọn mục đã <strong>Phê duyệt</strong>.</span>
-                    </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Năm ngân sách:</span>
                     <select
                         value={fiscalYear}
                         onChange={(e) => setFiscalYear(Number(e.target.value))}
-                        className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
+                        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:border-slate-600 outline-none"
                     >
                         {[2024, 2025, 2026, 2027, 2028].map(year => (
-                            <option key={year} value={year}>Năm {year}</option>
+                            <option key={year} value={year}>{year}</option>
                         ))}
                     </select>
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã TM</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên tiểu mục</th>
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ver</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lý do điều chỉnh</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày điều chỉnh</th>
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {getAdjustedBudgets().map((budget) => (
-                            <tr key={budget.id} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{budget.item_code}</td>
-                                <td className="px-6 py-4 text-sm">{budget.item_name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-blue-600">v{budget.version}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold">{formatCurrency(budget.allocated_amount)}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{budget.adjustment_reason}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">{new Date(budget.created_at).toLocaleDateString('vi-VN')}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                    <button onClick={() => viewHistory(budget.item_code)} className="text-indigo-600 hover:text-indigo-900">Chi tiết</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {getAdjustedBudgets().length === 0 && (
+            <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="overflow-auto flex-1">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                        <thead className="bg-gray-50 dark:bg-slate-700/50 sticky top-0 z-10">
                             <tr>
-                                <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
-                                    Chưa có dữ liệu điều chỉnh nào được ghi nhận.
-                                </td>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã TM</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên tiểu mục</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ver</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lý do điều chỉnh</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày điều chỉnh</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                            {getAdjustedBudgets().map((budget) => (
+                                <tr key={budget.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{budget.item_code}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{budget.item_name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-blue-600 dark:text-blue-400">v{budget.version}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(budget.allocated_amount)}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{budget.adjustment_reason}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{new Date(budget.created_at).toLocaleDateString('vi-VN')}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                        <button onClick={() => viewHistory(budget.item_code)} className="text-indigo-600 hover:text-indigo-900 dark:hover:text-indigo-400">Chi tiết</button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {getAdjustedBudgets().length === 0 && (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
+                                        Chưa có dữ liệu điều chỉnh nào được ghi nhận.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

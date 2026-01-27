@@ -14,7 +14,7 @@ interface PeriodLockProps {
 }
 
 export const PeriodLock: React.FC<PeriodLockProps> = ({ onClose, onRefresh }) => {
-    const [lockedDate, setLockedDate] = React.useState('2024-10-31');
+    const [lockedDate, setLockedDate] = React.useState('');
     const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {

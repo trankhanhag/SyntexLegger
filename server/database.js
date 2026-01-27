@@ -200,7 +200,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (!err && row && row.count === 0) {
                     db.run(`INSERT INTO companies (id, name, address, tax_code) VALUES (?, ?, ?, ?)`,
                         ['1', 'Đơn vị HCSN Mẫu', '123 Đường Mẫu, Hà Nội', '0101234567'], (err) => {
-                            if (!err) console.log("Seeded default company.");
+                            // Default company seeded
                         });
                 }
             });
@@ -231,7 +231,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                                 if (err) {
                                     console.error('Failed to seed admin user:', err);
                                 } else {
-                                    console.log(`Seeded admin user: ${DEFAULT_ADMIN_USER}`);
+                                    // Admin user seeded
                                 }
                             });
                     });
@@ -244,7 +244,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                             db.run("ALTER TABLE users ADD COLUMN fullname TEXT");
                             db.run("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Active'");
                             db.run("ALTER TABLE users ADD COLUMN last_login TEXT", () => {
-                                console.log("Updated 'users' table schema (added fullname, status, last_login).");
+                                // Users table schema updated
                                 addColumns();
                             });
                         });
@@ -274,7 +274,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         DEFAULT_ACCOUNTS.forEach(acc => {
                             db.run(insert, [acc.code, acc.name, acc.category]);
                         });
-                        console.log("Seeded Chart of Accounts.");
+                        // Chart of Accounts seeded
                     });
                 });
             });
@@ -295,7 +295,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     ['KH002', 'Cửa hàng Nội thất Minh Quân', '0405556667', '32Lý Thường Kiệt, Đà Nẵng']
                 ];
                 samplePartners.forEach(p => db.run(insert, p));
-                console.log("Seeded Partners.");
+                // Partners seeded
             });
 
             // 4. Table: General Ledger (NEW)
@@ -309,7 +309,9 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 reciprocal_acc TEXT,
                 debit_amount REAL,
                 credit_amount REAL,
-                origin_staging_id TEXT
+                origin_staging_id TEXT,
+                item_code TEXT,
+                sub_item_code TEXT
             )`, () => {
                 // Seed some initial balances for demo
                 const insert = 'INSERT OR IGNORE INTO general_ledger (id, trx_date, posted_at, doc_no, description, account_code, reciprocal_acc, debit_amount, credit_amount, origin_staging_id) VALUES (?,?,?,?,?,?,?,?,?,?)';
@@ -330,7 +332,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     ['seed_risk_p', '2024-12-10', now, 'PC099', 'Mua hàng từ DN rủi ro', 'NCC_RISK', '', 0, 0, 'seed']
                 ];
                 sampleGL.forEach(row => db.run(insert, row));
-                console.log("Seeded General Ledger sample data.");
+                // General Ledger sample data seeded
 
                 // 4.1. Migration: Add partner_code to general_ledger
                 db.all("PRAGMA table_info(general_ledger)", (err, columns) => {
@@ -338,7 +340,17 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         const hasPartner = columns.some(c => c.name === 'partner_code');
                         if (!hasPartner) {
                             db.run("ALTER TABLE general_ledger ADD COLUMN partner_code TEXT");
-                            console.log("Added 'partner_code' to 'general_ledger'.");
+                            // Column added to general_ledger
+                        }
+                        const hasItemCode = columns.some(c => c.name === 'item_code');
+                        if (!hasItemCode) {
+                            db.run("ALTER TABLE general_ledger ADD COLUMN item_code TEXT");
+                            // Column added to general_ledger
+                        }
+                        const hasSubItemCode = columns.some(c => c.name === 'sub_item_code');
+                        if (!hasSubItemCode) {
+                            db.run("ALTER TABLE general_ledger ADD COLUMN sub_item_code TEXT");
+                            // Column added to general_ledger
                         }
                     }
                 });
@@ -357,6 +369,8 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             credit_acc TEXT,
             amount REAL,
             partner_code TEXT,
+            item_code TEXT,
+            sub_item_code TEXT,
             is_valid INTEGER DEFAULT 0,
             error_log TEXT,
             raw_data TEXT
@@ -365,7 +379,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             db.get("SELECT count(*) as count FROM staging_transactions", (err, row) => {
                 if (err) return console.error(err.message);
                 if (row.count === 0) {
-                    console.log("Seeding sample transactions...");
+                    // Seeding sample transactions
                     const insert = `INSERT INTO staging_transactions (id, batch_id, row_index, trx_date, doc_no, description, debit_acc, credit_acc, amount, partner_code, is_valid) VALUES (?,?,?,?,?,?,?,?,?,?,?)`;
 
                     const samples = [
@@ -418,6 +432,8 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             debt_note TEXT,
             partner_code TEXT,
             fund_source_id TEXT,
+            item_code TEXT,
+            sub_item_code TEXT,
             budget_estimate_id TEXT,
             FOREIGN KEY (voucher_id) REFERENCES vouchers (id) ON DELETE CASCADE
         )`, () => {
@@ -441,27 +457,37 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         const hasPartner = columns.some(c => c.name === 'partner_code');
                         if (!hasPartner) {
                             db.run("ALTER TABLE voucher_items ADD COLUMN partner_code TEXT");
-                            console.log("Added 'partner_code' to 'voucher_items'.");
+                            // Column added to voucher_items
+                        }
+                        const hasItemCode = columns.some(c => c.name === 'item_code');
+                        if (!hasItemCode) {
+                            db.run("ALTER TABLE voucher_items ADD COLUMN item_code TEXT");
+                            // Column added to voucher_items
+                        }
+                        const hasSubItemCode = columns.some(c => c.name === 'sub_item_code');
+                        if (!hasSubItemCode) {
+                            db.run("ALTER TABLE voucher_items ADD COLUMN sub_item_code TEXT");
+                            // Column added to voucher_items
                         }
                         const hasCost = columns.some(c => c.name === 'cost_price');
                         if (!hasCost) {
                             db.run("ALTER TABLE voucher_items ADD COLUMN cost_price REAL DEFAULT 0");
-                            console.log("Added 'cost_price' to 'voucher_items'.");
+                            // Column added to voucher_items
                         }
                         const hasQty = columns.some(c => c.name === 'quantity');
                         if (!hasQty) {
                             db.run("ALTER TABLE voucher_items ADD COLUMN quantity REAL DEFAULT 0");
-                            console.log("Added 'quantity' to 'voucher_items'.");
+                            // Column added to voucher_items
                         }
                         const hasInputUnit = columns.some(c => c.name === 'input_unit');
                         if (!hasInputUnit) {
                             db.run("ALTER TABLE voucher_items ADD COLUMN input_unit TEXT");
-                            console.log("Added 'input_unit' to 'voucher_items'.");
+                            // Column added to voucher_items
                         }
                         const hasInputQty = columns.some(c => c.name === 'input_quantity');
                         if (!hasInputQty) {
                             db.run("ALTER TABLE voucher_items ADD COLUMN input_quantity REAL DEFAULT 0");
-                            console.log("Added 'input_quantity' to 'voucher_items'.");
+                            // Column added to voucher_items
                         }
                         const colNames = columns.map(c => c.name);
                         const missingCols = [];
@@ -477,7 +503,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
 
                         missingCols.forEach(col => {
                             db.run(`ALTER TABLE voucher_items ${col}`, (e) => {
-                                if (!e) console.log(`Added column: ${col} to voucher_items`);
+                                // Column added to voucher_items
                             });
                         });
                     }
@@ -514,7 +540,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         db.run(insertVoucher, [v4, 'PC099', '2024-12-05', '2024-12-05', 'Chi tiếp khách quá mức', 'CASH_OUT', 100000000, now]);
                         db.run(insertItem, [v4, 'Chi phí QLDN', '6428', '1111', 100000000, '', '', '']);
 
-                        console.log("Seeded missing Sales/Purchase/Cash vouchers.");
+                        // Vouchers seeded
                     }
                 });
 
@@ -524,7 +550,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         const hasStatus = columns.some(c => c.name === 'status');
                         if (!hasStatus) {
                             db.run("ALTER TABLE vouchers ADD COLUMN status TEXT DEFAULT 'POSTED'");
-                            console.log("Added 'status' to 'vouchers'.");
+                            // Column added to vouchers
                         }
                         const colNames = columns.map(c => c.name);
                         const missingCols = [];
@@ -534,7 +560,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         if (!colNames.includes('fx_rate')) missingCols.push("ADD COLUMN fx_rate REAL DEFAULT 1");
                         missingCols.forEach(col => {
                             db.run(`ALTER TABLE vouchers ${col}`, (e) => {
-                                if (!e) console.log(`Added column: ${col} to vouchers`);
+                                // Column added to vouchers
                             });
                         });
                     }
@@ -597,6 +623,18 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             });
             db.run(`ALTER TABLE staging_transactions ADD COLUMN suggested_credit TEXT`, (err) => {
                 if (err) { }
+                db.all("PRAGMA table_info(staging_transactions)", (err, columns) => {
+                    if (!err && columns) {
+                        const hasItemCode = columns.some(c => c.name === 'item_code');
+                        if (!hasItemCode) {
+                            db.run("ALTER TABLE staging_transactions ADD COLUMN item_code TEXT");
+                        }
+                        const hasSubItemCode = columns.some(c => c.name === 'sub_item_code');
+                        if (!hasSubItemCode) {
+                            db.run("ALTER TABLE staging_transactions ADD COLUMN sub_item_code TEXT");
+                        }
+                    }
+                });
                 // 11. Table: Checklist Tasks (NEW)
                 db.run(`CREATE TABLE IF NOT EXISTS checklist_tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -624,7 +662,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         [14, 'Đối chiếu dữ liệu chi tiết và sổ cái', 'Hàng quý', 'todo', 1]
                     ];
                     defaultTasks.forEach(task => db.run(insert, task));
-                    console.log("Seeded Checklist Tasks.");
+                    // Checklist tasks seeded
                 });
 
                 // 12. Table: Fixed Assets (LEGACY - Disabled, replaced by HCSN TT 24/2024 schema below)
@@ -647,7 +685,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         ['3', 'TS003', 'Máy chiếu Sony 4K', '2023-06-01', 28000000, 4, 7000000, 21000000, 'Văn phòng']
                     ];
                     sampleAssets.forEach(a => db.run(insert, a));
-                    console.log("Seeded Fixed Assets.");
+                    // Fixed assets seeded
                 });
                 */
 
@@ -668,7 +706,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         ['C2', 'CC002', 'Bộ lưu điện UPS 1000VA', '2024-02-01', 2500000, 24, 200000, 2300000]
                     ];
                     sampleCCDC.forEach(c => db.run(insert, c));
-                    console.log("Seeded CCDC Items.");
+                    // CCDC items seeded
                 });
 
                 // 14. Table: Employees (Updated for HCSN)
@@ -940,7 +978,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         [102, 1, 'KU-VCB-02', 1500000000, 8.7, '2024-04-15', '2024-10-15', 'Mua nguyên vật liệu']
                     ];
                     sampleNotes.forEach(n => db.run(insert, n));
-                    console.log("Seeded Debt Notes.");
+                    // Debt notes seeded
                 });
 
                 // 21. Table: Dimensions
@@ -1013,7 +1051,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                                     const insert = 'INSERT INTO budgets (account_code, period, budget_amount, notes, created_at) VALUES (?,?,?,?,?)';
                                     db.run(insert, ['642', '2024-12', 50000000, 'Ngân sách chi phí quản lý T12', new Date().toISOString()]);
                                     db.run(insert, ['641', '2024-12', 30000000, 'Ngân sách chi phí bán hàng T12', new Date().toISOString()]);
-                                    console.log("Seeded Budgets.");
+                                    // Budgets seeded
                                 }
                             });
                         };
@@ -1024,12 +1062,12 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                                 const hasAmount = columns.some(c => c.name === 'amount');
                                 if (hasAmount) {
                                     db.run("ALTER TABLE budgets RENAME COLUMN amount TO budget_amount", () => {
-                                        console.log("Renamed 'amount' to 'budget_amount' in 'budgets' table.");
+                                        // Budgets table column renamed
                                         seedBudgets();
                                     });
                                 } else {
                                     db.run("ALTER TABLE budgets ADD COLUMN budget_amount REAL", () => {
-                                        console.log("Added 'budget_amount' column to 'budgets' table.");
+                                        // Budgets table column added
                                         seedBudgets();
                                     });
                                 }
@@ -1057,8 +1095,8 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     db.run(insert, ['VT001', 'Thép cuộn phi 6', 'Kg', 20000, 10, 'Vật tư']);
                     db.run(insert, ['VT002', 'Xi măng PC40', 'Bao 50kg', 80000, 8, 'Vật tư']);
                     db.run(insert, ['DV001', 'Cước vận chuyển', 'Chuyến', 500000, 10, 'Dịch vụ']);
-                    console.log("Seeded Products.");
-                    console.log("Database schema initialized with all modules.");
+                    // Products seeded
+                    // Database schema initialized
 
                     // 25. Table: System Logs (NEW)
                     db.run(`CREATE TABLE IF NOT EXISTS system_logs (
@@ -1069,7 +1107,19 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         details TEXT,
                         target TEXT
                     )`, () => {
-                        console.log("Initialized 'system_logs' table.");
+                        // system_logs table initialized
+
+                        // 25.1 Table: XML Export Logs (KBNN DVC)
+                        db.run(`CREATE TABLE IF NOT EXISTS xml_export_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            export_type TEXT,
+                            doc_count INTEGER,
+                            exported_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                            exported_by TEXT,
+                            file_name TEXT
+                        )`, () => {
+                            // xml_export_logs table initialized
+                        });
                     });
                 });
             });
@@ -1082,7 +1132,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 if (!hasConv) {
                     db.run("ALTER TABLE products ADD COLUMN conversion_units TEXT", (alterErr) => {
                         if (!alterErr) {
-                            console.log("Added 'conversion_units' to 'products'.");
+                            // Column added to products
                         }
                     });
                 }
@@ -1131,7 +1181,7 @@ db.run(`CREATE TABLE IF NOT EXISTS fixed_assets (
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)
 )`, (err) => {
     if (err) return console.error("Error creating 'fixed_assets':", err);
-    console.log("Initialized 'fixed_assets' table for HCSN (TT 24/2024).");
+    // fixed_assets table initialized
 
     // Seed sample data
     const assets = [
@@ -1183,7 +1233,7 @@ db.run(`CREATE TABLE IF NOT EXISTS fixed_assets (
         ]);
     });
 
-    console.log("Seeded sample fixed assets for HCSN.");
+    // Sample fixed assets seeded
 
 
 });
@@ -1217,7 +1267,58 @@ db.run(`CREATE TABLE IF NOT EXISTS infrastructure_assets (
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)
 )`, (err) => {
     if (err) console.error("Error creating 'infrastructure_assets':", err);
-    else console.log("Initialized 'infrastructure_assets' table for HCSN (TT 24/2024).");
+    // infrastructure_assets table initialized
+});
+
+// Bảng: Công cụ dụng cụ (CCDC - Chi phí trả trước) - HCSN
+db.run(`CREATE TABLE IF NOT EXISTS ccdc_items (
+    id TEXT PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    start_date TEXT,
+    cost REAL NOT NULL DEFAULT 0,
+    life_months INTEGER DEFAULT 12,
+    allocated REAL DEFAULT 0,
+    remaining REAL DEFAULT 0,
+    target_account TEXT DEFAULT '642',
+    status TEXT DEFAULT 'ACTIVE',
+    created_at TEXT,
+    updated_at TEXT
+)`, (err) => {
+    if (err) console.error("Error creating 'ccdc_items':", err);
+
+    // Seed sample CCDC data
+    db.get("SELECT COUNT(*) as count FROM ccdc_items", (checkErr, row) => {
+        if (!checkErr && (!row || row.count === 0)) {
+            const sampleCCDC = [
+                { id: 'ccdc_001', code: 'CCDC001', name: 'Ghế xoay nhân viên', start_date: '2025-07-01', cost: 1200000, life_months: 12, allocated: 0, remaining: 1200000 },
+                { id: 'ccdc_002', code: 'CCDC002', name: 'Bộ lưu điện UPS 1000VA', start_date: '2025-06-01', cost: 2500000, life_months: 12, allocated: 0, remaining: 2500000 },
+                { id: 'ccdc_003', code: 'CCDC003', name: 'Phần mềm Office 365 (1 năm)', start_date: '2025-01-01', cost: 3600000, life_months: 12, allocated: 0, remaining: 3600000 }
+            ];
+            sampleCCDC.forEach(item => {
+                db.run(`INSERT OR IGNORE INTO ccdc_items (id, code, name, start_date, cost, life_months, allocated, remaining, created_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+                    [item.id, item.code, item.name, item.start_date, item.cost, item.life_months, item.allocated, item.remaining]);
+            });
+        }
+    });
+});
+
+// Bảng: Lịch sử phân bổ chi phí trả trước (Allocation History) - HCSN
+db.run(`CREATE TABLE IF NOT EXISTS allocation_history (
+    id TEXT PRIMARY KEY,
+    period TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    item_type TEXT DEFAULT 'CCDC',
+    item_name TEXT,
+    amount REAL NOT NULL DEFAULT 0,
+    target_account TEXT,
+    voucher_id TEXT,
+    created_at TEXT,
+    FOREIGN KEY (voucher_id) REFERENCES vouchers(id)
+)`, (err) => {
+    if (err) console.error("Error creating 'allocation_history':", err);
+    // allocation_history table initialized
 });
 
 // Bảng: Theo dõi tài khoản ngoài bảng (Off-Balance Tracking) - MỚI TT 24/2024
@@ -1232,7 +1333,16 @@ db.run(`CREATE TABLE IF NOT EXISTS off_balance_tracking (
     balance REAL DEFAULT 0,
     created_at TEXT
 )`, () => {
-    console.log("Initialized 'off_balance_tracking' table for HCSN (TT 24/2024).");
+    // off_balance_tracking table initialized
+    db.get("SELECT COUNT(*) as count FROM off_balance_tracking", (err, row) => {
+        if (!err && row.count === 0) {
+            const insert = `INSERT INTO off_balance_tracking (account_code, transaction_date, doc_no, description, increase_amount, decrease_amount, balance, created_at) VALUES (?,?,?,?,?,?,?,?)`;
+            const now = new Date().toISOString();
+            db.run(insert, ['008', '2026-01-01', 'DT001', 'Dự toán chi hoạt động năm 2026', 5000000000, 0, 5000000000, now]);
+            db.run(insert, ['008', '2026-01-15', 'CK001', 'Chuyển khoản thanh toán lương tháng 1', 0, 450000000, 4550000000, now]);
+            db.run(insert, ['012', '2026-01-20', 'LC001', 'Lệnh chi tiền thực chi - Mua sắm máy móc', 120000000, 0, 120000000, now]);
+        }
+    });
 });
 
 // Bảng: Đầu tư dài hạn (Long-term Investments) - MỚI TT 24/2024
@@ -1261,7 +1371,7 @@ db.run(`CREATE TABLE IF NOT EXISTS long_term_investments (
     
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)
 )`, () => {
-    console.log("Initialized 'long_term_investments' table for HCSN (TT 24/2024).");
+    // long_term_investments table initialized
 });
 
 // Bảng: Danh mục loại thu sự nghiệp (Revenue Categories) - HCSN
@@ -1275,7 +1385,7 @@ db.run(`CREATE TABLE IF NOT EXISTS revenue_categories (
     active BOOLEAN DEFAULT 1,
     created_at TEXT
 )`, () => {
-    console.log("Initialized 'revenue_categories' table for HCSN revenue tracking.");
+    // revenue_categories table initialized
 
     // Seed initial revenue categories
     const categories = [
@@ -1297,7 +1407,7 @@ db.run(`CREATE TABLE IF NOT EXISTS revenue_categories (
         });
 
         stmt.finalize(() => {
-            console.log("Seeded revenue categories for HCSN.");
+            // Revenue categories seeded
         });
     });
 });
@@ -1325,6 +1435,8 @@ db.run(`CREATE TABLE IF NOT EXISTS revenue_receipts (
     -- Liên kết HCSN
     fund_source_id TEXT,
     budget_estimate_id TEXT,
+    item_code TEXT,
+    sub_item_code TEXT,
     
     -- Kế toán
     payment_method TEXT DEFAULT 'CASH',      -- 'CASH', 'TRANSFER'
@@ -1341,7 +1453,20 @@ db.run(`CREATE TABLE IF NOT EXISTS revenue_receipts (
     FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id),
     FOREIGN KEY (category_code) REFERENCES revenue_categories(code)
 )`, () => {
-    console.log("Initialized 'revenue_receipts' table for HCSN revenue tracking.");
+    // revenue_receipts table initialized
+});
+
+db.all("PRAGMA table_info(revenue_receipts)", (err, columns) => {
+    if (!err && columns) {
+        const hasItemCode = columns.some(c => c.name === 'item_code');
+        if (!hasItemCode) {
+            db.run("ALTER TABLE revenue_receipts ADD COLUMN item_code TEXT");
+        }
+        const hasSubItemCode = columns.some(c => c.name === 'sub_item_code');
+        if (!hasSubItemCode) {
+            db.run("ALTER TABLE revenue_receipts ADD COLUMN sub_item_code TEXT");
+        }
+    }
 });
 
 // Bảng: Danh mục Khoản mục chi (Expense Categories) - HCSN
@@ -1358,7 +1483,7 @@ db.run(`CREATE TABLE IF NOT EXISTS expense_categories (
     if (err) {
         console.error("Error creating 'expense_categories':", err);
     } else {
-        console.log("Initialized 'expense_categories' table for HCSN expense tracking.");
+        // expense_categories table initialized
 
         // Seed initial expense categories
         const categories = [
@@ -1380,7 +1505,7 @@ db.run(`CREATE TABLE IF NOT EXISTS expense_categories (
             });
 
             stmt.finalize(() => {
-                console.log("Seeded expense categories for HCSN.");
+                // Expense categories seeded
             });
         });
     }
@@ -1409,6 +1534,8 @@ db.run(`CREATE TABLE IF NOT EXISTS expense_vouchers (
 
     fund_source_id TEXT,
     budget_estimate_id TEXT,
+    item_code TEXT,
+    sub_item_code TEXT,
     
 
     payment_method TEXT DEFAULT 'CASH',
@@ -1426,7 +1553,20 @@ db.run(`CREATE TABLE IF NOT EXISTS expense_vouchers (
     FOREIGN KEY (category_code) REFERENCES expense_categories(code)
 )`, (err) => {
     if (err) console.error("Error creating 'expense_vouchers':", err);
-    else console.log("Initialized 'expense_vouchers' table for HCSN expense tracking.");
+    // expense_vouchers table initialized
+});
+
+db.all("PRAGMA table_info(expense_vouchers)", (err, columns) => {
+    if (!err && columns) {
+        const hasItemCode = columns.some(c => c.name === 'item_code');
+        if (!hasItemCode) {
+            db.run("ALTER TABLE expense_vouchers ADD COLUMN item_code TEXT");
+        }
+        const hasSubItemCode = columns.some(c => c.name === 'sub_item_code');
+        if (!hasSubItemCode) {
+            db.run("ALTER TABLE expense_vouchers ADD COLUMN sub_item_code TEXT");
+        }
+    }
 });
 
 
@@ -1447,7 +1587,7 @@ db.run(`CREATE TABLE IF NOT EXISTS asset_depreciation_log (
     FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)
 )`, (err) => {
     if (err) console.error("Error creating 'asset_depreciation_log':", err);
-    else console.log("Initialized 'asset_depreciation_log' table for HCSN (TT 24/2024).");
+    // asset_depreciation_log table initialized
 });
 
 // Bảng: Thẻ Tài sản (Asset Cards) - Mẫu S02a-H
@@ -1478,7 +1618,7 @@ db.run(`CREATE TABLE IF NOT EXISTS asset_cards (
     FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)
 )`, (err) => {
     if (err) console.error("Error creating 'asset_cards':", err);
-    else console.log("Initialized 'asset_cards' table for HCSN Asset Cards (S02a-H).");
+    // asset_cards table initialized
 });
 
 // Bảng: Phiếu Kiểm kê Tài sản
@@ -1501,7 +1641,7 @@ db.run(`CREATE TABLE IF NOT EXISTS asset_inventory (
     updated_at TEXT
 )`, (err) => {
     if (err) console.error("Error creating 'asset_inventory':", err);
-    else console.log("Initialized 'asset_inventory' table for HCSN Asset Inventory.");
+    // asset_inventory table initialized
 });
 
 // Bảng: Chi tiết Kiểm kê
@@ -1532,7 +1672,7 @@ db.run(`CREATE TABLE IF NOT EXISTS asset_inventory_items (
     FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)
 )`, (err) => {
     if (err) console.error("Error creating 'asset_inventory_items':", err);
-    else console.log("Initialized 'asset_inventory_items' table for HCSN Asset Inventory Details.");
+    // asset_inventory_items table initialized
 });
 
 db.run(`CREATE TABLE IF NOT EXISTS asset_movements (
@@ -1558,7 +1698,7 @@ db.run(`CREATE TABLE IF NOT EXISTS asset_movements (
     FOREIGN KEY (asset_id) REFERENCES fixed_assets(id)
 )`, (err) => {
     if (err) console.error("Error creating 'asset_movements':", err);
-    else console.log("Initialized 'asset_movements' table for HCSN (TT 24/2024).");
+    // asset_movements table initialized
 });
 
 // ==========================================
@@ -1573,7 +1713,7 @@ db.run(`CREATE TABLE IF NOT EXISTS salary_grades (
     category TEXT -- A1, A2...
 )`, (err) => {
     if (!err) {
-        console.log("Initialized 'salary_grades' table.");
+        // salary_grades table initialized
         // Seed simple data
         db.get("SELECT count(*) as count FROM salary_grades", (err, row) => {
             if (row && row.count === 0) {
@@ -1582,7 +1722,7 @@ db.run(`CREATE TABLE IF NOT EXISTS salary_grades (
                 stmt.run('MN_01002', '01.002', 'Chuyên viên chính', 'A2.1');
                 stmt.run('MN_06031', '06.031', 'Kế toán viên', 'A1');
                 stmt.finalize();
-                console.log("Seeded 'salary_grades' data.");
+                // Salary grades seeded
             }
         });
     }
@@ -1617,11 +1757,11 @@ db.run(`CREATE TABLE IF NOT EXISTS employees (
 )`, (err) => {
     if (err) console.error("Error creating 'employees':", err);
     else {
-        console.log("Initialized 'employees' table.");
+        // employees table initialized
         // Seed Admin Employee if empty
         db.get("SELECT count(*) as count FROM employees", (err, row) => {
             if (row && row.count === 0) {
-                console.log("Seeding sample employees...");
+                // Seeding sample employees
                 const adminId = 'EMP_001';
                 db.run(`INSERT INTO employees (id, code, name, department, position, salary_grade_id, salary_level, salary_coefficient, status) 
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1646,7 +1786,7 @@ db.serialize(() => {
         created_at TEXT
     )`, (err) => {
         if (err) return console.error("Error creating 'allowance_types':", err);
-        console.log("Initialized 'allowance_types' table for HCSN HR.");
+        // allowance_types table initialized
 
         // Seed sample allowances
         const insert = 'INSERT OR IGNORE INTO allowance_types (id, code, name, calculation_type, default_value) VALUES (?,?,?,?,?)';
@@ -1675,7 +1815,7 @@ db.serialize(() => {
         FOREIGN KEY (employee_id) REFERENCES employees(id),
         FOREIGN KEY (allowance_type_id) REFERENCES allowance_types(id)
     )`, (err) => {
-        if (!err) console.log("Initialized 'employee_allowances' table.");
+        // employee_allowances table initialized
     });
 });
 
@@ -1690,7 +1830,7 @@ db.run(`CREATE TABLE IF NOT EXISTS payroll_periods (
     status TEXT DEFAULT 'DRAFT', -- DRAFT, LOCKED, POSTED
     created_at TEXT
 )`, (err) => {
-    if (!err) console.log("Initialized 'payroll_periods' table.");
+    // payroll_periods table initialized
 });
 
 // Bảng: Chi tiết lương (Payroll Details)
@@ -1722,7 +1862,7 @@ db.run(`CREATE TABLE IF NOT EXISTS payroll_details (
     FOREIGN KEY (period_id) REFERENCES payroll_periods(id),
     FOREIGN KEY (employee_id) REFERENCES employees(id)
 )`, (err) => {
-    if (!err) console.log("Initialized 'payroll_details' table.");
+    // payroll_details table initialized
 });
 
 // Bảng: Hợp đồng & Quyết định (Employee Contracts)
@@ -1746,7 +1886,7 @@ db.run(`CREATE TABLE IF NOT EXISTS employee_contracts (
     FOREIGN KEY (employee_id) REFERENCES employees(id),
     FOREIGN KEY (salary_grade_id) REFERENCES salary_grades(id)
 )`, (err) => {
-    if (!err) console.log("Initialized 'employee_contracts' table for HCSN.");
+    // employee_contracts table initialized
 });
 
 // Bảng: Quá trình Lương (Salary History)
@@ -1769,7 +1909,7 @@ db.run(`CREATE TABLE IF NOT EXISTS salary_history (
     FOREIGN KEY (old_grade_id) REFERENCES salary_grades(id),
     FOREIGN KEY (new_grade_id) REFERENCES salary_grades(id)
 )`, (err) => {
-    if (!err) console.log("Initialized 'salary_history' table for HCSN.");
+    // salary_history table initialized
 });
 
 // BHXH Authority Data (for reconciliation)
@@ -1789,7 +1929,7 @@ db.run(`CREATE TABLE IF NOT EXISTS bhxh_authority_data (
     import_date TEXT DEFAULT CURRENT_TIMESTAMP,
     source TEXT DEFAULT 'BHXH_AUTHORITY'
 )`, (err) => {
-    if (!err) console.log("Initialized 'bhxh_authority_data' table for HCSN.");
+    // bhxh_authority_data table initialized
 });
 
 // Insurance Discrepancies (tracking variances)
@@ -1811,7 +1951,7 @@ db.run(`CREATE TABLE IF NOT EXISTS insurance_discrepancies (
     created_date TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (employee_id) REFERENCES employees(id)
 )`, (err) => {
-    if (!err) console.log("Initialized 'insurance_discrepancies' table for HCSN.");
+    // insurance_discrepancies table initialized
 });
 
 // Migration: Thêm cột cho chart_of_accounts để hỗ trợ TT 24/2024
@@ -1825,19 +1965,19 @@ db.all("PRAGMA table_info(chart_of_accounts)", (err, columns) => {
         db.serialize(() => {
             if (!hasAccountType) {
                 db.run("ALTER TABLE chart_of_accounts ADD COLUMN account_type TEXT");
-                console.log("Added 'account_type' to 'chart_of_accounts' for HCSN.");
+                // Column added to chart_of_accounts
             }
             if (!hasBudgetCategory) {
                 db.run("ALTER TABLE chart_of_accounts ADD COLUMN budget_category TEXT");
-                console.log("Added 'budget_category' to 'chart_of_accounts' for HCSN.");
+                // Column added to chart_of_accounts
             }
             if (!hasIsOffBalance) {
                 db.run("ALTER TABLE chart_of_accounts ADD COLUMN is_off_balance INTEGER DEFAULT 0");
-                console.log("Added 'is_off_balance' to 'chart_of_accounts' for HCSN.");
+                // Column added to chart_of_accounts
             }
             if (!hasTT24Class) {
                 db.run("ALTER TABLE chart_of_accounts ADD COLUMN tt24_classification TEXT");
-                console.log("Added 'tt24_classification' to 'chart_of_accounts' for HCSN (TT 24/2024).");
+                // Column added to chart_of_accounts
             }
         });
     }
@@ -1853,15 +1993,15 @@ db.all("PRAGMA table_info(voucher_items)", (err, columns) => {
         db.serialize(() => {
             if (!hasFundSource) {
                 db.run("ALTER TABLE voucher_items ADD COLUMN fund_source_id TEXT");
-                console.log("Added 'fund_source_id' to 'voucher_items' for HCSN.");
+                // Column added to voucher_items
             }
             if (!hasBudgetCat) {
                 db.run("ALTER TABLE voucher_items ADD COLUMN budget_category TEXT");
-                console.log("Added 'budget_category' to 'voucher_items' for HCSN.");
+                // Column added to voucher_items
             }
             if (!hasEstimateId) {
                 db.run("ALTER TABLE voucher_items ADD COLUMN estimate_id TEXT");
-                console.log("Added 'estimate_id' to 'voucher_items' for HCSN.");
+                // Column added to voucher_items
             }
         });
     }
@@ -1890,7 +2030,7 @@ db.run(`CREATE TABLE IF NOT EXISTS materials (
     updated_at TEXT
 )`, (err) => {
     if (err) return console.error("Error creating 'materials':", err);
-    console.log("Initialized 'materials' table for HCSN Inventory.");
+    // materials table initialized
 
     // Seed sample materials
     const insert = 'INSERT OR IGNORE INTO materials (id, code, name, category, unit, account_code, unit_price, min_stock, max_stock, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
@@ -1903,7 +2043,7 @@ db.run(`CREATE TABLE IF NOT EXISTS materials (
         [`mat_${Date.now()}_5`, 'HH001', 'Sách giáo khoa Toán 10', 'GOODS', 'Cuốn', '153', 45000, 100, 1000, 'ACTIVE', now]
     ];
     samples.forEach(s => db.run(insert, s));
-    console.log("Seeded sample materials for HCSN.");
+    // Sample materials seeded
 });
 
 // Bảng: Phiếu nhập kho vật tư (Material Receipts)
@@ -1923,7 +2063,7 @@ db.run(`CREATE TABLE IF NOT EXISTS material_receipts (
     updated_at TEXT,
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)
 )`, () => {
-    console.log("Initialized 'material_receipts' table for HCSN Inventory.");
+    // material_receipts table initialized
 });
 
 // Bảng: Chi tiết phiếu nhập kho (Material Receipt Items)
@@ -1939,7 +2079,7 @@ db.run(`CREATE TABLE IF NOT EXISTS material_receipt_items (
     FOREIGN KEY (receipt_id) REFERENCES material_receipts(id) ON DELETE CASCADE,
     FOREIGN KEY (material_id) REFERENCES materials(id)
 )`, () => {
-    console.log("Initialized 'material_receipt_items' table for HCSN Inventory.");
+    // material_receipt_items table initialized
 });
 
 // Bảng: Phiếu xuất kho vật tư (Material Issues)
@@ -1960,7 +2100,7 @@ db.run(`CREATE TABLE IF NOT EXISTS material_issues (
     created_at TEXT,
     updated_at TEXT
 )`, () => {
-    console.log("Initialized 'material_issues' table for HCSN Inventory.");
+    // material_issues table initialized
 });
 
 // Bảng: Chi tiết phiếu xuất kho (Material Issue Items)
@@ -1976,7 +2116,7 @@ db.run(`CREATE TABLE IF NOT EXISTS material_issue_items (
     FOREIGN KEY (issue_id) REFERENCES material_issues(id) ON DELETE CASCADE,
     FOREIGN KEY (material_id) REFERENCES materials(id)
 )`, () => {
-    console.log("Initialized 'material_issue_items' table for HCSN Inventory.");
+    // material_issue_items table initialized
 });
 
 // Bảng: Phiếu điều chuyển kho (Material Transfers)
@@ -1994,7 +2134,7 @@ db.run(`CREATE TABLE IF NOT EXISTS material_transfers (
     created_at TEXT,
     updated_at TEXT
 )`, () => {
-    console.log("Initialized 'material_transfers' table for HCSN Inventory.");
+    // material_transfers table initialized
 });
 
 // Bảng: Chi tiết phiếu điều chuyển (Material Transfer Items)
@@ -2007,7 +2147,7 @@ db.run(`CREATE TABLE IF NOT EXISTS material_transfer_items (
     FOREIGN KEY (transfer_id) REFERENCES material_transfers(id) ON DELETE CASCADE,
     FOREIGN KEY (material_id) REFERENCES materials(id)
 )`, () => {
-    console.log("Initialized 'material_transfer_items' table for HCSN Inventory.");
+    // material_transfer_items table initialized
 });
 
 // Bảng: Thẻ kho theo nguồn kinh phí (Inventory Cards)
@@ -2030,7 +2170,7 @@ db.run(`CREATE TABLE IF NOT EXISTS inventory_cards (
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),
     UNIQUE(material_id, fund_source_id, fiscal_year, warehouse)
 )`, () => {
-    console.log("Initialized 'inventory_cards' table for HCSN Inventory.");
+    // inventory_cards table initialized
 });
 
 // ========================================
@@ -2059,7 +2199,7 @@ db.run(`CREATE TABLE IF NOT EXISTS temporary_advances (
     created_at TEXT,
     updated_at TEXT
 )`, () => {
-    console.log("Initialized 'temporary_advances' table for HCSN.");
+    // temporary_advances table initialized
     db.run(`CREATE INDEX IF NOT EXISTS idx_temp_adv_status ON temporary_advances(status)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_temp_adv_employee ON temporary_advances(employee_id)`);
 });
@@ -2085,7 +2225,7 @@ db.run(`CREATE TABLE IF NOT EXISTS budget_advances (
     updated_at TEXT,
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)
 )`, () => {
-    console.log("Initialized 'budget_advances' table for HCSN.");
+    // budget_advances table initialized
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_adv_year ON budget_advances(fiscal_year)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_adv_status ON budget_advances(status)`);
 });
@@ -2116,7 +2256,7 @@ db.run(`CREATE TABLE IF NOT EXISTS receivables (
     FOREIGN KEY (partner_code) REFERENCES partners(partner_code),
     FOREIGN KEY (revenue_category_id) REFERENCES revenue_categories(id)
 )`, () => {
-    console.log("Initialized 'receivables' table for HCSN.");
+    // receivables table initialized
     db.run(`CREATE INDEX IF NOT EXISTS idx_receivables_partner ON receivables(partner_code)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_receivables_status ON receivables(status)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_receivables_account ON receivables(account_code)`);
@@ -2152,7 +2292,7 @@ db.run(`CREATE TABLE IF NOT EXISTS payables (
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),
     FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id)
 )`, () => {
-    console.log("Initialized 'payables' table for HCSN.");
+    // payables table initialized
     db.run(`CREATE INDEX IF NOT EXISTS idx_payables_partner ON payables(partner_code)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_payables_status ON payables(status)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_payables_account ON payables(account_code)`);
@@ -2171,7 +2311,7 @@ db.run(`CREATE TABLE IF NOT EXISTS receivable_payments (
     created_at TEXT,
     FOREIGN KEY (receivable_id) REFERENCES receivables(id) ON DELETE CASCADE
 )`, () => {
-    console.log("Initialized 'receivable_payments' table for HCSN.");
+    // receivable_payments table initialized
 });
 
 // Bảng: Lịch sử thanh toán công nợ phải trả (Payable Payments)
@@ -2187,7 +2327,7 @@ db.run(`CREATE TABLE IF NOT EXISTS payable_payments (
     created_at TEXT,
     FOREIGN KEY (payable_id) REFERENCES payables(id) ON DELETE CASCADE
 )`, () => {
-    console.log("Initialized 'payable_payments' table for HCSN.");
+    // payable_payments table initialized
 });
 
 
@@ -2215,7 +2355,7 @@ db.run(`CREATE TABLE IF NOT EXISTS fund_sources (
     FOREIGN KEY (company_id) REFERENCES companies(id),
     UNIQUE(company_id, code, fiscal_year)
 )`, () => {
-    console.log("Initialized 'fund_sources' table for HCSN Budget Management.");
+    // fund_sources table initialized
     db.run(`CREATE INDEX IF NOT EXISTS idx_fund_sources_fiscal_year ON fund_sources(fiscal_year)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_fund_sources_company ON fund_sources(company_id)`);
 });
@@ -2260,7 +2400,7 @@ db.run(`CREATE TABLE IF NOT EXISTS budget_estimates (
     FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),
     FOREIGN KEY (parent_id) REFERENCES budget_estimates(id)
 )`, () => {
-    console.log("Initialized 'budget_estimates' table for HCSN Budget Management.");
+    // budget_estimates table initialized
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_estimates_fiscal_year ON budget_estimates(fiscal_year)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_estimates_fund_source ON budget_estimates(fund_source_id)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_estimates_chapter ON budget_estimates(chapter_code)`);
@@ -2312,10 +2452,516 @@ db.run(`CREATE TABLE IF NOT EXISTS budget_allocations (
     
     FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id) ON DELETE CASCADE
 )`, () => {
-    console.log("Initialized 'budget_allocations' table for HCSN Budget Management.");
+    // budget_allocations table initialized
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_allocations_estimate ON budget_allocations(budget_estimate_id)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_allocations_department ON budget_allocations(department_code)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_allocations_project ON budget_allocations(project_code)`);
+});
+
+
+// ================================================================
+// COMPREHENSIVE AUDIT TRAIL SYSTEM (TT 24/2024 Compliance)
+// Hệ thống Dấu vết Kiểm toán
+// ================================================================
+
+// Bảng: Audit Trail - Comprehensive transaction change tracking
+db.run(`CREATE TABLE IF NOT EXISTS audit_trail (
+    id TEXT PRIMARY KEY,
+
+    -- Transaction identification
+    entity_type TEXT NOT NULL,          -- 'VOUCHER', 'BUDGET', 'ASSET', 'PARTNER', 'EMPLOYEE', 'OPENING_BALANCE', etc.
+    entity_id TEXT NOT NULL,            -- ID of the affected entity
+    doc_no TEXT,                        -- Document number for quick reference
+
+    -- Action details
+    action TEXT NOT NULL,               -- 'CREATE', 'UPDATE', 'DELETE', 'POST', 'UNPOST', 'APPROVE', 'REJECT', 'LOCK', 'UNLOCK'
+    action_category TEXT,               -- 'DATA_ENTRY', 'APPROVAL', 'PERIOD_CLOSE', 'RECONCILIATION', 'SYSTEM'
+
+    -- Change tracking (JSON format for before/after values)
+    old_values TEXT,                    -- JSON: Previous state before change
+    new_values TEXT,                    -- JSON: New state after change
+    changed_fields TEXT,                -- JSON array of field names that changed
+
+    -- User and session info
+    user_id INTEGER,
+    username TEXT NOT NULL,
+    user_role TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    session_id TEXT,
+
+    -- Timestamps
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    fiscal_year INTEGER,
+    fiscal_period INTEGER,              -- Month (1-12) or Quarter (Q1-Q4)
+
+    -- Approval workflow tracking
+    approval_status TEXT,               -- 'PENDING', 'APPROVED', 'REJECTED', 'BYPASSED'
+    approved_by TEXT,
+    approved_at TEXT,
+    approval_notes TEXT,
+
+    -- Additional context
+    amount REAL,                        -- Transaction amount for quick filtering
+    account_code TEXT,                  -- Primary account affected
+    fund_source_id TEXT,                -- Budget fund source if applicable
+    budget_estimate_id TEXT,            -- Budget estimate if applicable
+    department_code TEXT,
+    project_code TEXT,
+
+    -- Source and reason
+    source TEXT DEFAULT 'MANUAL',       -- 'MANUAL', 'IMPORT', 'API', 'SYSTEM', 'MIGRATION'
+    reason TEXT,                        -- User-provided reason for change
+
+    -- Integrity check
+    checksum TEXT,                      -- Hash of critical fields for tamper detection
+
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)`, (err) => {
+    if (err) return console.error("Error creating 'audit_trail':", err);
+    // Create indexes for efficient querying
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_trail_entity ON audit_trail(entity_type, entity_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_trail_user ON audit_trail(username)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_trail_date ON audit_trail(created_at)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_trail_action ON audit_trail(action)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_trail_fiscal ON audit_trail(fiscal_year, fiscal_period)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_trail_doc ON audit_trail(doc_no)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_trail_approval ON audit_trail(approval_status)`);
+});
+
+// Bảng: Audit Sessions - Track user sessions for audit purposes
+db.run(`CREATE TABLE IF NOT EXISTS audit_sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    username TEXT NOT NULL,
+    login_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    logout_at TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    is_active INTEGER DEFAULT 1,
+    last_activity TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+)`, (err) => {
+    if (err) return console.error("Error creating 'audit_sessions':", err);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_sessions_user ON audit_sessions(user_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_sessions_active ON audit_sessions(is_active)`);
+});
+
+// Bảng: Audit Anomalies - Track detected anomalies and exceptions
+db.run(`CREATE TABLE IF NOT EXISTS audit_anomalies (
+    id TEXT PRIMARY KEY,
+
+    -- Anomaly classification
+    anomaly_type TEXT NOT NULL,         -- 'BUDGET_OVERRUN', 'DUPLICATE_DOC', 'INVALID_ACCOUNT', 'DATE_VIOLATION', 'UNUSUAL_AMOUNT', 'RISKY_PARTNER', 'SEGREGATION_OF_DUTY'
+    severity TEXT DEFAULT 'MEDIUM',     -- 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+
+    -- Related entities
+    entity_type TEXT,
+    entity_id TEXT,
+    doc_no TEXT,
+
+    -- Anomaly details
+    description TEXT NOT NULL,
+    detected_value TEXT,                -- The problematic value
+    expected_value TEXT,                -- What was expected
+    threshold_value TEXT,               -- Threshold that was exceeded
+
+    -- Detection info
+    detected_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    detected_by TEXT DEFAULT 'SYSTEM',  -- 'SYSTEM', 'USER', 'AUDIT'
+    detection_rule TEXT,                -- Rule ID or name that triggered this
+
+    -- Resolution
+    status TEXT DEFAULT 'OPEN',         -- 'OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'FALSE_POSITIVE', 'ESCALATED'
+    resolved_by TEXT,
+    resolved_at TEXT,
+    resolution_notes TEXT,
+
+    -- Impact assessment
+    fiscal_year INTEGER,
+    amount_impact REAL,
+    risk_score INTEGER,                 -- 1-100 scale
+
+    FOREIGN KEY (entity_id) REFERENCES vouchers(id)
+)`, (err) => {
+    if (err) return console.error("Error creating 'audit_anomalies':", err);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_anomalies_type ON audit_anomalies(anomaly_type)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_anomalies_status ON audit_anomalies(status)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_anomalies_severity ON audit_anomalies(severity)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_audit_anomalies_date ON audit_anomalies(detected_at)`);
+});
+
+// Bảng: Reconciliation Tracking - Track reconciliation status
+db.run(`CREATE TABLE IF NOT EXISTS reconciliation_records (
+    id TEXT PRIMARY KEY,
+
+    -- Reconciliation type
+    recon_type TEXT NOT NULL,           -- 'BANK', 'TREASURY', 'INTERCOMPANY', 'PARTNER', 'INVENTORY', 'ASSET'
+
+    -- Period
+    fiscal_year INTEGER NOT NULL,
+    fiscal_period INTEGER NOT NULL,
+    period_start TEXT,
+    period_end TEXT,
+
+    -- Account/Entity being reconciled
+    account_code TEXT,
+    bank_account_id TEXT,
+    partner_code TEXT,
+
+    -- Balances
+    book_balance REAL,
+    external_balance REAL,
+    difference REAL,
+
+    -- Reconciling items
+    outstanding_items TEXT,             -- JSON array of uncleared items
+    adjustments TEXT,                   -- JSON array of adjustments made
+
+    -- Status
+    status TEXT DEFAULT 'DRAFT',        -- 'DRAFT', 'IN_PROGRESS', 'COMPLETED', 'APPROVED'
+
+    -- Metadata
+    prepared_by TEXT,
+    prepared_at TEXT,
+    reviewed_by TEXT,
+    reviewed_at TEXT,
+    approved_by TEXT,
+    approved_at TEXT,
+    notes TEXT,
+
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+    if (err) return console.error("Error creating 'reconciliation_records':", err);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_recon_fiscal ON reconciliation_records(fiscal_year, fiscal_period)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_recon_type ON reconciliation_records(recon_type)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_recon_status ON reconciliation_records(status)`);
+});
+
+
+// ================================================================
+// BUDGET CONTROL SYSTEM (TT 24/2024)
+// Hệ thống Kiểm soát Ngân sách HCSN
+// ================================================================
+
+// Bảng: Budget Periods - Manage budget period locks
+db.run(`CREATE TABLE IF NOT EXISTS budget_periods (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    period_type TEXT DEFAULT 'MONTHLY',  -- 'MONTHLY', 'QUARTERLY', 'YEARLY'
+    period_number INTEGER NOT NULL,       -- 1-12 for monthly, 1-4 for quarterly
+    period_name TEXT,                     -- 'Tháng 1', 'Quý I', etc.
+
+    -- Period dates
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+
+    -- Lock status
+    is_locked INTEGER DEFAULT 0,
+    locked_at TEXT,
+    locked_by TEXT,
+    lock_reason TEXT,
+
+    -- Budget control thresholds
+    warning_threshold REAL DEFAULT 80,    -- Warn at 80% utilization
+    block_threshold REAL DEFAULT 100,     -- Block at 100% utilization
+    allow_override INTEGER DEFAULT 0,     -- Allow budget override with approval
+
+    -- Status
+    status TEXT DEFAULT 'OPEN',           -- 'OPEN', 'CLOSING', 'CLOSED', 'REOPENED'
+
+    -- Metadata
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (company_id) REFERENCES companies(id),
+    UNIQUE(company_id, fiscal_year, period_type, period_number)
+)`, (err) => {
+    if (err) return console.error("Error creating 'budget_periods':", err);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_periods_fiscal ON budget_periods(fiscal_year)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_periods_company ON budget_periods(company_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_periods_status ON budget_periods(status)`);
+
+    // Seed default budget periods for current and next year
+    const currentYear = new Date().getFullYear();
+    const months = [
+        'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+        'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+    ];
+
+    [currentYear, currentYear + 1].forEach(year => {
+        months.forEach((name, idx) => {
+            const periodNum = idx + 1;
+            const startDate = `${year}-${String(periodNum).padStart(2, '0')}-01`;
+            const endDate = new Date(year, periodNum, 0).toISOString().split('T')[0];
+
+            db.run(`INSERT OR IGNORE INTO budget_periods
+                (id, company_id, fiscal_year, period_type, period_number, period_name, start_date, end_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [`BP_${year}_M${periodNum}`, '1', year, 'MONTHLY', periodNum, name, startDate, endDate]
+            );
+        });
+    });
+});
+
+// Bảng: Budget Authorization - Spending authorization workflow
+db.run(`CREATE TABLE IF NOT EXISTS budget_authorizations (
+    id TEXT PRIMARY KEY,
+
+    -- Request info
+    request_type TEXT NOT NULL,           -- 'SPENDING', 'OVERRIDE', 'TRANSFER', 'ADDITIONAL'
+    request_date TEXT DEFAULT CURRENT_TIMESTAMP,
+    requested_by TEXT NOT NULL,
+    department_code TEXT,
+
+    -- Budget reference
+    budget_estimate_id TEXT,
+    fund_source_id TEXT,
+    fiscal_year INTEGER NOT NULL,
+
+    -- Amount details
+    requested_amount REAL NOT NULL,
+    approved_amount REAL,
+    budget_available REAL,                -- Available budget at time of request
+
+    -- Purpose and justification
+    purpose TEXT NOT NULL,
+    justification TEXT,
+    supporting_docs TEXT,                 -- JSON array of document references
+
+    -- Approval workflow
+    status TEXT DEFAULT 'PENDING',        -- 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'
+    approval_level INTEGER DEFAULT 1,     -- Current approval level
+    required_level INTEGER DEFAULT 1,     -- Levels required based on amount
+
+    -- Approver info
+    approver_id INTEGER,
+    approved_by TEXT,
+    approved_at TEXT,
+    approval_notes TEXT,
+
+    -- Related transaction
+    voucher_id TEXT,
+    doc_no TEXT,
+
+    -- Expiry
+    expires_at TEXT,                      -- Authorization expiry date
+
+    -- Metadata
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id),
+    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),
+    FOREIGN KEY (voucher_id) REFERENCES vouchers(id)
+)`, (err) => {
+    if (err) return console.error("Error creating 'budget_authorizations':", err);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_auth_status ON budget_authorizations(status)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_auth_date ON budget_authorizations(request_date)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_auth_user ON budget_authorizations(requested_by)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_auth_fiscal ON budget_authorizations(fiscal_year)`);
+});
+
+// Bảng: Budget Transactions - Track all budget-affecting transactions
+db.run(`CREATE TABLE IF NOT EXISTS budget_transactions (
+    id TEXT PRIMARY KEY,
+
+    -- Budget reference
+    budget_estimate_id TEXT NOT NULL,
+    fund_source_id TEXT,
+    budget_allocation_id TEXT,
+
+    -- Transaction info
+    transaction_type TEXT NOT NULL,       -- 'COMMITMENT', 'SPENDING', 'REVERSAL', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'
+    transaction_date TEXT NOT NULL,
+
+    -- Source document
+    voucher_id TEXT,
+    doc_no TEXT,
+    description TEXT,
+
+    -- Amount
+    amount REAL NOT NULL,
+
+    -- Running balances (snapshot at time of transaction)
+    budget_allocated REAL,
+    budget_committed REAL,
+    budget_spent REAL,
+    budget_available REAL,
+
+    -- Authorization
+    authorization_id TEXT,
+    authorized_by TEXT,
+
+    -- Status
+    status TEXT DEFAULT 'POSTED',         -- 'POSTED', 'REVERSED', 'PENDING'
+    reversed_by TEXT,
+    reversed_at TEXT,
+    reversal_reason TEXT,
+
+    -- Metadata
+    fiscal_year INTEGER,
+    fiscal_period INTEGER,
+    department_code TEXT,
+    project_code TEXT,
+    account_code TEXT,
+    created_by TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id),
+    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id),
+    FOREIGN KEY (voucher_id) REFERENCES vouchers(id),
+    FOREIGN KEY (authorization_id) REFERENCES budget_authorizations(id)
+)`, (err) => {
+    if (err) return console.error("Error creating 'budget_transactions':", err);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_trx_estimate ON budget_transactions(budget_estimate_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_trx_fund ON budget_transactions(fund_source_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_trx_date ON budget_transactions(transaction_date)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_trx_type ON budget_transactions(transaction_type)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_trx_voucher ON budget_transactions(voucher_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_trx_fiscal ON budget_transactions(fiscal_year, fiscal_period)`);
+});
+
+// Bảng: Budget Alerts - Track budget warnings and violations
+db.run(`CREATE TABLE IF NOT EXISTS budget_alerts (
+    id TEXT PRIMARY KEY,
+
+    -- Alert type
+    alert_type TEXT NOT NULL,             -- 'WARNING', 'OVERRUN', 'APPROACHING_LIMIT', 'PERIOD_END', 'UNAUTHORIZED'
+    severity TEXT DEFAULT 'MEDIUM',       -- 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+
+    -- Budget reference
+    budget_estimate_id TEXT,
+    fund_source_id TEXT,
+    fiscal_year INTEGER,
+    fiscal_period INTEGER,
+
+    -- Alert details
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+
+    -- Thresholds
+    threshold_percent REAL,               -- The threshold that was reached
+    current_percent REAL,                 -- Current utilization percent
+    budget_amount REAL,
+    spent_amount REAL,
+    remaining_amount REAL,
+
+    -- Related transaction
+    triggered_by_voucher TEXT,
+    triggered_by_user TEXT,
+
+    -- Status
+    status TEXT DEFAULT 'ACTIVE',         -- 'ACTIVE', 'ACKNOWLEDGED', 'RESOLVED', 'DISMISSED'
+    acknowledged_by TEXT,
+    acknowledged_at TEXT,
+    resolved_by TEXT,
+    resolved_at TEXT,
+    resolution_notes TEXT,
+
+    -- Notifications
+    notified_users TEXT,                  -- JSON array of notified user IDs
+    notification_sent_at TEXT,
+
+    -- Metadata
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (budget_estimate_id) REFERENCES budget_estimates(id),
+    FOREIGN KEY (fund_source_id) REFERENCES fund_sources(id)
+)`, (err) => {
+    if (err) return console.error("Error creating 'budget_alerts':", err);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_alerts_type ON budget_alerts(alert_type)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_alerts_status ON budget_alerts(status)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_alerts_severity ON budget_alerts(severity)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_alerts_estimate ON budget_alerts(budget_estimate_id)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_budget_alerts_date ON budget_alerts(created_at)`);
+});
+
+// Bảng: Approval Workflow Rules - Define approval thresholds and routing
+db.run(`CREATE TABLE IF NOT EXISTS approval_workflow_rules (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+
+    -- Rule definition
+    rule_name TEXT NOT NULL,
+    rule_type TEXT NOT NULL,              -- 'BUDGET_SPENDING', 'BUDGET_OVERRIDE', 'VOUCHER_APPROVAL', 'PERIOD_CLOSE'
+
+    -- Amount thresholds
+    min_amount REAL DEFAULT 0,
+    max_amount REAL,                      -- NULL means unlimited
+
+    -- Approval requirements
+    required_approvers INTEGER DEFAULT 1,
+    required_role TEXT,                   -- Required role for approval
+    escalation_role TEXT,                 -- Role for escalation
+
+    -- Time limits
+    approval_deadline_hours INTEGER DEFAULT 48,
+    auto_escalate_hours INTEGER,
+
+    -- Conditions
+    department_code TEXT,                 -- Specific department or NULL for all
+    fund_source_type TEXT,                -- Specific fund type or NULL for all
+
+    -- Active status
+    is_active INTEGER DEFAULT 1,
+    effective_from TEXT,
+    effective_to TEXT,
+
+    -- Metadata
+    created_by TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (company_id) REFERENCES companies(id)
+)`, (err) => {
+    if (err) return console.error("Error creating 'approval_workflow_rules':", err);
+
+    // Seed default approval rules
+    const defaultRules = [
+        { id: 'AWR_SPEND_1', name: 'Chi tiêu dưới 10 triệu', type: 'BUDGET_SPENDING', min: 0, max: 10000000, approvers: 1, role: 'accountant' },
+        { id: 'AWR_SPEND_2', name: 'Chi tiêu từ 10-50 triệu', type: 'BUDGET_SPENDING', min: 10000000, max: 50000000, approvers: 1, role: 'chief_accountant' },
+        { id: 'AWR_SPEND_3', name: 'Chi tiêu từ 50-200 triệu', type: 'BUDGET_SPENDING', min: 50000000, max: 200000000, approvers: 2, role: 'chief_accountant' },
+        { id: 'AWR_SPEND_4', name: 'Chi tiêu trên 200 triệu', type: 'BUDGET_SPENDING', min: 200000000, max: null, approvers: 2, role: 'admin' },
+        { id: 'AWR_OVERRIDE_1', name: 'Vượt dự toán', type: 'BUDGET_OVERRIDE', min: 0, max: null, approvers: 2, role: 'admin' }
+    ];
+
+    defaultRules.forEach(rule => {
+        db.run(`INSERT OR IGNORE INTO approval_workflow_rules
+            (id, company_id, rule_name, rule_type, min_amount, max_amount, required_approvers, required_role, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [rule.id, '1', rule.name, rule.type, rule.min, rule.max, rule.approvers, rule.role, new Date().toISOString()]
+        );
+    });
+});
+
+// Migration: Add budget control columns to vouchers if not exists
+db.all("PRAGMA table_info(vouchers)", (err, columns) => {
+    if (!err && columns) {
+        const colNames = columns.map(c => c.name);
+        if (!colNames.includes('budget_authorization_id')) {
+            db.run("ALTER TABLE vouchers ADD COLUMN budget_authorization_id TEXT");
+        }
+        if (!colNames.includes('budget_check_status')) {
+            db.run("ALTER TABLE vouchers ADD COLUMN budget_check_status TEXT DEFAULT 'NOT_REQUIRED'");
+            // Values: 'NOT_REQUIRED', 'PASSED', 'OVERRIDE_APPROVED', 'PENDING'
+        }
+        if (!colNames.includes('budget_check_message')) {
+            db.run("ALTER TABLE vouchers ADD COLUMN budget_check_message TEXT");
+        }
+    }
+});
+
+// Migration: Add committed_amount to budget_estimates for commitment tracking
+db.all("PRAGMA table_info(budget_estimates)", (err, columns) => {
+    if (!err && columns) {
+        const colNames = columns.map(c => c.name);
+        if (!colNames.includes('committed_amount')) {
+            db.run("ALTER TABLE budget_estimates ADD COLUMN committed_amount REAL DEFAULT 0");
+        }
+    }
 });
 
 

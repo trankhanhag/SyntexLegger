@@ -80,6 +80,9 @@ const HCSN_ACCOUNTS_TT24 = [
 
     { code: '333', name: 'Thuế và các khoản phải nộp Nhà nước', category: 'NỢ PHẢI TRẢ', type: 'LIABILITY', tt24_class: 'Loại 3' },
     { code: '3331', name: 'Thuế GTGT phải nộp', category: 'NỢ PHẢI TRẢ', type: 'LIABILITY', tt24_class: 'Loại 3' },
+    { code: '3334', name: 'Thuế thu nhập doanh nghiệp', category: 'NỢ PHẢI TRẢ', type: 'LIABILITY', tt24_class: 'Loại 3' },
+    { code: '3335', name: 'Thuế thu nhập cá nhân', category: 'NỢ PHẢI TRẢ', type: 'LIABILITY', tt24_class: 'Loại 3' },
+    { code: '3338', name: 'Các khoản phải nộp khác', category: 'NỢ PHẢI TRẢ', type: 'LIABILITY', tt24_class: 'Loại 3' },
 
     { code: '334', name: 'Phải trả người lao động', category: 'NỢ PHẢI TRẢ', type: 'LIABILITY', tt24_class: 'Loại 3' },
     { code: '336', name: 'Phải trả nội bộ', category: 'NỢ PHẢI TRẢ', type: 'LIABILITY', tt24_class: 'Loại 3' },
@@ -124,10 +127,26 @@ const HCSN_ACCOUNTS_TT24 = [
     // ========================================
 
     { code: '611', name: 'Chi phí hoạt động (NSNN)', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6111', name: 'Chi thanh toán cá nhân (lương, phụ cấp...)', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6112', name: 'Chi nghiệp vụ chuyên môn', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6113', name: 'Chi mua sắm, sửa chữa', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6114', name: 'Chi đảng, đoàn thể', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6115', name: 'Chi đào tạo, bồi dưỡng', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6116', name: 'Chi hội nghị, hội thảo', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6117', name: 'Chi công tác phí', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6118', name: 'Chi thường xuyên khác', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
     { code: '612', name: 'Chi phí từ nguồn viện trợ, vay nợ nước ngoài', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
     { code: '614', name: 'Chi phí từ nguồn phí được khấu trừ, để lại', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6141', name: 'Chi thanh toán cá nhân từ phí', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6142', name: 'Chi nghiệp vụ từ phí', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6148', name: 'Chi khác từ phí', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
     { code: '615', name: 'Chi phí hoạt động tài chính', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6151', name: 'Lỗ chênh lệch tỷ giá', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6152', name: 'Lãi vay phải trả', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
     { code: '618', name: 'Chi phí từ hoạt động nghiệp vụ', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6181', name: 'Chi thanh toán cá nhân (HĐ nghiệp vụ)', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6182', name: 'Chi nghiệp vụ chuyên môn (HĐ NV)', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
+    { code: '6188', name: 'Chi khác (HĐ nghiệp vụ)', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
     { code: '642', name: 'Chi phí hoạt động SXKD, dịch vụ', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
     { code: '651', name: 'Chi phí khác', category: 'CHI PHÍ', type: 'EXPENSE', tt24_class: 'Loại 6' },
 

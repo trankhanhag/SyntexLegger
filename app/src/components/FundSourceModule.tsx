@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import BudgetEstimateModule from './BudgetEstimateModule';
 import BudgetAllocationModule from './BudgetAllocationModule';
+import OffBalanceModule from './OffBalanceModule';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
 
-const API_BASE = 'http://localhost:3005/api/hcsn';
+const API_BASE = 'http://localhost:3000/api/hcsn';
 
 interface FundSource {
     id: string;
@@ -19,7 +22,7 @@ interface FundSource {
     updated_at: string;
 }
 
-const FundSourceModule: React.FC<{ subView?: string, onSetHeader?: any }> = ({ subView = 'list', onSetHeader }) => {
+const FundSourceModule: React.FC<{ subView?: string, onSetHeader?: any, onNavigate?: (view: string) => void }> = ({ subView = 'list', onSetHeader, onNavigate }) => {
     const [fundSources, setFundSources] = useState<FundSource[]>([]);
     const [loading, setLoading] = useState(false);
     const [showForm, setShowForm] = useState(false);
@@ -47,7 +50,8 @@ const FundSourceModule: React.FC<{ subView?: string, onSetHeader?: any }> = ({ s
                     title: 'Quản lý Nguồn kinh phí',
                     icon: 'account_balance',
                     actions: [
-                        { label: 'Thêm nguồn', icon: 'add', onClick: () => setShowForm(true), primary: true }
+                        { label: 'Thêm nguồn', icon: 'add', onClick: () => setShowForm(true), primary: true },
+                        { label: 'Làm mới', icon: 'refresh', onClick: loadFundSources }
                     ]
                 });
             }
@@ -146,144 +150,106 @@ const FundSourceModule: React.FC<{ subView?: string, onSetHeader?: any }> = ({ s
 
     // --- RENDER CONTENT BASED ON SUBVIEW ---
 
+    // --- RENDER CONTENT BASED ON SUBVIEW ---
+
     // 1. FUND LIST VIEW
     const renderFundList = () => (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            {/* Header */}
-            <div className="mb-6 flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Quản lý Nguồn Kinh Phí</h1>
-                    <p className="text-gray-600 mt-1">Theo dõi và quản lý nguồn kinh phí HCSN (TT 24/2024/TT-BTC)</p>
-                </div>
-                <div className="flex gap-4 items-center">
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
+            {/* Toolbar for Filters */}
+            <div className="px-6 py-3 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Năm ngân sách:</span>
                     <select
                         value={fiscalYear}
                         onChange={(e) => setFiscalYear(Number(e.target.value))}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:border-slate-600 outline-none"
                     >
                         {[2024, 2025, 2026, 2027, 2028].map(year => (
-                            <option key={year} value={year}>Năm {year}</option>
+                            <option key={year} value={year}>{year}</option>
                         ))}
                     </select>
-                    <button
-                        onClick={() => setShowForm(true)}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-lg"
-                    >
-                        + Thêm nguồn
-                    </button>
+                </div>
+                <div className="flex gap-4 text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                        <span className="text-slate-500">Tỷ lệ giải ngân:</span>
+                        <span className="text-blue-600 font-bold">
+                            {fundSources.length > 0
+                                ? Math.round((fundSources.reduce((s, f) => s + f.spent_amount, 0) / fundSources.reduce((s, f) => s + f.allocated_amount, 0)) * 100) || 0
+                                : 0}%
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            {/* Summary Cards */}
-            {fundSources.length > 0 && (
-                <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-blue-100 text-sm font-semibold">Tổng được cấp</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {formatCurrency(fundSources.reduce((sum, fs) => sum + fs.allocated_amount, 0))}
-                                </p>
-                            </div>
-                            <div className="text-5xl opacity-20">💰</div>
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-orange-100 text-sm font-semibold">Tổng đã chi</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {formatCurrency(fundSources.reduce((sum, fs) => sum + fs.spent_amount, 0))}
-                                </p>
-                            </div>
-                            <div className="text-5xl opacity-20">📤</div>
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-green-100 text-sm font-semibold">Tổng còn lại</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {formatCurrency(fundSources.reduce((sum, fs) => sum + fs.remaining_amount, 0))}
-                                </p>
-                            </div>
-                            <div className="text-5xl opacity-20">✅</div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {loading ? (
-                <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    Đang tải dữ liệu...
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
                 </div>
             ) : fundSources.length === 0 ? (
-                <div className="p-8 text-center text-gray-500 bg-white rounded-lg shadow">
-                    <span className="material-symbols-outlined text-4xl mb-2 text-gray-400">info</span>
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+                    <span className="material-symbols-outlined text-4xl mb-2 text-gray-300">inbox</span>
                     <p>Chưa có nguồn kinh phí nào cho năm {fiscalYear}</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã nguồn</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên nguồn</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Dự toán</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Đã dùng</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Còn lại</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Tỷ lệ</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {fundSources.map((fs) => {
-                                const usagePercent = calculateUsagePercent(fs.spent_amount, fs.allocated_amount);
-                                return (
-                                    <tr key={fs.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{fs.code}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{fs.name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {getTypeLabel(fs.type)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-blue-600">
-                                            {formatCurrency(fs.allocated_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                                            {formatCurrency(fs.spent_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-green-600">
-                                            {formatCurrency(fs.remaining_amount)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="w-full max-w-xs">
-                                                <div className="flex mb-1 items-center justify-between">
-                                                    <span className="text-xs font-semibold inline-block text-blue-600">
-                                                        {usagePercent}%
-                                                    </span>
+                <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 overflow-hidden relative">
+                    <div className="overflow-auto flex-1">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                            <thead className="bg-gray-50 dark:bg-slate-700/50 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Mã nguồn</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tên nguồn</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Loại</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Dự toán</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Đã dùng</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Còn lại</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Tiến độ</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                                {fundSources.map((fs) => {
+                                    const usagePercent = calculateUsagePercent(fs.spent_amount, fs.allocated_amount);
+                                    return (
+                                        <tr key={fs.id} className="hover:bg-blue-50/30 dark:hover:bg-slate-700/50 transition-colors">
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-blue-600 dark:text-blue-400">{fs.code}</td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-medium">{fs.name}</td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                {getTypeLabel(fs.type)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-right font-medium text-slate-700 dark:text-slate-200">
+                                                {formatCurrency(fs.allocated_amount)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-right text-orange-600 dark:text-orange-400">
+                                                {formatCurrency(fs.spent_amount)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-right font-bold text-green-600 dark:text-green-400">
+                                                {formatCurrency(fs.remaining_amount)}
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap align-middle">
+                                                <div className="w-full max-w-[100px] mx-auto">
+                                                    <div className="overflow-hidden h-1.5 text-xs flex rounded-full bg-slate-200 dark:bg-slate-600">
+                                                        <div
+                                                            style={{ width: `${usagePercent}%` }}
+                                                            className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-amber-500' : 'bg-green-500'}`}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="text-[10px] text-center mt-0.5 text-slate-400">{usagePercent}%</div>
                                                 </div>
-                                                <div className="overflow-hidden h-2 text-xs flex rounded bg-blue-100">
-                                                    <div
-                                                        style={{ width: `${usagePercent}%` }}
-                                                        className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-green-500'
-                                                            }`}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                            <button onClick={() => handleEdit(fs)} className="text-indigo-600 hover:text-indigo-900 mr-3">Sửa</button>
-                                            <button onClick={() => handleDelete(fs.id, fs.name)} className="text-red-600 hover:text-red-900">Xóa</button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                            </td>
+                                            <td className="px-6 py-3 whitespace-nowrap text-center text-sm font-medium">
+                                                <button onClick={() => handleEdit(fs)} className="text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 mr-3 transition-colors" title="Sửa">
+                                                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                </button>
+                                                <button onClick={() => handleDelete(fs.id, fs.name)} className="text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors" title="Xóa">
+                                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
@@ -382,13 +348,32 @@ const FundSourceModule: React.FC<{ subView?: string, onSetHeader?: any }> = ({ s
 
     // MAIN RENDER SWITCH
     switch (subView) {
+        case 'overview':
+            return (
+                <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
+                    <ModuleOverview
+                        title={MODULE_CONFIGS.hcsn.title}
+                        description={MODULE_CONFIGS.hcsn.description}
+                        icon={MODULE_CONFIGS.hcsn.icon}
+                        iconColor={MODULE_CONFIGS.hcsn.iconColor}
+                        workflow={MODULE_CONFIGS.hcsn.workflow}
+                        features={MODULE_CONFIGS.hcsn.features}
+                        onNavigate={onNavigate}
+                        stats={[
+                            { icon: 'account_balance', label: 'Tổng nguồn', value: formatCurrency(fundSources.reduce((sum, fs) => sum + fs.allocated_amount, 0)), color: 'blue' },
+                            { icon: 'payments', label: 'Đã giải ngân', value: formatCurrency(fundSources.reduce((sum, fs) => sum + fs.spent_amount, 0)), color: 'green' },
+                            { icon: 'pending', label: 'Nguồn còn lại', value: formatCurrency(fundSources.reduce((sum, fs) => sum + fs.remaining_amount, 0)), color: 'amber' },
+                        ]}
+                    />
+                </div>
+            );
 
         case 'list': return renderFundList();
-        case 'budget': return <BudgetEstimateModule subView="list" onSetHeader={onSetHeader} />;
-        case 'adjustment': return <BudgetEstimateModule subView="adjustment" onSetHeader={onSetHeader} />;
-        case 'allocation': return <BudgetAllocationModule />;
+        case 'budget': return <BudgetEstimateModule subView="list" onSetHeader={onSetHeader} onNavigate={onNavigate} />;
+        case 'adjustment': return <BudgetEstimateModule subView="adjustment" onSetHeader={onSetHeader} onNavigate={onNavigate} />;
+        case 'allocation': return <BudgetAllocationModule onNavigate={onNavigate} onSetHeader={onSetHeader} />;
         case 'infrastructure': return renderPlaceholder('Tài sản Hạ tầng', 'Vui lòng truy cập menu "Tài sản" để quản lý chi tiết.');
-        case 'off_balance': return renderPlaceholder('Tài khoản Ngoài bảng', 'Theo dõi TK 008, 009, 012, 014, 018.');
+        case 'off_balance': return <OffBalanceModule onSetHeader={onSetHeader} />;
         case 'reports': return renderPlaceholder('Báo cáo Nguồn kinh phí', 'Vui lòng truy cập menu "Báo cáo" để xem B01/BCQT và B03/HD.');
         default: return renderFundList();
     }

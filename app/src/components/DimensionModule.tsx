@@ -3,6 +3,9 @@ import { SmartTable, type ColumnDef } from './SmartTable';
 import { dimensionService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { FormModal } from './FormModal';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 // Mock data removed
 
@@ -10,9 +13,10 @@ interface DimensionModuleProps {
     subView?: string;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (viewId: string) => void;
 }
 
-export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'list', printSignal = 0, onSetHeader }) => {
+export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'list', printSignal = 0, onSetHeader, onNavigate }) => {
     const [view, setView] = useState(subView);
     const [dimTab, setDimTab] = useState(1);
     const [showModal, setShowModal] = useState<string | null>(null);
@@ -101,11 +105,8 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
             .catch(err => console.error("Initial configs fetch failed:", err));
     }, []);
 
-    useEffect(() => {
-        if (printSignal > 0) {
-            window.print();
-        }
-    }, [printSignal]);
+    // Print handler
+    useSimplePrint(printSignal, 'Mã thống kê', { allowBrowserPrint: true });
 
     const listColumns: ColumnDef[] = [
         { field: 'code', headerName: 'Mã Thống kê', width: 'w-40' },
@@ -145,9 +146,27 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
 
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
+            {/* Module Overview - Default Landing Page */}
+            {(view === 'overview' || view === 'dimension_overview') && (
+                <ModuleOverview
+                    title={MODULE_CONFIGS.dimension.title}
+                    description={MODULE_CONFIGS.dimension.description}
+                    icon={MODULE_CONFIGS.dimension.icon}
+                    iconColor={MODULE_CONFIGS.dimension.iconColor}
+                    workflow={MODULE_CONFIGS.dimension.workflow}
+                    features={MODULE_CONFIGS.dimension.features}
+                    onNavigate={onNavigate}
+                    stats={[
+                        { icon: 'list', label: 'Chiều 1', value: dimensions.filter(d => d.type === 1).length || 0, color: 'purple' },
+                        { icon: 'list_alt', label: 'Chiều 2', value: dimensions.filter(d => d.type === 2).length || 0, color: 'blue' },
+                        { icon: 'group_work', label: 'Nhóm mã', value: groups.length, color: 'green' },
+                        { icon: 'settings_suggest', label: 'Cấu hình', value: configs.filter(c => c.isActive).length, color: 'amber' },
+                    ]}
+                />
+            )}
 
             {/* Action Bar & Tabs */}
-            <div className="px-6 py-3 bg-white/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 backdrop-blur-md">
+            <div className={`px-6 py-3 bg-white/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 backdrop-blur-md ${(view === 'overview' || view === 'dimension_overview') ? 'hidden' : ''}`}>
                 <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-lg">
                     {view === 'list' ? (
                         [1, 2, 3, 4, 5].map(t => (
@@ -167,7 +186,7 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
                 </div>
             </div>
 
-            <div className="flex-1 overflow-auto relative">
+            <div className={`flex-1 overflow-auto relative ${(view === 'overview' || view === 'dimension_overview') ? 'hidden' : ''}`}>
                 {loading && (
                     <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 flex items-center justify-center z-10 transition-opacity">
                         <div className="w-10 h-10 border-4 border-violet-600 border-t-transparent rounded-full animate-spin"></div>

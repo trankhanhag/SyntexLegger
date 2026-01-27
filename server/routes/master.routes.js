@@ -5,7 +5,7 @@
 
 const express = require('express');
 
-const { verifyToken, requireRole } = require('../middleware');
+const { verifyToken, requireRole, sanitizeBody, sanitizeQuery, validatePartner, validateAccount } = require('../middleware');
 
 module.exports = (db) => {
     const router = express.Router();
@@ -30,7 +30,7 @@ module.exports = (db) => {
      * POST /api/master/accounts
      * Save/update chart of accounts
      */
-    router.post('/master/accounts', verifyToken, (req, res) => {
+    router.post('/master/accounts', sanitizeBody, validateAccount, verifyToken, (req, res) => {
         const { accounts } = req.body;
         if (!accounts || !Array.isArray(accounts)) return res.status(400).json({ error: "Invalid data" });
 
@@ -144,7 +144,7 @@ module.exports = (db) => {
      * POST /api/partners
      * Create or update partner
      */
-    router.post('/partners', verifyToken, (req, res) => {
+    router.post('/partners', sanitizeBody, validatePartner, verifyToken, (req, res) => {
         const { partner_code, partner_name, tax_code, address } = req.body;
         if (!partner_code || !partner_name) {
             return res.status(400).json({ error: "Partner code and name are required." });
@@ -179,6 +179,89 @@ module.exports = (db) => {
         });
     });
 
+    /**
+     * POST /api/master/partners
+     * Bulk import partners from Excel
+     */
+    router.post('/master/partners', sanitizeBody, verifyToken, (req, res) => {
+        const { partners } = req.body;
+        if (!partners || !Array.isArray(partners)) {
+            return res.status(400).json({ error: "Invalid data format" });
+        }
+
+        let inserted = 0;
+        let updated = 0;
+        let errors = [];
+
+        db.serialize(() => {
+            const selectStmt = db.prepare("SELECT partner_code FROM partners WHERE partner_code = ?");
+            const insertStmt = db.prepare("INSERT INTO partners (partner_code, partner_name, tax_code, address, phone, email, contact_person, partner_type, bank_account, bank_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            const updateStmt = db.prepare("UPDATE partners SET partner_name=?, tax_code=?, address=?, phone=?, email=?, contact_person=?, partner_type=?, bank_account=?, bank_name=? WHERE partner_code=?");
+
+            partners.forEach((p, index) => {
+                if (!p.partner_code || !p.partner_name) {
+                    errors.push({ row: index + 1, error: "Missing partner_code or partner_name" });
+                    return;
+                }
+
+                selectStmt.get([p.partner_code], (err, row) => {
+                    if (err) {
+                        errors.push({ row: index + 1, error: err.message });
+                        return;
+                    }
+
+                    if (row) {
+                        // Update existing
+                        updateStmt.run([
+                            p.partner_name,
+                            p.tax_code || null,
+                            p.address || null,
+                            p.phone || null,
+                            p.email || null,
+                            p.contact_person || null,
+                            p.partner_type || 'CUSTOMER',
+                            p.bank_account || null,
+                            p.bank_name || null,
+                            p.partner_code
+                        ], (updateErr) => {
+                            if (updateErr) errors.push({ row: index + 1, error: updateErr.message });
+                            else updated++;
+                        });
+                    } else {
+                        // Insert new
+                        insertStmt.run([
+                            p.partner_code,
+                            p.partner_name,
+                            p.tax_code || null,
+                            p.address || null,
+                            p.phone || null,
+                            p.email || null,
+                            p.contact_person || null,
+                            p.partner_type || 'CUSTOMER',
+                            p.bank_account || null,
+                            p.bank_name || null
+                        ], (insertErr) => {
+                            if (insertErr) errors.push({ row: index + 1, error: insertErr.message });
+                            else inserted++;
+                        });
+                    }
+                });
+            });
+
+            selectStmt.finalize();
+            insertStmt.finalize();
+            updateStmt.finalize((finalErr) => {
+                if (finalErr) return res.status(500).json({ error: finalErr.message });
+                res.json({
+                    message: "Partners imported successfully",
+                    inserted,
+                    updated,
+                    errors: errors.length > 0 ? errors : undefined
+                });
+            });
+        });
+    });
+
     // ========================================
     // PRODUCTS
     // ========================================
@@ -188,7 +271,7 @@ module.exports = (db) => {
      * Get all products
      */
     router.get('/products', verifyToken, (req, res) => {
-        const sql = "SELECT * FROM products ORDER BY product_code ASC";
+        const sql = "SELECT id, code as product_code, name as product_name, unit, price as unit_price, tax, type as category, conversion_units FROM products ORDER BY code ASC";
         db.all(sql, [], (err, rows) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(rows);
@@ -201,11 +284,10 @@ module.exports = (db) => {
      */
     router.post('/products', verifyToken, (req, res) => {
         const { product_code, product_name, unit, category, unit_price } = req.body;
-        const id = `prod_${Date.now()}`;
-        const sql = `INSERT INTO products (id, product_code, product_name, unit, category, unit_price) VALUES (?, ?, ?, ?, ?, ?)`;
-        db.run(sql, [id, product_code, product_name, unit, category, unit_price || 0], function (err) {
+        const sql = `INSERT INTO products (code, name, unit, type, price) VALUES (?, ?, ?, ?, ?)`;
+        db.run(sql, [product_code, product_name, unit, category, unit_price || 0], function (err) {
             if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Product created", id });
+            res.json({ message: "Product created", id: this.lastID });
         });
     });
 
@@ -218,6 +300,122 @@ module.exports = (db) => {
         db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ message: "Product deleted", changes: this.changes });
+        });
+    });
+
+    /**
+     * POST /api/master/products
+     * Bulk import products from Excel
+     */
+    router.post('/master/products', sanitizeBody, verifyToken, (req, res) => {
+        const { products } = req.body;
+        if (!products || !Array.isArray(products)) {
+            return res.status(400).json({ error: "Invalid data format" });
+        }
+
+        let inserted = 0;
+        let updated = 0;
+        let errors = [];
+
+        db.serialize(() => {
+            const selectStmt = db.prepare("SELECT id FROM products WHERE code = ?");
+            const insertStmt = db.prepare("INSERT INTO products (code, name, unit, type, price, tax, conversion_units, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            const updateStmt = db.prepare("UPDATE products SET name=?, unit=?, type=?, price=?, tax=?, conversion_units=?, description=? WHERE code=?");
+
+            products.forEach((p, index) => {
+                if (!p.product_code || !p.product_name) {
+                    errors.push({ row: index + 1, error: "Missing product_code or product_name" });
+                    return;
+                }
+
+                selectStmt.get([p.product_code], (err, row) => {
+                    if (err) {
+                        errors.push({ row: index + 1, error: err.message });
+                        return;
+                    }
+
+                    if (row) {
+                        // Update existing
+                        updateStmt.run([
+                            p.product_name,
+                            p.unit || 'Cái',
+                            p.category || 'GOODS',
+                            p.unit_price || 0,
+                            p.tax || 0,
+                            p.conversion_units || null,
+                            p.description || null,
+                            p.product_code
+                        ], (updateErr) => {
+                            if (updateErr) errors.push({ row: index + 1, error: updateErr.message });
+                            else updated++;
+                        });
+                    } else {
+                        // Insert new
+                        insertStmt.run([
+                            p.product_code,
+                            p.product_name,
+                            p.unit || 'Cái',
+                            p.category || 'GOODS',
+                            p.unit_price || 0,
+                            p.tax || 0,
+                            p.conversion_units || null,
+                            p.description || null
+                        ], (insertErr) => {
+                            if (insertErr) errors.push({ row: index + 1, error: insertErr.message });
+                            else inserted++;
+                        });
+                    }
+                });
+            });
+
+            selectStmt.finalize();
+            insertStmt.finalize();
+            updateStmt.finalize((finalErr) => {
+                if (finalErr) return res.status(500).json({ error: finalErr.message });
+                res.json({
+                    message: "Products imported successfully",
+                    inserted,
+                    updated,
+                    errors: errors.length > 0 ? errors : undefined
+                });
+            });
+        });
+    });
+
+    /**
+     * GET /api/balances
+     * Get cash and bank balances and history
+     */
+    router.get('/balances', verifyToken, (req, res) => {
+        // 1. Calculate Balances
+        const balanceSql = `
+            SELECT 
+                SUM(CASE WHEN account_code LIKE '111%' THEN debit_amount - credit_amount ELSE 0 END) as cash_balance,
+                SUM(CASE WHEN account_code LIKE '112%' THEN debit_amount - credit_amount ELSE 0 END) as bank_balance
+            FROM general_ledger
+        `;
+
+        // 2. Get Transaction History
+        const historySql = `
+            SELECT * 
+            FROM general_ledger 
+            WHERE account_code LIKE '111%' OR account_code LIKE '112%' OR account_code LIKE '113%'
+            ORDER BY trx_date DESC
+            LIMIT 100
+        `;
+
+        db.get(balanceSql, [], (err, balanceRow) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            db.all(historySql, [], (err2, historyRows) => {
+                if (err2) return res.status(500).json({ error: err2.message });
+
+                res.json({
+                    cash: balanceRow ? balanceRow.cash_balance || 0 : 0,
+                    bank: balanceRow ? balanceRow.bank_balance || 0 : 0,
+                    history: historyRows || []
+                });
+            });
         });
     });
 

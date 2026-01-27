@@ -1,18 +1,26 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import api, { reportService } from '../api';
+import api, { reportService, settingsService } from '../api';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { formatNumber } from '../utils/format';
 import { type RibbonAction } from './Ribbon';
 import { DateInput } from './DateInput';
 import { formatDateVN, toInputDateValue } from '../utils/dateUtils';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { type PaperSize, getPaperDimensions, getPaperSizeClass, PrintConfigControls, normalizePrintConfig } from './PrintTemplates';
+import { PrintPreviewShell } from './PrintPreviewShell';
+import { CustomReportGenerator } from './CustomReportGenerator';
 
 // Types for reports are now handled as any to allow flexibility with back-end schemas
 
 interface ReportsProps {
     subView?: string;
     printSignal?: number;
+    exportSignal?: number;
+    importSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[] }) => void;
+    onNavigate?: (view: string) => void;
 }
 
 const REPORT_NAMES: Record<string, string> = {
@@ -53,11 +61,16 @@ const REPORT_NAMES: Record<string, string> = {
     // REMOVED: expense_dept (DN)
 };
 
-export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'balance_sheet_hcsn', printSignal = 0, onSetHeader }) => {
+export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'balance_sheet_hcsn', printSignal = 0, exportSignal = 0, importSignal = 0, onSetHeader }) => {
     const [activeSubView, setActiveSubView] = useState(initialSubView);
     const [entries, setEntries] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [paperSize, setPaperSize] = useState<PaperSize>('A4');
+    const [companyInfo, setCompanyInfo] = useState({ name: 'TÊN ĐƠN VỊ', address: 'Địa chỉ đơn vị', maDVQHNS: '', taxCode: '' });
+    const [headTitle, setHeadTitle] = useState('Thủ trưởng đơn vị');
+    const [signatures, setSignatures] = useState({ preparer: '', chiefAccountant: '', director: '' });
+    const [printConfig, setPrintConfig] = useState({ marginTop: 12, marginBottom: 12, marginLeft: 15, marginRight: 15, scale: 100 });
     const [filters, setFilters] = useState(() => {
         const now = new Date();
         return {
@@ -74,6 +87,26 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
     }, [printSignal]);
 
     const getReportTitle = (viewId: string) => REPORT_NAMES[viewId] || 'Báo cáo';
+
+    useEffect(() => {
+        settingsService.getSettings()
+            .then(res => {
+                const s = res.data || {};
+                setCompanyInfo({
+                    name: s.company_name || 'TÊN ĐƠN VỊ',
+                    address: s.company_address || 'Địa chỉ đơn vị',
+                    maDVQHNS: s.madvqhns || s.ma_dvqhnS || '',
+                    taxCode: s.company_tax_code || s.tax_code || ''
+                });
+                setHeadTitle(s.head_title || s.unit_head_title || s.director_title || 'Thủ trưởng đơn vị');
+                setSignatures(prev => ({
+                    preparer: s.report_preparer || s.preparer_name || prev.preparer,
+                    chiefAccountant: s.chief_accountant || s.accountant_lead || prev.chiefAccountant,
+                    director: s.director || s.ceo_name || s.legal_representative || prev.director
+                }));
+            })
+            .catch(err => console.error('Load company info failed:', err));
+    }, []);
 
     useEffect(() => {
         setActiveSubView(initialSubView);
@@ -156,6 +189,16 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
             });
         }
     }, [activeSubView, exportToExcel, onSetHeader]);
+
+    // Handle export signal from Ribbon (for non-custom_report views)
+    useEffect(() => {
+        if (exportSignal > 0 && activeSubView !== 'custom_report') {
+            exportToExcel();
+        }
+    }, [exportSignal, activeSubView, exportToExcel]);
+
+    // Note: Import signal not handled in Reports module - reports are read-only views
+    // Import functionality is handled by data entry modules (GeneralModule, etc.)
 
     // --- Traceability Enrichment Logic ---
     const enrichWithTraceability = (data: any[], type: string) => {
@@ -252,10 +295,10 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
 
                 // === BÁO CÁO QUẢN LÝ HCSN (MỚI - TT 24/2024) ===
                 case 'fund_source_report':
-                    res = await api.get('/reports/fund-source-report', { params: { fiscal_year: new Date(filters.fromDate).getFullYear() } });
+                    res = await api.get('/reports/hcsn/fund-sources', { params: { fiscal_year: new Date(filters.fromDate).getFullYear() } });
                     break;
                 case 'infrastructure_report':
-                    res = await api.get('/reports/infrastructure-report');
+                    res = await api.get('/reports/hcsn/infrastructure');
                     break;
 
                 // === SỔ KẾ TOÁN (GIỮ NGUYÊN) ===
@@ -263,7 +306,7 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     res = await reportService.getTrialBalance(rangeParams);
                     break;
                 case 'ledger':
-                    res = await api.get('/gl', { params: { from: filters.fromDate, to: filters.toDate } });
+                    res = await reportService.getGeneralJournal(rangeParams);
                     break;
                 case 'general_ledger':
                     if (!accountCode) {
@@ -303,7 +346,24 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
             }
 
             const rawData = Array.isArray(res.data) ? res.data : [];
-            const enrichedData = enrichWithTraceability(rawData, activeSubView);
+
+            // Ensure numeric fields are numbers (Fix for Grand Total issue)
+            const numericData = rawData.map((row: any) => ({
+                ...row,
+                debit_amount: row.debit_amount ? Number(row.debit_amount) : 0,
+                credit_amount: row.credit_amount ? Number(row.credit_amount) : 0,
+                balance: row.balance ? Number(row.balance) : 0,
+                amount: row.amount ? Number(row.amount) : 0,
+                // Ensure other potential numeric fields
+                opening_debit: row.opening_debit ? Number(row.opening_debit) : 0,
+                opening_credit: row.opening_credit ? Number(row.opening_credit) : 0,
+                period_debit: row.period_debit ? Number(row.period_debit) : 0,
+                period_credit: row.period_credit ? Number(row.period_credit) : 0,
+                closing_debit: row.closing_debit ? Number(row.closing_debit) : 0,
+                closing_credit: row.closing_credit ? Number(row.closing_credit) : 0,
+            }));
+
+            const enrichedData = enrichWithTraceability(numericData, activeSubView);
             setEntries(enrichedData);
         } catch (err) {
             console.error("Failed to load report data", err);
@@ -346,13 +406,13 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
         ];
 
         const ledgerColumns: ColumnDef[] = [
-            { field: 'trx_date', headerName: 'Ngày', width: 'w-24', type: 'date', renderCell: (v: any) => renderDateCell(v) },
-            { field: 'doc_no', headerName: 'Số CT', width: 'w-24' },
-            { field: 'description', headerName: 'Diễn giải', width: 'min-w-[300px]' },
-            { field: 'reciprocal_acc', headerName: 'TK đối ứng', width: 'w-24', align: 'center' as const },
-            { field: 'debit_amount', headerName: 'Nợ', width: 'w-32', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.debit_amount) },
-            { field: 'credit_amount', headerName: 'Có', width: 'w-32', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.credit_amount) },
-            { field: 'balance', headerName: 'Số dư', width: 'w-32', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.balance) },
+            { field: 'trx_date', headerName: 'Ngày', width: 'w-20', type: 'date', align: 'center' as const, renderCell: (v: any) => renderDateCell(v) },
+            { field: 'doc_no', headerName: 'Số CT', width: 'w-20', align: 'center' as const },
+            { field: 'description', headerName: 'Diễn giải', width: 'w-auto' },
+            { field: 'reciprocal_acc', headerName: 'TK đối ứng', width: 'w-16', align: 'center' as const },
+            { field: 'debit_amount', headerName: 'Nợ', width: 'w-28', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.debit_amount) },
+            { field: 'credit_amount', headerName: 'Có', width: 'w-28', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.credit_amount) },
+            { field: 'balance', headerName: 'Số dư', width: 'w-28', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.balance) },
         ];
 
         switch (activeSubView) {
@@ -424,6 +484,8 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     { field: 'credit_acc', headerName: 'TK Có', width: 'w-16', align: 'center' as const },
                     { field: 'amount', headerName: 'Số tiền', width: 'w-28', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.amount) },
                     { field: 'partner_code', headerName: 'Đối tượng', width: 'w-24' },
+                    { field: 'item_code', headerName: 'Mục', width: 'w-20', align: 'center' as const },
+                    { field: 'sub_item_code', headerName: 'Tiểu mục', width: 'w-24', align: 'center' as const },
                     { field: 'contract_code', headerName: 'Hợp đồng', width: 'w-24' },
                     { field: 'project_code', headerName: 'Dự án', width: 'w-24' },
                     { field: 'debt_note', headerName: 'Khế ước', width: 'w-24' },
@@ -484,10 +546,56 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
         }
     };
 
-    const ROWS_PER_PAGE = 28;
-    const pagedData = [];
-    for (let i = 0; i < entries.length; i += ROWS_PER_PAGE) {
-        pagedData.push(entries.slice(i, i + ROWS_PER_PAGE));
+    const rowsPerPage = useMemo(() => {
+        if (paperSize === 'A4-landscape') return 22;
+        if (paperSize === 'A5-landscape') return 16;
+        if (paperSize === 'A5') return 18;
+        return 28;
+    }, [paperSize]);
+
+    const normalizedConfig = normalizePrintConfig(printConfig);
+    const previewDimensions = getPaperDimensions(paperSize);
+    const paddingValue = `${normalizedConfig.marginTop}mm ${normalizedConfig.marginRight}mm ${normalizedConfig.marginBottom}mm ${normalizedConfig.marginLeft}mm`;
+    const scaleFactor = normalizedConfig.scale / 100;
+    const widthMm = Number.parseFloat(previewDimensions.width);
+    const heightMm = Number.parseFloat(previewDimensions.minHeight);
+    const contentWidthMm = Math.max(0, widthMm - normalizedConfig.marginLeft - normalizedConfig.marginRight);
+    const contentHeightMm = Math.max(0, heightMm - normalizedConfig.marginTop - normalizedConfig.marginBottom);
+    const safeScaleFactor = scaleFactor || 1;
+    const scaledWidth = `${contentWidthMm / safeScaleFactor}mm`;
+    const scaledHeight = `${contentHeightMm / safeScaleFactor}mm`;
+
+    const pagedData = useMemo(() => {
+        const pages: any[][] = [];
+        for (let i = 0; i < entries.length; i += rowsPerPage) {
+            pages.push(entries.slice(i, i + rowsPerPage));
+        }
+        return pages;
+    }, [entries, rowsPerPage]);
+
+    // ModuleOverview for Reports module
+    if (activeSubView === 'overview') {
+        return (
+            <ModuleOverview
+                title={MODULE_CONFIGS.report?.title || 'Phân hệ Báo cáo'}
+                description={MODULE_CONFIGS.report?.description || 'Báo cáo tài chính, sổ kế toán và quyết toán ngân sách'}
+                icon={MODULE_CONFIGS.report?.icon || 'assignment'}
+                iconColor={MODULE_CONFIGS.report?.iconColor || 'blue'}
+                workflow={MODULE_CONFIGS.report?.workflow || []}
+                features={MODULE_CONFIGS.report?.features || []}
+                stats={[
+                    { icon: 'account_balance', label: 'Cân đối TK', value: '-', color: 'blue' },
+                    { icon: 'summarize', label: 'Kết quả HĐ', value: '-', color: 'green' },
+                    { icon: 'fact_check', label: 'Quyết toán', value: '-', color: 'amber' },
+                    { icon: 'book', label: 'Sổ kế toán', value: '-', color: 'purple' },
+                ]}
+            />
+        );
+    }
+
+    // Custom Report Generator - Import Excel templates
+    if (activeSubView === 'custom_report') {
+        return <CustomReportGenerator onSetHeader={onSetHeader} exportSignal={exportSignal} importSignal={importSignal} />;
     }
 
     return (
@@ -569,37 +677,88 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                 )}
             </div>
 
-            {/* Print Preview Overlay (Remains mostly SAME but with dynamic titles) */}
+            {/* Print Preview Overlay (shared shell for consistency) */}
             {showPrintPreview && (
-                <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex flex-col no-print overflow-hidden">
-                    <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800 text-white shrink-0">
-                        <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-blue-500">print</span>
-                            <h3 className="font-bold uppercase tracking-widest text-[10px]">Chế độ Phân trang Thực tế (WYSIWYG A4)</h3>
-                        </div>
-                        <div className="flex gap-2">
-                            <button className="px-8 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg hover:shadow-blue-500/40" onClick={() => window.print()}>
-                                <span className="material-symbols-outlined text-[18px] mr-2">print</span> Thực hiện In
-                            </button>
-                            <button onClick={() => setShowPrintPreview(false)} className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-700 hover:bg-red-500 transition-colors">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-auto bg-slate-300 p-8 flex flex-col items-center gap-8 custom-scrollbar">
-                        {/* Print pages container with printable-area class */}
-                        <div className="printable-area">
-                            {pagedData.length > 0 ? pagedData.map((pageItems, pageIdx) => (
-                                <div key={`page-${pageIdx}`} className="a4-page bg-white text-slate-900 w-[210mm] h-[297mm] p-[20mm] relative flex flex-col shadow-2xl">
-                                    <div className="flex justify-between items-start mb-6 border-b border-slate-200 pb-2">
-                                        <div className="text-[10px]">
-                                            <p className="font-black uppercase text-blue-900">Công ty Cổ phần Syntex Legger</p>
-                                            <p>Số 1, Đường Công Nghệ, Hòa Lạc, Hà Nội</p>
+                <PrintPreviewShell
+                    title="Xem trước bản in"
+                    onClose={() => setShowPrintPreview(false)}
+                    onPrint={() => window.print()}
+                    controls={(
+                        <PrintConfigControls
+                            paperSize={paperSize}
+                            onPaperSizeChange={setPaperSize}
+                            printConfig={printConfig}
+                            onPrintConfigChange={setPrintConfig}
+                        >
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500">Người lập:</span>
+                                <input
+                                    value={signatures.preparer}
+                                    onChange={(e) => setSignatures({ ...signatures, preparer: e.target.value })}
+                                    placeholder="Tên người lập"
+                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500">Kế toán trưởng:</span>
+                                <input
+                                    value={signatures.chiefAccountant}
+                                    onChange={(e) => setSignatures({ ...signatures, chiefAccountant: e.target.value })}
+                                    placeholder="Tên KTT"
+                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500">Giám đốc:</span>
+                                <input
+                                    value={signatures.director}
+                                    onChange={(e) => setSignatures({ ...signatures, director: e.target.value })}
+                                    placeholder="Tên thủ trưởng"
+                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500 whitespace-nowrap">Chức danh thủ trưởng:</span>
+                                <input
+                                    value={headTitle}
+                                    onChange={(e) => setHeadTitle(e.target.value)}
+                                    placeholder="Giám đốc / Hiệu trưởng / ..."
+                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                />
+                            </div>
+                        </PrintConfigControls>
+                    )}
+                    footerHint={`Khổ giấy: ${paperSize} • Lề: ${normalizedConfig.marginTop}/${normalizedConfig.marginRight}/${normalizedConfig.marginBottom}/${normalizedConfig.marginLeft} mm • Scale: ${normalizedConfig.scale}%`}
+                >
+                    {pagedData.length > 0 ? pagedData.map((pageItems, pageIdx) => (
+                        <div
+                            key={`page-${pageIdx}`}
+                            className={`bg-white text-slate-900 relative flex flex-col shadow-2xl printable-area font-serif preview-page ${getPaperSizeClass(paperSize)} ${pageIdx < pagedData.length - 1 ? 'page-break-after' : ''}`}
+                            style={{
+                                width: previewDimensions.width,
+                                minHeight: previewDimensions.minHeight,
+                                ['--print-padding' as any]: paddingValue
+                            }}
+                        >
+                            <div
+                                className="print-scale-wrapper"
+                                style={{
+                                    transform: `scale(${scaleFactor})`,
+                                    transformOrigin: 'top left',
+                                    width: scaledWidth,
+                                    minHeight: scaledHeight
+                                }}
+                            >
+                                    <div className="flex justify-between items-start mb-6 border-b border-slate-900 pb-2">
+                                        <div className="text-[11px] leading-relaxed">
+                                            <p className="font-bold uppercase text-slate-900 text-sm">{companyInfo.name || 'ĐƠN VỊ BÁO CÁO'}</p>
+                                            <p className="text-slate-700">{companyInfo.address || 'Địa chỉ đơn vị'}</p>
+                                            {companyInfo.taxCode && <p className="font-semibold">MST: {companyInfo.taxCode}</p>}
+                                            {companyInfo.maDVQHNS && <p className="font-semibold">Mã ĐVQHNS: {companyInfo.maDVQHNS}</p>}
                                         </div>
-                                        <div className="text-[9px] text-right italic">
-                                            <span className="font-bold not-italic">Mẫu báo cáo HCSN</span><br />
-                                            Thông tư 24/2024/TT-BTC
+                                        <div className="text-[10px] text-right">
+                                            <p className="font-bold">Mẫu báo cáo HCSN</p>
+                                            <p className="italic">Thông tư 24/2024/TT-BTC</p>
                                         </div>
                                     </div>
 
@@ -612,7 +771,7 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                                     )}
 
                                     <div className="flex-1">
-                                        <table className="w-full border-collapse border border-slate-900 text-[9px]">
+                                        <table className="w-full border-collapse border border-slate-900 text-[9px] printable-table">
                                             <thead className="bg-slate-100">
                                                 <tr>
                                                     {getColumns().map(col => (
@@ -636,22 +795,42 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                                         </table>
                                     </div>
 
-                                    <div className="mt-8 grid grid-cols-3 text-center text-[10px] leading-relaxed">
-                                        <div>
-                                            <span className="font-bold uppercase block mb-1">Người lập biểu</span>
-                                            (Ký, họ và tên)
-                                            <div className="mt-12 font-bold">Lê Văn A</div>
+                                    <div className="mt-10 grid grid-cols-3 gap-8 text-center text-[11px] leading-relaxed break-inside-avoid">
+                                        <div className="flex flex-col items-center">
+                                            <div className="h-24 flex flex-col justify-between w-full">
+                                                <div>
+                                                    <span className="invisible block mb-0.5">Placeholder Date</span>
+                                                    <span className="font-bold uppercase block">NGƯỜI LẬP BIỂU</span>
+                                                    <span className="italic font-normal text-[10px]">(Ký, họ và tên)</span>
+                                                </div>
+                                                <div className="font-bold uppercase mt-auto pt-8">
+                                                    {signatures.preparer || '...........................'}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <span className="font-bold uppercase block mb-1">Kế toán trưởng</span>
-                                            (Ký, họ và tên)
-                                            <div className="mt-12 font-bold">Bùi Thị B</div>
+                                        <div className="flex flex-col items-center">
+                                            <div className="h-24 flex flex-col justify-between w-full">
+                                                <div>
+                                                    <span className="invisible block mb-0.5">Placeholder Date</span>
+                                                    <span className="font-bold uppercase block">KẾ TOÁN TRƯỞNG</span>
+                                                    <span className="italic font-normal text-[10px]">(Ký, họ và tên)</span>
+                                                </div>
+                                                <div className="font-bold uppercase mt-auto pt-8">
+                                                    {signatures.chiefAccountant || '...........................'}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <span className="italic block mb-1">Ngày {formatDateVN(new Date())}</span>
-                                            <span className="font-bold uppercase block mb-1">Giám đốc</span>
-                                            (Ký, họ tên, đóng dấu)
-                                            <div className="mt-12 font-bold">Nguyễn Văn C</div>
+                                        <div className="flex flex-col items-center">
+                                            <div className="h-24 flex flex-col justify-between w-full">
+                                                <div className="mb-1">
+                                                    <span className="italic block mb-0.5 whitespace-nowrap">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</span>
+                                                    <span className="font-bold uppercase block">{(headTitle || 'Thủ trưởng đơn vị').toUpperCase()}</span>
+                                                    <span className="italic font-normal text-[10px]">(Ký, họ tên, đóng dấu)</span>
+                                                </div>
+                                                <div className="font-bold uppercase mt-auto pt-8">
+                                                    {signatures.director || '...........................'}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -659,13 +838,21 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                                         <span>Syntex Legger ERP System</span>
                                         <span>Trang {pageIdx + 1} / {pagedData.length}</span>
                                     </div>
-                                </div>
-                            )) : (
-                                <div className="a4-page bg-white p-[20mm] text-center italic text-slate-400">Không có dữ liệu báo cáo</div>
-                            )}
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    )) : (
+                        <div
+                            className={`bg-white text-slate-600 italic printable-area preview-page text-center shadow-2xl font-serif ${getPaperSizeClass(paperSize)}`}
+                            style={{
+                                width: previewDimensions.width,
+                                minHeight: previewDimensions.minHeight,
+                                ['--print-padding' as any]: paddingValue
+                            }}
+                        >
+                            Không có dữ liệu báo cáo
+                        </div>
+                    )}
+                </PrintPreviewShell>
             )}
         </div>
     );

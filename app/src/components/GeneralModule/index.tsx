@@ -22,6 +22,8 @@ import { VoucherActions, ActionBar } from './VoucherActions';
 import { PostingModal } from './PostingModal';
 import { StagingArea } from './StagingArea';
 import { VoucherTableRow, VoucherTableHeader } from './VoucherTableRow';
+import { GeneralVoucherList } from './GeneralVoucherList';
+import { GeneralVoucherForm } from './GeneralVoucherForm';
 
 // Re-export types
 export * from './types/voucher.types';
@@ -53,5 +55,7 @@ export {
     PostingModal,
     StagingArea,
     VoucherTableRow,
-    VoucherTableHeader
+    VoucherTableHeader,
+    GeneralVoucherList,
+    GeneralVoucherForm
 };

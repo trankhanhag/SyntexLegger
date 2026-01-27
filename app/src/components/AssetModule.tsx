@@ -5,6 +5,9 @@ import { type RibbonAction } from './Ribbon';
 import { formatMonthVN, toInputDateValue, toInputMonthValue } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
+import { ModuleOverview } from './ModuleOverview';
+import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { useSimplePrint } from '../hooks/usePrintHandler';
 
 // --- TYPES ---
 interface AssetModuleProps {
@@ -12,10 +15,11 @@ interface AssetModuleProps {
     onCloseModal?: () => void;
     printSignal?: number;
     onSetHeader?: (header: { title: string; icon: string; actions?: RibbonAction[]; onDelete?: () => void }) => void;
+    onNavigate?: (viewId: string) => void;
 }
 
 // --- MAIN COMPONENT ---
-export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed_list', printSignal = 0, onSetHeader }) => {
+export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed_list', printSignal = 0, onSetHeader, onNavigate }) => {
     // Data State
     const [assets, setAssets] = useState<any[]>([]); // Fixed Assets
     const [infraAssets, setInfraAssets] = useState<any[]>([]); // Infrastructure
@@ -92,9 +96,8 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
         fetchFundSources();
     }, []);
 
-    useEffect(() => {
-        if (printSignal > 0) window.print();
-    }, [printSignal]);
+    // Print handler
+    useSimplePrint(printSignal, 'Tài sản', { allowBrowserPrint: true });
 
     // Handle SubView Changes -> Modal Triggers
     useEffect(() => {
@@ -266,7 +269,26 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     // --- RENDER ---
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
-            <div className="flex-1 overflow-hidden relative">
+            {/* Module Overview - Default Landing Page */}
+            {(subView === 'overview' || subView === 'asset_overview') && (
+                <ModuleOverview
+                    title={MODULE_CONFIGS.asset.title}
+                    description={MODULE_CONFIGS.asset.description}
+                    icon={MODULE_CONFIGS.asset.icon}
+                    iconColor={MODULE_CONFIGS.asset.iconColor}
+                    workflow={MODULE_CONFIGS.asset.workflow}
+                    features={MODULE_CONFIGS.asset.features}
+                    onNavigate={onNavigate}
+                    stats={[
+                        { icon: 'domain', label: 'TSCĐ', value: assets.length, color: 'purple' },
+                        { icon: 'location_city', label: 'Hạ tầng', value: infraAssets.length, color: 'blue' },
+                        { icon: 'handyman', label: 'CCDC', value: ccdc.length, color: 'green' },
+                        { icon: 'inventory', label: 'Kiểm kê', value: inventory.length, color: 'amber' },
+                    ]}
+                />
+            )}
+
+            <div className={`flex-1 overflow-hidden relative ${(subView === 'overview' || subView === 'asset_overview') ? 'hidden' : ''}`}>
                 {loading ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10">
                         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
