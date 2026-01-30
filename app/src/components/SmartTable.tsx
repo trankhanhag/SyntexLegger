@@ -143,6 +143,11 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     // Excel-like: Name Box input
     const [nameBoxValue, setNameBoxValue] = useState('');
 
+    // Excel-like: Drag-Fill (kéo góc ô để copy/fill)
+    const [isFillDragging, setIsFillDragging] = useState(false);
+    const [fillPreviewRange, setFillPreviewRange] = useState<{ start: { rIdx: number, cIdx: number }, end: { rIdx: number, cIdx: number } } | null>(null);
+    const [pendingFillRange, setPendingFillRange] = useState<{ start: { rIdx: number, cIdx: number }, end: { rIdx: number, cIdx: number } } | null>(null);
+
     // Trigger onSelectionChange when activeCell updates
     useEffect(() => {
         const handler = onRowClick || onSelectionChange;
@@ -158,7 +163,13 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     // Global Mouse Up Config
     useEffect(() => {
         const handleGlobalMouseUp = () => {
+            // Queue fill execution if was fill-dragging (will be processed by separate effect)
+            if (isFillDragging && fillPreviewRange) {
+                setPendingFillRange(fillPreviewRange);
+            }
             setIsDragging(false);
+            setIsFillDragging(false);
+            setFillPreviewRange(null);
             setResizingCol(null);
         };
         const handleGlobalMouseMove = (e: MouseEvent) => {
@@ -174,7 +185,7 @@ export const SmartTable: React.FC<SmartTableProps> = ({
             window.removeEventListener('mouseup', handleGlobalMouseUp);
             window.removeEventListener('mousemove', handleGlobalMouseMove);
         };
-    }, [resizingCol]);
+    }, [resizingCol, isFillDragging, fillPreviewRange]);
 
     // Update nameBox when activeCell changes
     useEffect(() => {
@@ -319,6 +330,12 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     };
 
     const handleCellMouseEnter = (rIdx: number, cIdx: number) => {
+        // Handle fill dragging
+        if (isFillDragging) {
+            handleFillMouseMove(rIdx, cIdx);
+            return;
+        }
+
         if (isDragging) {
             setSelectionRanges(prev => {
                 if (prev.length === 0) return prev;
@@ -1019,6 +1036,387 @@ export const SmartTable: React.FC<SmartTableProps> = ({
         });
     };
 
+    // --- Excel-like Drag-Fill ---
+    const getSelectionBounds = () => {
+        if (selectionRanges.length === 0) return null;
+        const range = selectionRanges[selectionRanges.length - 1];
+        return {
+            rMin: Math.min(range.start.rIdx, range.end.rIdx),
+            rMax: Math.max(range.start.rIdx, range.end.rIdx),
+            cMin: Math.min(range.start.cIdx, range.end.cIdx),
+            cMax: Math.max(range.start.cIdx, range.end.cIdx),
+        };
+    };
+
+    const handleFillHandleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (readOnly) return;
+        setIsFillDragging(true);
+        // Initialize fill preview to current selection
+        const bounds = getSelectionBounds();
+        if (bounds) {
+            setFillPreviewRange({
+                start: { rIdx: bounds.rMin, cIdx: bounds.cMin },
+                end: { rIdx: bounds.rMax, cIdx: bounds.cMax }
+            });
+        }
+    };
+
+    const handleFillMouseMove = (rIdx: number, cIdx: number) => {
+        if (!isFillDragging) return;
+        const bounds = getSelectionBounds();
+        if (!bounds) return;
+
+        // Determine fill direction: extend rows (down/up) or columns (right/left)
+        // Priority: vertical fill if moving vertically, horizontal if moving horizontally
+        const rowDiff = Math.abs(rIdx - bounds.rMax);
+        const colDiff = Math.abs(cIdx - bounds.cMax);
+
+        if (rIdx > bounds.rMax || rIdx < bounds.rMin) {
+            // Vertical fill (most common use case)
+            setFillPreviewRange({
+                start: { rIdx: Math.min(bounds.rMin, rIdx), cIdx: bounds.cMin },
+                end: { rIdx: Math.max(bounds.rMax, rIdx), cIdx: bounds.cMax }
+            });
+        } else if (cIdx > bounds.cMax || cIdx < bounds.cMin) {
+            // Horizontal fill
+            setFillPreviewRange({
+                start: { rIdx: bounds.rMin, cIdx: Math.min(bounds.cMin, cIdx) },
+                end: { rIdx: bounds.rMax, cIdx: Math.max(bounds.cMax, cIdx) }
+            });
+        }
+    };
+
+    const detectFillPattern = (values: string[]): { type: 'copy' | 'number' | 'date'; step?: number } => {
+        if (values.length === 0) return { type: 'copy' };
+
+        // Check for number sequence
+        const nums = values.map(v => parseNumericValue(v));
+        if (values.length >= 2 && nums.every(n => !isNaN(n))) {
+            const steps = [];
+            for (let i = 1; i < nums.length; i++) {
+                steps.push(nums[i] - nums[i - 1]);
+            }
+            // If all steps are the same, it's an arithmetic sequence
+            if (steps.length > 0 && steps.every(s => s === steps[0])) {
+                return { type: 'number', step: steps[0] };
+            }
+        }
+
+        // Check for date sequence (DD/MM/YYYY format)
+        const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+        const dates = values.map(v => {
+            const match = v.match(dateRegex);
+            if (match) {
+                const d = new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+                return isNaN(d.getTime()) ? null : d;
+            }
+            return null;
+        });
+
+        if (values.length >= 2 && dates.every(d => d !== null)) {
+            const daySteps = [];
+            for (let i = 1; i < dates.length; i++) {
+                const diffDays = Math.round((dates[i]!.getTime() - dates[i - 1]!.getTime()) / (1000 * 60 * 60 * 24));
+                daySteps.push(diffDays);
+            }
+            if (daySteps.length > 0 && daySteps.every(s => s === daySteps[0])) {
+                return { type: 'date', step: daySteps[0] };
+            }
+        }
+
+        return { type: 'copy' };
+    };
+
+    const formatDateForFill = (date: Date): string => {
+        const d = String(date.getDate()).padStart(2, '0');
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const y = date.getFullYear();
+        return `${d}/${m}/${y}`;
+    };
+
+    const executeFill = () => {
+        if (!fillPreviewRange) return;
+        const bounds = getSelectionBounds();
+        if (!bounds) return;
+
+        const { rMin: srcRMin, rMax: srcRMax, cMin: srcCMin, cMax: srcCMax } = bounds;
+        const { start: fillStart, end: fillEnd } = fillPreviewRange;
+
+        const fillRMin = Math.min(fillStart.rIdx, fillEnd.rIdx);
+        const fillRMax = Math.max(fillStart.rIdx, fillEnd.rIdx);
+        const fillCMin = Math.min(fillStart.cIdx, fillEnd.cIdx);
+        const fillCMax = Math.max(fillStart.cIdx, fillEnd.cIdx);
+
+        // Determine direction
+        const isDownFill = fillRMax > srcRMax;
+        const isUpFill = fillRMin < srcRMin;
+        const isRightFill = fillCMax > srcCMax;
+        const isLeftFill = fillCMin < srcCMin;
+
+        if (isDownFill || isUpFill) {
+            // Vertical fill - for each column in selection
+            for (let c = srcCMin; c <= srcCMax; c++) {
+                // Get source values for this column
+                const sourceValues: string[] = [];
+                for (let r = srcRMin; r <= srcRMax; r++) {
+                    sourceValues.push(getCellValue(r, c));
+                }
+
+                const pattern = detectFillPattern(sourceValues);
+                const srcLen = sourceValues.length;
+
+                if (isDownFill) {
+                    // Fill down
+                    for (let r = srcRMax + 1; r <= fillRMax; r++) {
+                        const offset = r - srcRMin;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[srcLen - 1]);
+                            const increment = (r - srcRMax) * pattern.step;
+                            newValue = formatNumberDisplay(baseNum + increment);
+                        } else if (pattern.type === 'date' && pattern.step !== undefined) {
+                            const lastDateMatch = sourceValues[srcLen - 1].match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                            if (lastDateMatch) {
+                                const lastDate = new Date(parseInt(lastDateMatch[3]), parseInt(lastDateMatch[2]) - 1, parseInt(lastDateMatch[1]));
+                                lastDate.setDate(lastDate.getDate() + (r - srcRMax) * pattern.step);
+                                newValue = formatDateForFill(lastDate);
+                            } else {
+                                newValue = sourceValues[offset % srcLen];
+                            }
+                        } else {
+                            // Copy pattern
+                            newValue = sourceValues[offset % srcLen];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+
+                if (isUpFill) {
+                    // Fill up
+                    for (let r = srcRMin - 1; r >= fillRMin; r--) {
+                        const offset = srcRMin - r;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[0]);
+                            newValue = formatNumberDisplay(baseNum - offset * pattern.step);
+                        } else if (pattern.type === 'date' && pattern.step !== undefined) {
+                            const firstDateMatch = sourceValues[0].match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                            if (firstDateMatch) {
+                                const firstDate = new Date(parseInt(firstDateMatch[3]), parseInt(firstDateMatch[2]) - 1, parseInt(firstDateMatch[1]));
+                                firstDate.setDate(firstDate.getDate() - offset * pattern.step);
+                                newValue = formatDateForFill(firstDate);
+                            } else {
+                                newValue = sourceValues[srcLen - 1 - ((offset - 1) % srcLen)];
+                            }
+                        } else {
+                            newValue = sourceValues[srcLen - 1 - ((offset - 1) % srcLen)];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+            }
+        }
+
+        if (isRightFill || isLeftFill) {
+            // Horizontal fill - for each row in selection
+            for (let r = srcRMin; r <= srcRMax; r++) {
+                // Get source values for this row
+                const sourceValues: string[] = [];
+                for (let c = srcCMin; c <= srcCMax; c++) {
+                    sourceValues.push(getCellValue(r, c));
+                }
+
+                const pattern = detectFillPattern(sourceValues);
+                const srcLen = sourceValues.length;
+
+                if (isRightFill) {
+                    for (let c = srcCMax + 1; c <= fillCMax; c++) {
+                        const offset = c - srcCMin;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[srcLen - 1]);
+                            newValue = formatNumberDisplay(baseNum + (c - srcCMax) * pattern.step);
+                        } else {
+                            newValue = sourceValues[offset % srcLen];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+
+                if (isLeftFill) {
+                    for (let c = srcCMin - 1; c >= fillCMin; c--) {
+                        const offset = srcCMin - c;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[0]);
+                            newValue = formatNumberDisplay(baseNum - offset * pattern.step);
+                        } else {
+                            newValue = sourceValues[srcLen - 1 - ((offset - 1) % srcLen)];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+            }
+        }
+
+        // Update selection to include filled area
+        setSelectionRanges([{
+            start: { rIdx: fillRMin, cIdx: fillCMin },
+            end: { rIdx: fillRMax, cIdx: fillCMax }
+        }]);
+    };
+
+    // Process pending fill (executed in separate effect to avoid stale closures)
+    useEffect(() => {
+        if (pendingFillRange) {
+            executeFillWithRange(pendingFillRange);
+            setPendingFillRange(null);
+        }
+    }, [pendingFillRange]);
+
+    // Execute fill with explicit range parameter (to avoid closure issues)
+    const executeFillWithRange = (targetRange: { start: { rIdx: number, cIdx: number }, end: { rIdx: number, cIdx: number } }) => {
+        const bounds = getSelectionBounds();
+        if (!bounds) return;
+
+        const { rMin: srcRMin, rMax: srcRMax, cMin: srcCMin, cMax: srcCMax } = bounds;
+        const { start: fillStart, end: fillEnd } = targetRange;
+
+        const fillRMin = Math.min(fillStart.rIdx, fillEnd.rIdx);
+        const fillRMax = Math.max(fillStart.rIdx, fillEnd.rIdx);
+        const fillCMin = Math.min(fillStart.cIdx, fillEnd.cIdx);
+        const fillCMax = Math.max(fillStart.cIdx, fillEnd.cIdx);
+
+        // Determine direction
+        const isDownFill = fillRMax > srcRMax;
+        const isUpFill = fillRMin < srcRMin;
+        const isRightFill = fillCMax > srcCMax;
+        const isLeftFill = fillCMin < srcCMin;
+
+        if (isDownFill || isUpFill) {
+            for (let c = srcCMin; c <= srcCMax; c++) {
+                const sourceValues: string[] = [];
+                for (let r = srcRMin; r <= srcRMax; r++) {
+                    sourceValues.push(getCellValue(r, c));
+                }
+
+                const pattern = detectFillPattern(sourceValues);
+                const srcLen = sourceValues.length;
+
+                if (isDownFill) {
+                    for (let r = srcRMax + 1; r <= fillRMax; r++) {
+                        const offset = r - srcRMin;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[srcLen - 1]);
+                            const increment = (r - srcRMax) * pattern.step;
+                            newValue = formatNumberDisplay(baseNum + increment);
+                        } else if (pattern.type === 'date' && pattern.step !== undefined) {
+                            const lastDateMatch = sourceValues[srcLen - 1].match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                            if (lastDateMatch) {
+                                const lastDate = new Date(parseInt(lastDateMatch[3]), parseInt(lastDateMatch[2]) - 1, parseInt(lastDateMatch[1]));
+                                lastDate.setDate(lastDate.getDate() + (r - srcRMax) * pattern.step);
+                                newValue = formatDateForFill(lastDate);
+                            } else {
+                                newValue = sourceValues[offset % srcLen];
+                            }
+                        } else {
+                            newValue = sourceValues[offset % srcLen];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+
+                if (isUpFill) {
+                    for (let r = srcRMin - 1; r >= fillRMin; r--) {
+                        const offset = srcRMin - r;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[0]);
+                            newValue = formatNumberDisplay(baseNum - offset * pattern.step);
+                        } else if (pattern.type === 'date' && pattern.step !== undefined) {
+                            const firstDateMatch = sourceValues[0].match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                            if (firstDateMatch) {
+                                const firstDate = new Date(parseInt(firstDateMatch[3]), parseInt(firstDateMatch[2]) - 1, parseInt(firstDateMatch[1]));
+                                firstDate.setDate(firstDate.getDate() - offset * pattern.step);
+                                newValue = formatDateForFill(firstDate);
+                            } else {
+                                newValue = sourceValues[srcLen - 1 - ((offset - 1) % srcLen)];
+                            }
+                        } else {
+                            newValue = sourceValues[srcLen - 1 - ((offset - 1) % srcLen)];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+            }
+        }
+
+        if (isRightFill || isLeftFill) {
+            for (let r = srcRMin; r <= srcRMax; r++) {
+                const sourceValues: string[] = [];
+                for (let c = srcCMin; c <= srcCMax; c++) {
+                    sourceValues.push(getCellValue(r, c));
+                }
+
+                const pattern = detectFillPattern(sourceValues);
+                const srcLen = sourceValues.length;
+
+                if (isRightFill) {
+                    for (let c = srcCMax + 1; c <= fillCMax; c++) {
+                        const offset = c - srcCMin;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[srcLen - 1]);
+                            newValue = formatNumberDisplay(baseNum + (c - srcCMax) * pattern.step);
+                        } else {
+                            newValue = sourceValues[offset % srcLen];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+
+                if (isLeftFill) {
+                    for (let c = srcCMin - 1; c >= fillCMin; c--) {
+                        const offset = srcCMin - c;
+                        let newValue: string;
+
+                        if (pattern.type === 'number' && pattern.step !== undefined) {
+                            const baseNum = parseNumericValue(sourceValues[0]);
+                            newValue = formatNumberDisplay(baseNum - offset * pattern.step);
+                        } else {
+                            newValue = sourceValues[srcLen - 1 - ((offset - 1) % srcLen)];
+                        }
+
+                        setCellValue(r, c, newValue);
+                    }
+                }
+            }
+        }
+
+        // Update selection to include filled area
+        setSelectionRanges([{
+            start: { rIdx: fillRMin, cIdx: fillCMin },
+            end: { rIdx: fillRMax, cIdx: fillCMax }
+        }]);
+    };
+
     // --- Name Box Navigation ---
     const handleNameBoxSubmit = () => {
         const match = nameBoxValue.toUpperCase().match(/^([A-Z]+)(\d+)$/);
@@ -1537,6 +1935,27 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                             }
                                         }
 
+                                        // Check if this cell is in fill preview range (but not in original selection)
+                                        let isInFillPreview = false;
+                                        if (fillPreviewRange && isFillDragging) {
+                                            const fillRMin = Math.min(fillPreviewRange.start.rIdx, fillPreviewRange.end.rIdx);
+                                            const fillRMax = Math.max(fillPreviewRange.start.rIdx, fillPreviewRange.end.rIdx);
+                                            const fillCMin = Math.min(fillPreviewRange.start.cIdx, fillPreviewRange.end.cIdx);
+                                            const fillCMax = Math.max(fillPreviewRange.start.cIdx, fillPreviewRange.end.cIdx);
+                                            if (rIdx >= fillRMin && rIdx <= fillRMax && cIdx >= fillCMin && cIdx <= fillCMax && !isInRange) {
+                                                isInFillPreview = true;
+                                            }
+                                        }
+
+                                        // Check if this cell is at the bottom-right corner of selection (for fill handle)
+                                        let showFillHandle = false;
+                                        if (!readOnly && selectionRanges.length > 0 && !isFillDragging) {
+                                            const lastRange = selectionRanges[selectionRanges.length - 1];
+                                            const selRMax = Math.max(lastRange.start.rIdx, lastRange.end.rIdx);
+                                            const selCMax = Math.max(lastRange.start.cIdx, lastRange.end.cIdx);
+                                            showFillHandle = rIdx === selRMax && cIdx === selCMax;
+                                        }
+
                                         const errorKey = `ERR-${row.id}-${col.id}`;
                                         const errorMsg = cellErrors[errorKey];
                                         const displayVal = getCellDisplayValue(rIdx, cIdx);
@@ -1564,7 +1983,10 @@ export const SmartTable: React.FC<SmartTableProps> = ({
 
                                         // Selection Styling - Excel-like colors (only in non-readOnly mode)
                                         if (!readOnly) {
-                                            if (isActive) {
+                                            if (isInFillPreview) {
+                                                // Fill preview: dashed border and light green background
+                                                cellClass += " bg-green-100 dark:bg-green-900/40 border-dashed border-green-500";
+                                            } else if (isActive) {
                                                 // Active cell: thick green border like Excel
                                                 cellClass += " ring-2 ring-inset ring-green-600 dark:ring-green-500 z-10 bg-white dark:bg-slate-900";
                                             } else if (isInRange) {
@@ -1649,6 +2071,14 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                                     <div className={`w-full h-full ${compact ? 'px-1 py-0.5' : 'px-2 py-1.5'} text-sm ${alignClass} truncate ${col.def?.fontClass || ''} ${col.type === 'draft' || row.type === 'draft' ? 'font-mono text-slate-600 dark:text-slate-400' : ''} select-none`}>
                                                         {col.def?.renderCell && row.type === 'real' ? col.def.renderCell(getCellValue(rIdx, cIdx), row.data, rIdx) : displayVal}
                                                     </div>
+                                                )}
+                                                {/* Fill Handle - shown at bottom-right corner of selection */}
+                                                {showFillHandle && (
+                                                    <div
+                                                        className="absolute -bottom-[3px] -right-[3px] w-[7px] h-[7px] bg-green-600 dark:bg-green-500 border border-white dark:border-slate-800 cursor-crosshair z-30 hover:bg-green-700 dark:hover:bg-green-400"
+                                                        onMouseDown={handleFillHandleMouseDown}
+                                                        title="Kéo để điền dữ liệu (Drag to fill)"
+                                                    />
                                                 )}
                                             </td>
                                         );
