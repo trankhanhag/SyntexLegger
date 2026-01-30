@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { hrService } from '../api';
 import { type RibbonAction } from './Ribbon';
@@ -8,6 +8,8 @@ import { FormModal } from './FormModal';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { useSimplePrint } from '../hooks/usePrintHandler';
+import { ExcelImportModal } from './ExcelImportModal';
+import { EMPLOYEE_TEMPLATE, TIMEKEEPING_TEMPLATE } from '../utils/excelTemplates';
 
 interface HRModuleProps {
     subView?: string;
@@ -32,6 +34,11 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
     const [showEmployeeModal, setShowEmployeeModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
     const [selectedRow, setSelectedRow] = useState<any>(null);
+
+    // Import states
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
     const [period, setPeriod] = useState(toInputMonthValue());
 
@@ -59,7 +66,7 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
             case 'employees': return { title: 'Hồ sơ nhân sự', icon: 'person_add', desc: 'Quản lý thông tin nhân viên, hợp đồng và mức lương cơ bản' };
             case 'contracts': return { title: 'Hợp đồng & Quyết định', icon: 'history_edu', desc: 'Quản lý hợp đồng lao động, quyết định bổ nhiệm và điều động' };
             case 'salary_process': return { title: 'Quá trình Lương', icon: 'trending_up', desc: 'Lịch sử nâng bậc, thăng hạng lương của cán bộ' };
-            case 'allowance_list': return { title: 'Danh mục Phụ cấp', icon: 'list_alt', desc: 'Quản lý các loại phụ cấp theo quy định HCSN' };
+            case 'allowance_list': return { title: 'Danh mục Phụ cấp', icon: 'list_alt', desc: 'Quản lý các loại phụ cấp theo quy định doanh nghiệp' };
             case 'timekeeping': return { title: 'Bảng chấm công', icon: 'event_available', desc: 'Theo dõi ngày công, nghỉ phép và tăng ca trong kỳ' };
             case 'insurance': return { title: 'Bảo hiểm & Khấu trừ', icon: 'health_and_safety', desc: 'Theo dõi trích nộp BHXH, BHYT, BHTN và Kinh phí công đoàn' };
             case 'report_insurance': return { title: 'Báo cáo Bảo hiểm', icon: 'description', desc: 'Báo cáo & Đối soát với cơ quan BHXH' };
@@ -124,6 +131,65 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
         fetchData();
     }, [view, period]);
 
+    // Excel import handler
+    const handleImportFromExcel = useCallback(async (rows: any[]) => {
+        if (rows.length === 0) return;
+
+        setImporting(true);
+        setImportProgress({ current: 0, total: rows.length });
+        setShowImportModal(false);
+
+        let successCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            setImportProgress({ current: i + 1, total: rows.length });
+
+            try {
+                if (view === 'employees') {
+                    // Import employee data
+                    await hrService.saveEmployee({
+                        code: rows[i].employee_code || rows[i]['Mã NV (*)'],
+                        name: rows[i].full_name || rows[i]['Họ tên (*)'],
+                        department: rows[i].department || rows[i]['Phòng ban'],
+                        position: rows[i].position || rows[i]['Chức vụ'],
+                        salary_grade_id: rows[i].salary_grade_code || rows[i]['Mã ngạch lương'],
+                        salary_level: rows[i].salary_level || rows[i]['Bậc lương'] || 1,
+                        salary_coefficient: rows[i].salary_coefficient || rows[i]['Hệ số lương'] || 2.34,
+                        start_date: rows[i].start_date || rows[i]['Ngày vào làm'],
+                        status: rows[i].status || 'ACTIVE'
+                    });
+                } else if (view === 'timekeeping') {
+                    // Import timekeeping data
+                    await hrService.saveTimekeeping({
+                        employee_code: rows[i].employee_code || rows[i]['Mã NV (*)'],
+                        period: rows[i].period || rows[i]['Kỳ công (*)'] || period,
+                        standard_days: rows[i].standard_days || rows[i]['Công chuẩn'] || 22,
+                        actual_days: rows[i].actual_days || rows[i]['Công thực tế (*)'],
+                        leave_days: rows[i].leave_days || rows[i]['Ngày nghỉ phép'] || 0,
+                        unpaid_leave: rows[i].unpaid_leave || rows[i]['Nghỉ không lương'] || 0,
+                        overtime_hours: rows[i].overtime_hours || rows[i]['Giờ tăng ca'] || 0,
+                        notes: rows[i].notes || rows[i]['Ghi chú'] || ''
+                    });
+                }
+                successCount++;
+            } catch (err: any) {
+                const code = rows[i].employee_code || rows[i]['Mã NV (*)'] || `Dòng ${i + 1}`;
+                errors.push(`${code}: ${err.response?.data?.error || err.message}`);
+            }
+        }
+
+        setImporting(false);
+
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} bản ghi!`);
+        } else {
+            alert(`Nhập ${successCount}/${rows.length} bản ghi.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        fetchData();
+    }, [view, period]);
+
     useEffect(() => {
         if (subView) setView(subView);
     }, [subView]);
@@ -150,6 +216,18 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
                         setSelectedEmployee(null);
                         setShowEmployeeModal(true);
                     },
+                    primary: true
+                });
+                actions.push({
+                    label: 'Nhập từ Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowImportModal(true)
+                });
+            } else if (view === 'timekeeping') {
+                actions.push({
+                    label: 'Nhập từ Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowImportModal(true),
                     primary: true
                 });
             }
@@ -413,6 +491,55 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
                     }}
                 />
             )}
+
+            {/* Excel Import Modal */}
+            {showImportModal && (
+                <ExcelImportModal
+                    onClose={() => setShowImportModal(false)}
+                    onImport={handleImportFromExcel}
+                    title={view === 'timekeeping' ? 'Nhập bảng chấm công từ Excel' : 'Nhập danh sách nhân viên từ Excel'}
+                    enhancedTemplate={view === 'timekeeping' ? TIMEKEEPING_TEMPLATE : EMPLOYEE_TEMPLATE}
+                    columns={view === 'timekeeping' ? [
+                        { key: 'employee_code', label: 'Mã NV', required: true },
+                        { key: 'period', label: 'Kỳ công', required: true },
+                        { key: 'standard_days', label: 'Công chuẩn' },
+                        { key: 'actual_days', label: 'Công thực tế', required: true },
+                        { key: 'leave_days', label: 'Ngày nghỉ phép' },
+                        { key: 'unpaid_leave', label: 'Nghỉ không lương' },
+                        { key: 'overtime_hours', label: 'Giờ tăng ca' }
+                    ] : [
+                        { key: 'employee_code', label: 'Mã NV', required: true },
+                        { key: 'full_name', label: 'Họ tên', required: true },
+                        { key: 'department', label: 'Phòng ban' },
+                        { key: 'position', label: 'Chức vụ' },
+                        { key: 'salary_grade_code', label: 'Mã ngạch lương' },
+                        { key: 'salary_level', label: 'Bậc lương' },
+                        { key: 'salary_coefficient', label: 'Hệ số lương' },
+                        { key: 'start_date', label: 'Ngày vào làm' }
+                    ]}
+                />
+            )}
+
+            {/* Import Progress Overlay */}
+            {importing && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                        <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            Đang nhập dữ liệu {view === 'timekeeping' ? 'chấm công' : 'nhân viên'}...
+                        </p>
+                        <p className="text-2xl font-mono text-indigo-600 mt-2">
+                            {importProgress.current} / {importProgress.total}
+                        </p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                            <div
+                                className="bg-indigo-600 h-2 rounded-full transition-all"
+                                style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -442,7 +569,7 @@ const PayrollCalcModal = ({ period, onClose, onConfirm }: { period: string, onCl
     };
 
     return (
-        <Modal title="Quy trình Tính lương & Trích bảo hiểm (HCSN)" onClose={onClose}>
+        <Modal title="Quy trình Tính lương & Trích bảo hiểm" onClose={onClose}>
             <div className="flex justify-between mb-10 relative">
                 <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-100 dark:bg-slate-800 -z-10"></div>
                 {[1, 2, 3].map(s => (
@@ -479,7 +606,7 @@ const PayrollCalcModal = ({ period, onClose, onConfirm }: { period: string, onCl
                                     <li>Lấy dữ liệu từ bảng chấm công kỳ {period}</li>
                                     <li>Tính lương Gross/Net dựa trên công thực tế</li>
                                     <li>Trích bảo hiểm và thuế TNCN theo quy định</li>
-                                    <li>Tạo các bút toán HCSN: 611, 332, 334...</li>
+                                    <li>Tạo các bút toán kế toán: 334, 338, 622, 627...</li>
                                 </ul>
                             </div>
                         </div>
@@ -601,7 +728,7 @@ const EmployeeFormModal = ({ initialData, onClose, onSave }: { initialData?: any
     const calculatedSalary = (formData.salary_coefficient || 0) * 2340000;
 
     return (
-        <Modal title={initialData ? "Cập nhật hồ sơ nhân sự (HCSN)" : "Tiếp nhận nhân viên mới (HCSN)"} onClose={onClose}>
+        <Modal title={initialData ? "Cập nhật hồ sơ nhân sự" : "Tiếp nhận nhân viên mới"} onClose={onClose}>
             <div className="grid grid-cols-12 gap-6">
                 {/* Left Column: Personal Info */}
                 <div className="col-span-7 space-y-4">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { DateInput } from './DateInput';
 import { FormModal } from './FormModal';
@@ -7,7 +7,9 @@ import { type RibbonAction } from './Ribbon';
 import { toInputDateValue } from '../utils/dateUtils';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
-import { useSimplePrint } from '../hooks/usePrintHandler';
+import { useSimplePrint, triggerBrowserPrint } from '../hooks/usePrintHandler';
+import { ExcelImportModal } from './ExcelImportModal';
+import { DEBT_TEMPLATE } from '../utils/excelTemplates';
 
 interface DebtManagementModuleProps {
     subView?: string;
@@ -27,6 +29,11 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
     const [budgetAdvances, setBudgetAdvances] = useState<any[]>([]);
     const [receivables, setReceivables] = useState<any[]>([]);
     const [payables, setPayables] = useState<any[]>([]);
+
+    // Import states
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
     useEffect(() => {
         setView(subView);
@@ -62,15 +69,77 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
         }
     };
 
+    // Excel import handler
+    const handleImportFromExcel = useCallback(async (rows: any[]) => {
+        if (rows.length === 0) return;
+
+        setImporting(true);
+        setImportProgress({ current: 0, total: rows.length });
+        setShowImportModal(false);
+
+        let successCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            setImportProgress({ current: i + 1, total: rows.length });
+
+            try {
+                if (view === 'temp_advances') {
+                    await debtService.createTemporaryAdvance({
+                        doc_no: rows[i].doc_no || rows[i]['Số CT (*)'],
+                        doc_date: rows[i].doc_date || rows[i]['Ngày TƯ (*)'] || toInputDateValue(),
+                        employee_name: rows[i].employee_name || rows[i]['Người tạm ứng (*)'],
+                        purpose: rows[i].purpose || rows[i]['Mục đích'],
+                        amount: parseFloat(rows[i].amount || rows[i]['Số tiền (*)'] || 0)
+                    });
+                } else if (view === 'receivables') {
+                    await debtService.createReceivable({
+                        doc_no: rows[i].doc_no || rows[i]['Số CT (*)'],
+                        doc_date: rows[i].doc_date || rows[i]['Ngày CT (*)'] || toInputDateValue(),
+                        partner_name: rows[i].partner_name || rows[i]['Đối tác (*)'],
+                        account_code: rows[i].account_code || rows[i]['Tài khoản'] || '136',
+                        description: rows[i].description || rows[i]['Nội dung'],
+                        original_amount: parseFloat(rows[i].amount || rows[i]['Số tiền (*)'] || 0),
+                        due_date: rows[i].due_date || rows[i]['Hạn TT']
+                    });
+                } else if (view === 'payables') {
+                    await debtService.createPayable({
+                        doc_no: rows[i].doc_no || rows[i]['Số CT (*)'],
+                        doc_date: rows[i].doc_date || rows[i]['Ngày CT (*)'] || toInputDateValue(),
+                        partner_name: rows[i].partner_name || rows[i]['Nhà cung cấp (*)'],
+                        account_code: rows[i].account_code || rows[i]['Tài khoản'] || '331',
+                        description: rows[i].description || rows[i]['Nội dung'],
+                        original_amount: parseFloat(rows[i].amount || rows[i]['Số tiền (*)'] || 0),
+                        due_date: rows[i].due_date || rows[i]['Hạn TT']
+                    });
+                }
+                successCount++;
+            } catch (err: any) {
+                const docNo = rows[i].doc_no || rows[i]['Số CT (*)'] || `Dòng ${i + 1}`;
+                errors.push(`${docNo}: ${err.response?.data?.error || err.message}`);
+            }
+        }
+
+        setImporting(false);
+
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} bản ghi!`);
+        } else {
+            alert(`Nhập ${successCount}/${rows.length} bản ghi.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        fetchData();
+    }, [view]);
+
     useEffect(() => {
         if (onSetHeader) {
             const getTitle = () => {
                 switch (view) {
                     case 'temp_advances': return 'Quản lý Tạm ứng (TK 141)';
-                    case 'budget_advances': return 'Ứng trước NSNN (TK 161)';
-                    case 'receivables': return 'Công nợ phải thu (TK 136, 138)';
-                    case 'payables': return 'Công nợ phải trả (TK 331, 336, 338)';
-                    default: return 'Quản lý Công nợ HCSN';
+                    case 'budget_advances': return 'Cho vay nội bộ (TK 128)';
+                    case 'receivables': return 'Công nợ phải thu (TK 131, 136, 138)';
+                    case 'payables': return 'Công nợ phải trả (TK 331, 333, 334)';
+                    default: return 'Quản lý Công nợ';
                 }
             };
 
@@ -78,15 +147,23 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
 
             actions.push({
                 label: view === 'temp_advances' ? 'Tạo tạm ứng' :
-                    view === 'budget_advances' ? 'Tạo ứng NSNN' :
+                    view === 'budget_advances' ? 'Tạo cho vay' :
                         view === 'receivables' ? 'Tạo phải thu' : 'Tạo phải trả',
                 icon: 'add_circle',
                 onClick: () => setShowForm(true),
                 primary: true
             });
 
+            if (view !== 'budget_advances') {
+                actions.push({
+                    label: 'Nhập từ Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowImportModal(true)
+                });
+            }
+
             actions.push({ label: 'Làm mới', icon: 'refresh', onClick: fetchData });
-            actions.push({ label: 'In danh sách', icon: 'print', onClick: () => window.print() });
+            actions.push({ label: 'In danh sách', icon: 'print', onClick: () => triggerBrowserPrint() });
 
             if (view === 'receivables' || view === 'payables') {
                 actions.push({
@@ -289,15 +366,15 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
     if (view === 'overview' || view === '' || !view) {
         return (
             <ModuleOverview
-                title={MODULE_CONFIGS.debt.title}
-                description={MODULE_CONFIGS.debt.description}
-                icon={MODULE_CONFIGS.debt.icon}
-                iconColor={MODULE_CONFIGS.debt.iconColor}
-                workflow={MODULE_CONFIGS.debt.workflow}
-                features={MODULE_CONFIGS.debt.features}
+                title={MODULE_CONFIGS.loan.title}
+                description={MODULE_CONFIGS.loan.description}
+                icon={MODULE_CONFIGS.loan.icon}
+                iconColor={MODULE_CONFIGS.loan.iconColor}
+                workflow={MODULE_CONFIGS.loan.workflow}
+                features={MODULE_CONFIGS.loan.features}
                 stats={[
                     { icon: 'savings', label: 'Tạm ứng (141)', value: tempAdvances.length || '-', color: 'blue' },
-                    { icon: 'account_balance', label: 'Ứng trước NS (161)', value: budgetAdvances.length || 0, color: 'green' },
+                    { icon: 'account_balance', label: 'Cho vay (128)', value: budgetAdvances.length || 0, color: 'green' },
                     { icon: 'credit_score', label: 'Phải thu', value: receivables.length || 0, color: 'amber' },
                     { icon: 'credit_card', label: 'Phải trả', value: payables.length || 0, color: 'purple' },
                 ]}
@@ -322,6 +399,46 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
                     onClose={() => setShowForm(false)}
                     onRefresh={fetchData}
                 />
+            )}
+
+            {/* Excel Import Modal */}
+            {showImportModal && (
+                <ExcelImportModal
+                    onClose={() => setShowImportModal(false)}
+                    onImport={handleImportFromExcel}
+                    title={view === 'temp_advances' ? 'Nhập tạm ứng từ Excel' : view === 'receivables' ? 'Nhập công nợ phải thu' : 'Nhập công nợ phải trả'}
+                    enhancedTemplate={DEBT_TEMPLATE}
+                    columns={[
+                        { key: 'doc_no', label: 'Số CT', required: true },
+                        { key: 'doc_date', label: 'Ngày CT', required: true },
+                        { key: 'partner_name', label: 'Đối tác', required: true },
+                        { key: 'account_code', label: 'Tài khoản' },
+                        { key: 'description', label: 'Nội dung' },
+                        { key: 'amount', label: 'Số tiền', required: true },
+                        { key: 'due_date', label: 'Hạn thanh toán' }
+                    ]}
+                />
+            )}
+
+            {/* Import Progress Overlay */}
+            {importing && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                        <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            Đang nhập công nợ...
+                        </p>
+                        <p className="text-2xl font-mono text-amber-600 mt-2">
+                            {importProgress.current} / {importProgress.total}
+                        </p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                            <div
+                                className="bg-amber-600 h-2 rounded-full transition-all"
+                                style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -378,7 +495,7 @@ const DebtFormModal = ({ view, onClose, onRefresh }: { view: string, onClose: ()
     const getTitle = () => {
         switch (view) {
             case 'temp_advances': return 'Tạo Tạm ứng mới';
-            case 'budget_advances': return 'Tạo Ứng trước NSNN';
+            case 'budget_advances': return 'Tạo Cho vay nội bộ';
             case 'receivables': return 'Tạo Công nợ phải thu';
             case 'payables': return 'Tạo Công nợ phải trả';
             default: return 'Tạo mới';

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -68,7 +68,8 @@ export const masterDataService = {
     deletePartner: (id: string) => api.delete(`/partners/${id}`),
     getProducts: () => api.get('/products'),
     saveProducts: (products: any[]) => api.post('/master/products', { products }),
-    getFundSources: () => api.get('/hcsn/fund-sources'),
+    getDepartments: () => api.get('/master/departments'), // DN: Bộ phận/Chi nhánh
+    getFundSources: () => api.get('/master/departments'), // Alias cho backward compatibility
 };
 
 export const taxService = {
@@ -155,120 +156,7 @@ export const auditService = {
         api.get('/audit/sessions', { params }),
 };
 
-// ========================================
-// BUDGET CONTROL SERVICE (TT 24/2024)
-// Hệ thống Kiểm soát Ngân sách
-// ========================================
-export const budgetControlService = {
-    // Budget Periods
-    getPeriods: (params?: { fiscal_year?: number; company_id?: string }) =>
-        api.get('/budget-control/periods', { params }),
-    getPeriod: (periodId: string) => api.get(`/budget-control/periods/${periodId}`),
-    lockPeriod: (periodId: string, data: { reason?: string }) =>
-        api.post(`/budget-control/periods/${periodId}/lock`, data),
-    unlockPeriod: (periodId: string, data: { reason: string }) =>
-        api.post(`/budget-control/periods/${periodId}/unlock`, data),
-    updatePeriodThresholds: (periodId: string, data: {
-        warning_threshold?: number;
-        block_threshold?: number;
-        allow_override?: boolean;
-    }) => api.put(`/budget-control/periods/${periodId}/thresholds`, data),
-
-    // Budget Availability
-    checkAvailability: (params: {
-        budget_estimate_id?: string;
-        fund_source_id?: string;
-        fiscal_year?: number;
-        item_code?: string;
-    }) => api.get('/budget-control/availability', { params }),
-    checkSpending: (data: {
-        budget_estimate_id?: string;
-        fund_source_id?: string;
-        amount: number;
-        fiscal_year?: number;
-        item_code?: string;
-        company_id?: string;
-    }) => api.post('/budget-control/check-spending', data),
-
-    // Spending Authorization
-    getAuthorizations: (params?: {
-        status?: string;
-        fiscal_year?: number;
-        requested_by?: string;
-        limit?: number;
-    }) => api.get('/budget-control/authorizations', { params }),
-    getPendingAuthorizations: (params?: { fiscal_year?: number; limit?: number }) =>
-        api.get('/budget-control/authorizations/pending', { params }),
-    createAuthorization: (data: {
-        request_type?: string;
-        department_code?: string;
-        budget_estimate_id?: string;
-        fund_source_id?: string;
-        fiscal_year?: number;
-        requested_amount: number;
-        purpose: string;
-        justification?: string;
-        supporting_docs?: string[];
-        voucher_id?: string;
-        doc_no?: string;
-    }) => api.post('/budget-control/authorizations', data),
-    approveAuthorization: (id: string, data?: { approved_amount?: number; approval_notes?: string }) =>
-        api.post(`/budget-control/authorizations/${id}/approve`, data),
-    rejectAuthorization: (id: string, data: { rejection_reason: string }) =>
-        api.post(`/budget-control/authorizations/${id}/reject`, data),
-
-    // Budget Transactions
-    getTransactions: (params?: {
-        budget_estimate_id?: string;
-        fund_source_id?: string;
-        transaction_type?: string;
-        fiscal_year?: number;
-        fiscal_period?: number;
-        from_date?: string;
-        to_date?: string;
-        limit?: number;
-    }) => api.get('/budget-control/transactions', { params }),
-    recordTransaction: (data: {
-        budget_estimate_id: string;
-        fund_source_id?: string;
-        transaction_type: string;
-        transaction_date?: string;
-        voucher_id?: string;
-        doc_no?: string;
-        description?: string;
-        amount: number;
-        authorization_id?: string;
-        fiscal_year?: number;
-        fiscal_period?: number;
-        department_code?: string;
-        project_code?: string;
-        account_code?: string;
-    }) => api.post('/budget-control/transactions', data),
-
-    // Budget Alerts
-    getAlerts: (params?: { fiscal_year?: number; severity?: string; limit?: number }) =>
-        api.get('/budget-control/alerts', { params }),
-    getAlertSummary: (params?: { fiscal_year?: number }) =>
-        api.get('/budget-control/alerts/summary', { params }),
-    acknowledgeAlert: (id: string, data?: { notes?: string }) =>
-        api.post(`/budget-control/alerts/${id}/acknowledge`, data),
-    resolveAlert: (id: string, data: { resolution_notes: string }) =>
-        api.post(`/budget-control/alerts/${id}/resolve`, data),
-
-    // Budget Reports
-    getUtilizationReport: (params?: { fiscal_year?: number; fund_source_id?: string; chapter_code?: string }) =>
-        api.get('/budget-control/report/utilization', { params }),
-    getVarianceReport: (params?: { fiscal_year?: number; chapter_code?: string }) =>
-        api.get('/budget-control/report/variance', { params }),
-    getDashboard: (params?: { fiscal_year?: number }) =>
-        api.get('/budget-control/dashboard', { params }),
-
-    // Workflow Rules
-    getWorkflowRules: (params?: { rule_type?: string; is_active?: number }) =>
-        api.get('/budget-control/workflow-rules', { params }),
-    updateWorkflowRule: (id: string, data: any) =>
-        api.put(`/budget-control/workflow-rules/${id}`, data),
-};
+// REMOVED: budgetControlService - DN không cần hệ thống ngân sách nội bộ HCSN
 
 export const bankService = {
     getAccounts: () => api.get('/bank/accounts'),
@@ -316,7 +204,7 @@ export const assetService = {
         api.post('/allocation-history', data),
     getAllocationSummary: () => api.get('/allocation-history/summary'),
 
-    // HCSN - Fixed Assets Extended
+    // Fixed Assets Extended
     getFixedAssets: (params?: any) => api.get('/assets/fixed', { params }),
     createFixedAsset: (data: any) => api.post('/assets/fixed', data),
     updateFixedAsset: (id: string, data: any) => api.put(`/assets/fixed/${id}`, data),
@@ -328,27 +216,27 @@ export const assetService = {
     transferAsset: (data: any) => api.post('/assets/fixed/transfer', data),
     revaluateAsset: (id: string, data: any) => api.put(`/assets/fixed/${id}/revaluation`, data),
 
-    // HCSN - Infrastructure Assets
+    // Infrastructure Assets
     getInfrastructure: () => api.get('/infrastructure-assets'),
     createInfrastructure: (data: any) => api.post('/infrastructure-assets', data),
     updateInfrastructure: (id: string, data: any) => api.put(`/infrastructure-assets/${id}`, data),
     recordMaintenance: (data: any) => api.post('/infrastructure/maintenance', data),
     updateCondition: (id: string, data: any) => api.put(`/infrastructure/${id}/condition`, data),
 
-    // HCSN - Long-term Investments
+    // Long-term Investments
     getInvestments: (params?: any) => api.get('/investments/long-term', { params }),
     createInvestment: (data: any) => api.post('/investments/long-term', data),
     updateInvestment: (id: string, data: any) => api.put(`/investments/long-term/${id}`, data),
     recordInvestmentIncome: (data: any) => api.post('/investments/income', data),
 
-    // HCSN - Inventory
+    // Inventory
     getInventoryRecords: (params?: any) => api.get('/assets/inventory', { params }),
     createInventory: (data: any) => api.post('/assets/inventory', data),
     addInventoryItem: (id: string, data: any) => api.post(`/assets/inventory/${id}/items`, data),
     completeInventory: (id: string, data: any) => api.put(`/assets/inventory/${id}/complete`, data),
     getInventoryReport: (id: string) => api.get(`/assets/inventory/${id}/report`),
 
-    // HCSN - Asset Cards
+    // Asset Cards
     getAssetCard: (id: string, params?: any) => api.get(`/assets/cards/${id}`, { params }),
     updateAssetCard: (id: string, data: any) => api.put(`/assets/cards/${id}`, data),
 };
@@ -359,22 +247,40 @@ export const budgetService = {
 };
 
 export const reportService = {
+    // === SỔ KẾ TOÁN (ACCOUNTING REGISTERS) ===
     getTrialBalance: (params: any) => api.get('/reports/trial-balance', { params }),
-    getCashBook: (params: any) => api.get('/reports/cash-book', { params }),
-    getInventorySummary: (params: any) => api.get('/reports/inventory', { params }),
-    getBalanceSheet: (params: any) => api.get('/reports/balance-sheet', { params }),
-    getPnL: (params: any) => api.get('/reports/pnl', { params }),
-    getCashFlow: (params: any) => api.get('/reports/cash-flow', { params }),
-    // NEW REPORTS
     getGeneralLedger: (params: any) => api.get('/reports/general-ledger', { params }),
     getGeneralJournal: (params: any) => api.get('/reports/general-journal', { params }),
+    getCashBook: (params: any) => api.get('/reports/cash-book', { params }),
     getBankBook: (params: any) => api.get('/reports/bank-book', { params }),
     getInventoryLedger: (params: any) => api.get('/reports/inventory-ledger', { params }),
+    getInventorySummary: (params: any) => api.get('/reports/inventory', { params }),
+    getTransactionDetails: (params: any) => api.get('/reports/transaction-details', { params }),
+
+    // === BÁO CÁO TÀI CHÍNH DOANH NGHIỆP (TT 99/2025) ===
+    getBalanceSheetDN: (params: any) => api.get('/reports/balance-sheet-dn', { params }),
+    getProfitLoss: (params: any) => api.get('/reports/profit-loss', { params }),
+    getCashFlowDN: (params: any) => api.get('/reports/cash-flow-dn', { params }),
+
+    // === BÁO CÁO NGÂN SÁCH NỘI BỘ ===
+    getBudgetPerformance: (params: any) => api.get('/reports/budget-performance', { params }),
+
+    // === DEPRECATED: HCSN Reports (Không dùng cho DN) ===
+    // Giữ lại để backward compatibility, sẽ xóa trong phiên bản sau
+    getBalanceSheetHCSN: (_params: any) => Promise.resolve({ data: [] }),
+    getActivityResult: (_params: any) => Promise.resolve({ data: [] }),
+    getCashFlow: (params: any) => api.get('/reports/cash-flow-dn', { params }), // Redirect to DN version
+    getBudgetSettlementRegular: (_params: any) => Promise.resolve({ data: [] }),
+    getBudgetSettlementNonRegular: (_params: any) => Promise.resolve({ data: [] }),
+    getBudgetSettlementCapex: (_params: any) => Promise.resolve({ data: [] }),
+    getFundSourceReport: (_params: any) => Promise.resolve({ data: [] }),
+    getInfrastructureReport: (_params: any) => Promise.resolve({ data: [] }),
+    getBalanceSheet: (params: any) => api.get('/reports/balance-sheet', { params }),
+    getPnL: (params: any) => api.get('/reports/pnl', { params }),
     getDebtLedger: (params: any) => api.get('/reports/debt-ledger', { params }),
     getVatIn: (params: any) => api.get('/reports/vat-in', { params }),
     getVatOut: (params: any) => api.get('/reports/vat-out', { params }),
     getProjectPnL: (params: any) => api.get('/reports/project-pnl', { params }),
-    getTransactionDetails: (params: any) => api.get('/reports/transaction-details', { params }),
 };
 
 export const hrService = {
@@ -382,7 +288,7 @@ export const hrService = {
     saveEmployee: (data: any) => api.post('/hr/employees', data),
     deleteEmployee: (id: string) => api.delete(`/employees/${id}`),
 
-    // HCSN New APIs
+    // Extended APIs
     getSalaryGrades: () => api.get('/hr/salary-grades'),
 
     // Allowance Types (Full CRUD)
@@ -406,6 +312,7 @@ export const hrService = {
 
     // Payroll & Timekeeping
     getTimekeeping: (params: { period: string }) => api.get('/hr/timekeeping', { params }),
+    saveTimekeeping: (data: any) => api.post('/hr/timekeeping', data),
     getPayroll: (params: { period: string }) => api.get('/hr/payroll', { params }),
     calculatePayroll: (data: { period: string }) => api.post('/hr/calculate-payroll', data),
 
@@ -430,8 +337,8 @@ export const salesService = {
 };
 
 // ========================================
-// REVENUE SERVICE - HCSN (TT 24/2024)
-// Quản lý Thu sự nghiệp
+// REVENUE SERVICE (TT 99/2025)
+// Quản lý Doanh thu
 // ========================================
 export const revenueService = {
     // Revenue Categories (Danh mục loại thu)
@@ -445,7 +352,7 @@ export const revenueService = {
     updateReceipt: (id: string, data: any) => api.put(`/revenue/receipts/${id}`, data),
     deleteReceipt: (id: string) => api.delete(`/revenue/receipts/${id}`),
 
-    // Revenue Reports (Báo cáo thu SN)
+    // Revenue Reports (Báo cáo Doanh thu)
     getReport: (params?: any) => api.get('/revenue/report', { params }),
     getBudgetComparison: (params: { fiscal_year: number }) => api.get('/revenue/budget-comparison', { params }),
 };
@@ -482,6 +389,13 @@ export const purchaseService = {
 export const inventoryService = {
     getReceipts: () => api.get('/inventory/receipts'),
     getIssues: () => api.get('/inventory/issues'),
+    // Materials (Vật tư) - Route vẫn dùng /hcsn/ cho backend compatibility
+    // TODO: Rename backend route từ /hcsn/materials → /inventory/materials
+    getMaterials: (params?: any) => api.get('/hcsn/materials', { params }),
+    createMaterial: (data: any) => api.post('/hcsn/materials', data),
+    updateMaterial: (id: string, data: any) => api.put(`/hcsn/materials/${id}`, data),
+    deleteMaterial: (id: string) => api.delete(`/hcsn/materials/${id}`),
+    importMaterials: (materials: any[]) => api.post('/hcsn/materials/import', { materials }),
 };
 
 export const contractService = {
@@ -546,16 +460,22 @@ export const reminderService = {
     getIncompleteDetail: () => api.get('/reminders/incomplete')
 };
 
+// DEPRECATED: hcsnService - Giữ lại cho backward compatibility với InventoryModule
+// TODO: Migrate InventoryModule to use new /inventory/ routes
 export const hcsnService = {
-    getFundSources: () => api.get('/hcsn/fund-sources'),
-    getBudgetEstimates: (params?: any) => api.get('/hcsn/budget-estimates', { params }),
-    getOffBalanceLogs: (params?: any) => api.get('/hcsn/off-balance/logs', { params }),
-    createOffBalanceLog: (data: any) => api.post('/hcsn/off-balance/logs', data),
-    getOffBalanceSummary: () => api.get('/hcsn/off-balance/summary'),
+    getFundSources: () => api.get('/master/departments'),
+    getBudgetEstimates: (params?: any) => api.get('/budget-control/budget-estimates', { params }),
+    getOffBalanceLogs: (_params?: any) => Promise.resolve({ data: [] }), // DN không dùng TK ngoài bảng
+    createOffBalanceLog: (_data: any) => Promise.resolve({ data: null }),
+    getOffBalanceSummary: () => Promise.resolve({ data: { balance: 0 } }),
+    // Bulk Import
+    importFundSources: (fundSources: any[]) => api.post('/master/departments/import', { departments: fundSources }),
+    importBudgetEstimates: (estimates: any[], fiscal_year?: number) =>
+        api.post('/budget-control/budget-estimates/import', { estimates, fiscal_year }),
 };
 
 // ========================================
-// DEBT MANAGEMENT SERVICE - HCSN (TT 24/2024)
+// DEBT MANAGEMENT SERVICE (TT 99/2025)
 // Quản lý Công nợ và Tạm ứng
 // ========================================
 export const debtService = {
@@ -565,7 +485,7 @@ export const debtService = {
     settleTemporaryAdvance: (id: string, data: any) => api.post(`/debt/temporary-advances/${id}/settle`, data),
     deleteTemporaryAdvance: (id: string) => api.delete(`/debt/temporary-advances/${id}`),
 
-    // Ứng trước NSNN (TK 161)
+    // Cho vay nội bộ (TK 128)
     getBudgetAdvances: (params?: any) => api.get('/debt/budget-advances', { params }),
     createBudgetAdvance: (data: any) => api.post('/debt/budget-advances', data),
     repayBudgetAdvance: (id: string, data: any) => api.post(`/debt/budget-advances/${id}/repay`, data),
@@ -587,18 +507,75 @@ export const debtService = {
     getAgingReport: (type: 'receivables' | 'payables') => api.get('/debt/aging-report', { params: { type } }),
 };
 
-export const treasuryService = {
-    testConnection: () => api.get('/treasury/connection-test'),
-    getBudgetAllocation: (params: { fiscalYear: string, budgetType: string }) => api.get('/treasury/budget/allocation', { params }),
-    getBudgetExecution: (params: { fiscalYear: string, fromDate: string, toDate: string }) => api.get('/treasury/budget/execution', { params }),
-    importTransactions: (params: { fromDate: string, toDate: string }) => api.get('/treasury/transactions/import', { params }),
-    saveImportedTransactions: (data: { fromDate: string, toDate: string }) => api.post('/treasury/transactions/import-save', data),
-    saveImportedData: (data: any[]) => api.post('/treasury/transactions/import-batch', { transactions: data }),
-    reconcile: (data: { fromDate: string, toDate: string }) => api.post('/treasury/reconciliation', data),
-    submitPaymentOrder: (data: any) => api.post('/treasury/payment-orders', data),
-    getPaymentOrderStatus: (id: string) => api.get(`/treasury/payment-orders/${id}/status`),
-    getReconciliationDetail: (fiscalMonth: string) => api.get('/treasury/reconciliation/detail', { params: { fiscalMonth } }),
-    handleReconciliationAction: (data: { itemId: string, action: string, note?: string }) => api.post('/treasury/reconciliation/action', data),
+// ========================================
+// E-INVOICE SERVICE - Hóa đơn điện tử
+// Integration: VNPT, Viettel, BKAV, MISA
+// ========================================
+export const einvoiceService = {
+    // Provider Management
+    getProviders: () => api.get('/einvoice/providers'),
+    getProviderConfig: (code: string) => api.get(`/einvoice/providers/${code}`),
+    saveProviderConfig: (code: string, config: any) => api.post(`/einvoice/providers/${code}/config`, config),
+    testConnection: (code: string) => api.post(`/einvoice/providers/${code}/test`),
+
+    // Invoice Sync
+    syncInvoices: (data: {
+        providerCode: string;
+        fromDate: string;
+        toDate: string;
+        filters?: any;
+    }) => api.post('/einvoice/sync', data),
+    getSyncLogs: (params?: { providerCode?: string; limit?: number }) =>
+        api.get('/einvoice/sync-logs', { params }),
+
+    // Invoice Management
+    getInvoices: (params?: {
+        status?: string;
+        invoiceType?: string;
+        fromDate?: string;
+        toDate?: string;
+        taxCode?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }) => api.get('/einvoice/invoices', { params }),
+    getInvoice: (id: string) => api.get(`/einvoice/invoices/${id}`),
+    updateInvoiceStatus: (id: string, status: string) =>
+        api.patch(`/einvoice/invoices/${id}/status`, { status }),
+
+    // Invoice Lookup (Real-time from provider)
+    lookupInvoice: (params: {
+        providerCode: string;
+        invoiceId?: string;
+        invoiceNo?: string;
+        invoiceSeries?: string;
+        taxCode?: string;
+        fromDate?: string;
+        toDate?: string;
+    }) => api.get('/einvoice/lookup', { params }),
+
+    // Voucher Matching
+    matchToVoucher: (invoiceId: string, data: { voucherId: number; matchType?: string }) =>
+        api.post(`/einvoice/match/${invoiceId}`, data),
+    getPotentialMatches: (invoiceId: string) =>
+        api.get(`/einvoice/invoices/${invoiceId}/potential-matches`),
+
+    // Voucher Creation from Invoice
+    getVoucherPreview: (invoiceId: string) =>
+        api.get(`/einvoice/import/${invoiceId}/preview`),
+    createVoucherFromInvoice: (invoiceId: string, options?: {
+        voucherType?: string;
+        expenseAccount?: string;
+        paymentAccount?: string;
+        revenueAccount?: string;
+        receivableAccount?: string;
+    }) => api.post(`/einvoice/import/${invoiceId}`, { options }),
+
+    // XML Import (GDT)
+    importFromXml: (xmlContent: string) =>
+        api.post('/einvoice/xml-import', { xmlContent }),
+    importBatchXml: (xmlContents: string[]) =>
+        api.post('/einvoice/xml-import/batch', { xmlContents }),
 };
 
 export const xmlExportService = {

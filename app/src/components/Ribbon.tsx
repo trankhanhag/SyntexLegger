@@ -1,4 +1,5 @@
 import React from 'react';
+import { triggerBrowserPrint } from '../hooks/usePrintHandler';
 
 export interface RibbonAction {
     label: string;
@@ -25,7 +26,7 @@ export const Ribbon: React.FC<RibbonProps> = ({ activeTab, onTabChange, onPrint,
 
     const handlePrint = () => {
         if (onPrint) onPrint();
-        else window.print();
+        else triggerBrowserPrint();
     };
 
     const handleSave = () => {
@@ -111,10 +112,10 @@ export const Ribbon: React.FC<RibbonProps> = ({ activeTab, onTabChange, onPrint,
                     <p className="text-sm font-medium leading-normal">Thuế</p>
                 </button>
                 <button onClick={() => onTabChange('revenue')} className={getTabClass('revenue')}>
-                    <p className="text-sm font-medium leading-normal">Thu sự nghiệp</p>
+                    <p className="text-sm font-medium leading-normal">Doanh thu</p>
                 </button>
                 <button onClick={() => onTabChange('expense')} className={getTabClass('expense')}>
-                    <p className="text-sm font-medium leading-normal">Mua sắm & Chi</p>
+                    <p className="text-sm font-medium leading-normal">Chi phí</p>
                 </button>
                 <button onClick={() => onTabChange('inventory')} className={getTabClass('inventory')}>
                     <p className="text-sm font-medium leading-normal">Kho</p>
@@ -140,9 +141,6 @@ export const Ribbon: React.FC<RibbonProps> = ({ activeTab, onTabChange, onPrint,
                 </button>
                 <button onClick={() => onTabChange('system')} className={getTabClass('system')}>
                     <p className="text-sm font-medium leading-normal">Hệ thống</p>
-                </button>
-                <button onClick={() => onTabChange('treasury')} className={getTabClass('treasury')}>
-                    <p className="text-sm font-medium leading-normal">Kho bạc</p>
                 </button>
             </div>
 

@@ -1,6 +1,6 @@
 /**
  * Reconciliation Component
- * SyntexHCSN - Đối chiếu số liệu
+ * SyntexLegger - Đối chiếu số liệu
  *
  * Updated: Production-ready - No mock data, real API integration
  */

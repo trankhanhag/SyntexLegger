@@ -524,10 +524,12 @@ module.exports = (db) => {
     });
 
     router.post('/dimensions', verifyToken, (req, res) => {
-        const { code, name, type } = req.body;
-        db.run("INSERT INTO dimensions (code, name, type) VALUES (?, ?, ?)", [code, name, type], function (err) {
+        const { id, code, name, type, description } = req.body;
+        const dimId = id || `DIM${type}_${Date.now()}`;
+        const sql = `INSERT OR REPLACE INTO dimensions (id, code, name, type, description) VALUES (?, ?, ?, ?, ?)`;
+        db.run(sql, [dimId, code, name, type, description], function (err) {
             if (err) return res.status(500).json({ error: err.message });
-            res.json({ id: this.lastID });
+            res.json({ id: dimId });
         });
     });
 

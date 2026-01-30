@@ -1,6 +1,6 @@
 /**
  * Audit Trail Module
- * SyntexHCSN - Hệ thống Dấu vết Kiểm toán theo TT 24/2024/TT-BTC
+ * SyntexLegger - Hệ thống Dấu vết Kiểm toán
  *
  * Provides UI for:
  * - Viewing audit trail history
@@ -9,10 +9,13 @@
  * - Audit statistics dashboard
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { auditService } from '../api';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { SmartTable } from './SmartTable';
+import type { ColumnDef } from './SmartTable';
+import { FormModal, FormSection, FormGrid, FormField, FormButton, FormActions } from './FormModal';
 
 // Types
 interface AuditEntry {
@@ -298,9 +301,189 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
         }
     };
 
+    // SmartTable columns for Audit Trail
+    const auditColumns: ColumnDef[] = useMemo(() => [
+        {
+            field: 'created_at',
+            headerName: 'Thời gian',
+            width: '150px',
+            renderCell: (value: string) => (
+                <span className="text-sm text-gray-500">{new Date(value).toLocaleString('vi-VN')}</span>
+            )
+        },
+        {
+            field: 'entity_type',
+            headerName: 'Loại',
+            width: '100px',
+            renderCell: (value: string) => (
+                <span className="px-2 py-1 bg-gray-100 dark:bg-slate-700 rounded text-xs">{value}</span>
+            )
+        },
+        {
+            field: 'action',
+            headerName: 'Hành động',
+            width: '100px',
+            renderCell: (value: string) => (
+                <span className={`px-2 py-1 rounded text-xs ${value === 'DELETE' ? 'bg-red-100 text-red-800' :
+                    value === 'CREATE' ? 'bg-green-100 text-green-800' :
+                        value === 'APPROVE' ? 'bg-blue-100 text-blue-800' :
+                            'bg-yellow-100 text-yellow-800'
+                    }`}>
+                    {value}
+                </span>
+            )
+        },
+        {
+            field: 'doc_no',
+            headerName: 'Số CT',
+            width: '100px',
+            renderCell: (value: string | null) => (
+                <span className="text-sm font-mono">{value || '-'}</span>
+            )
+        },
+        {
+            field: 'username',
+            headerName: 'Người dùng',
+            width: '120px'
+        },
+        {
+            field: 'amount',
+            headerName: 'Số tiền',
+            width: '110px',
+            align: 'right',
+            renderCell: (value: number | null) => (
+                <span className="text-sm">{value ? value.toLocaleString('vi-VN') : '-'}</span>
+            )
+        },
+        {
+            field: 'changed_fields',
+            headerName: 'Thay đổi',
+            width: '150px',
+            renderCell: (value: string[]) => (
+                <span className="text-sm text-gray-500">
+                    {Array.isArray(value) ? value.slice(0, 3).join(', ') : ''}
+                    {Array.isArray(value) && value.length > 3 && '...'}
+                </span>
+            )
+        },
+        {
+            field: 'actions',
+            headerName: 'Chi tiết',
+            width: '80px',
+            align: 'center',
+            type: 'actions',
+            renderCell: (_value: any, row: AuditEntry) => (
+                <button
+                    onClick={() => setSelectedEntry(row)}
+                    className="text-blue-600 hover:text-blue-800"
+                >
+                    <span className="material-symbols-outlined text-lg">visibility</span>
+                </button>
+            )
+        }
+    ], []);
+
+    // SmartTable columns for Reconciliation
+    const reconColumns: ColumnDef[] = useMemo(() => [
+        {
+            field: 'created_at',
+            headerName: 'Ngày tạo',
+            width: '110px',
+            renderCell: (value: string) => (
+                <span className="text-sm text-gray-500">{new Date(value || new Date()).toLocaleDateString('vi-VN')}</span>
+            )
+        },
+        {
+            field: 'recon_type',
+            headerName: 'Loại',
+            width: '90px',
+            renderCell: (value: string) => (
+                <span className="text-sm font-medium">{value}</span>
+            )
+        },
+        {
+            field: 'fiscal_period',
+            headerName: 'Kỳ/Năm',
+            width: '100px',
+            renderCell: (value: number, row: any) => (
+                <span className="text-sm text-gray-500">T{value}/{row.fiscal_year}</span>
+            )
+        },
+        {
+            field: 'account_code',
+            headerName: 'Tài khoản',
+            width: '100px',
+            renderCell: (value: string) => (
+                <span className="text-sm font-mono">{value}</span>
+            )
+        },
+        {
+            field: 'book_balance',
+            headerName: 'Số dư sổ sách',
+            width: '130px',
+            align: 'right',
+            renderCell: (value: number) => (
+                <span className="text-sm">{value?.toLocaleString('vi-VN')}</span>
+            )
+        },
+        {
+            field: 'external_balance',
+            headerName: 'Số dư thực tế',
+            width: '130px',
+            align: 'right',
+            renderCell: (value: number) => (
+                <span className="text-sm">{value?.toLocaleString('vi-VN')}</span>
+            )
+        },
+        {
+            field: 'difference',
+            headerName: 'Chênh lệch',
+            width: '110px',
+            align: 'right',
+            renderCell: (value: number) => (
+                <span className={`text-sm font-bold ${value !== 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {value?.toLocaleString('vi-VN')}
+                </span>
+            )
+        },
+        {
+            field: 'status',
+            headerName: 'Trạng thái',
+            width: '100px',
+            align: 'center',
+            renderCell: (value: string) => (
+                <span className={`px-2 py-1 rounded text-xs ${value === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                    value === 'DRAFT' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                    {value}
+                </span>
+            )
+        },
+        {
+            field: 'actions',
+            headerName: 'Thao tác',
+            width: '100px',
+            align: 'center',
+            type: 'actions',
+            renderCell: (_value: any, row: any) => {
+                if (row.status !== 'APPROVED') {
+                    return (
+                        <button
+                            onClick={() => handleApproveRecon(row.id)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                        >
+                            Phê duyệt
+                        </button>
+                    );
+                }
+                return null;
+            }
+        }
+    ], []);
+
     // Render tabs
     const renderTabs = () => (
-        <div className="flex border-b border-gray-200 mb-4">
+        <div className="flex border-b border-gray-200 dark:border-slate-700">
             {[
                 { key: 'trail', label: 'Dấu vết Kiểm toán', icon: 'history' },
                 { key: 'anomalies', label: 'Bất thường', icon: 'warning' },
@@ -326,7 +509,7 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
     const renderAuditTrail = () => (
         <div>
             {/* Filters */}
-            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <div className="bg-gray-50 dark:bg-slate-800 p-4 border-b border-slate-200 dark:border-slate-700">
                 <div className="grid grid-cols-6 gap-4">
                     <select
                         value={filters.entity_type}
@@ -399,65 +582,20 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thời gian</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hành động</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số CT</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người dùng</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thay đổi</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Chi tiết</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {auditEntries.map((entry) => (
-                            <tr key={entry.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 text-sm text-gray-500">
-                                    {new Date(entry.created_at).toLocaleString('vi-VN')}
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                                        {entry.entity_type}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 text-sm">
-                                    <span className={`px-2 py-1 rounded text-xs ${entry.action === 'DELETE' ? 'bg-red-100 text-red-800' :
-                                        entry.action === 'CREATE' ? 'bg-green-100 text-green-800' :
-                                            entry.action === 'APPROVE' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                        {entry.action}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono">{entry.doc_no || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{entry.username}</td>
-                                <td className="px-4 py-3 text-sm text-right">
-                                    {entry.amount ? entry.amount.toLocaleString('vi-VN') : '-'}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-500">
-                                    {entry.changed_fields?.slice(0, 3).join(', ')}
-                                    {entry.changed_fields?.length > 3 && '...'}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                    <button
-                                        onClick={() => setSelectedEntry(entry)}
-                                        className="text-blue-600 hover:text-blue-800"
-                                    >
-                                        <span className="material-symbols-outlined text-lg">visibility</span>
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {auditEntries.length === 0 && !loading && (
+            {auditEntries.length === 0 && !loading ? (
                 <p className="text-center text-gray-500 py-8">Không có dữ liệu</p>
+            ) : (
+                <SmartTable
+                    columns={auditColumns}
+                    data={auditEntries}
+                    keyField="id"
+                    readOnly={true}
+                    showFormulaBar={false}
+                    showStatusBar={false}
+                    showRowNumbers={false}
+                    stickyHeader={true}
+                    bordered={false}
+                />
             )}
         </div>
     );
@@ -681,8 +819,8 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
     // Render reconciliation tab
     const renderReconciliation = () => (
         <div>
-            <div className="bg-gray-50 p-4 rounded-lg mb-4 flex justify-between items-center">
-                <h3 className="font-medium text-gray-700">Danh sách Biên bản Đối chiếu</h3>
+            <div className="bg-gray-50 dark:bg-slate-800 p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 className="font-medium text-gray-700 dark:text-gray-300">Danh sách Biên bản Đối chiếu</h3>
                 <button
                     onClick={() => setShowReconModal(true)}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 flex items-center gap-2"
@@ -692,133 +830,97 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
                 </button>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày tạo</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kỳ/Năm</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tài khoản</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư sổ sách</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số dư thực tế</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Chênh lệch</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {reconciliations.map((recon) => (
-                            <tr key={recon.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 text-sm text-gray-500">
-                                    {new Date(recon.created_at || new Date()).toLocaleDateString('vi-VN')}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium">{recon.recon_type}</td>
-                                <td className="px-4 py-3 text-sm text-gray-500">
-                                    T{recon.fiscal_period}/{recon.fiscal_year}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono">{recon.account_code}</td>
-                                <td className="px-4 py-3 text-sm text-right">{recon.book_balance?.toLocaleString('vi-VN')}</td>
-                                <td className="px-4 py-3 text-sm text-right">{recon.external_balance?.toLocaleString('vi-VN')}</td>
-                                <td className={`px-4 py-3 text-sm text-right font-bold ${recon.difference !== 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    {recon.difference?.toLocaleString('vi-VN')}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                    <span className={`px-2 py-1 rounded text-xs ${recon.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                                        recon.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'
-                                        }`}>
-                                        {recon.status}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                    {recon.status !== 'APPROVED' && (
-                                        <button
-                                            onClick={() => handleApproveRecon(recon.id)}
-                                            className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                                        >
-                                            Phê duyệt
-                                        </button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {reconciliations.length === 0 && !loading && (
-                    <p className="text-center text-gray-500 py-8">Chưa có biên bản đối chiếu nào</p>
-                )}
-            </div>
+            {reconciliations.length === 0 && !loading ? (
+                <p className="text-center text-gray-500 py-8">Chưa có biên bản đối chiếu nào</p>
+            ) : (
+                <SmartTable
+                    columns={reconColumns}
+                    data={reconciliations}
+                    keyField="id"
+                    readOnly={true}
+                    showFormulaBar={false}
+                    showStatusBar={false}
+                    showRowNumbers={false}
+                    stickyHeader={true}
+                    bordered={false}
+                />
+            )}
 
             {/* Create Recon Modal */}
             {showReconModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-                        <h3 className="text-lg font-bold mb-4">Tạo biên bản đối chiếu mới</h3>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Loại đối chiếu</label>
-                                <select
-                                    className="w-full border rounded px-3 py-2"
-                                    value={newRecon.recon_type}
-                                    onChange={e => setNewRecon({ ...newRecon, recon_type: e.target.value })}
-                                >
-                                    <option value="BANK">Ngân hàng (Sổ phụ)</option>
-                                    <option value="TREASURY">Kho bạc (Giao dịch)</option>
-                                    <option value="INVENTORY">Kiểm kê kho</option>
-                                    <option value="ASSET">Kiểm kê tài sản</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Kỳ</label>
-                                    <input type="number" className="w-full border rounded px-3 py-2"
-                                        value={newRecon.fiscal_period}
-                                        onChange={e => setNewRecon({ ...newRecon, fiscal_period: parseInt(e.target.value) })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Năm</label>
-                                    <input type="number" className="w-full border rounded px-3 py-2"
-                                        value={newRecon.fiscal_year}
-                                        onChange={e => setNewRecon({ ...newRecon, fiscal_year: parseInt(e.target.value) })}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Tài khoản</label>
-                                <input type="text" className="w-full border rounded px-3 py-2"
-                                    value={newRecon.account_code}
-                                    onChange={e => setNewRecon({ ...newRecon, account_code: e.target.value })}
+                <FormModal
+                    title="Tạo biên bản đối chiếu mới"
+                    icon="compare_arrows"
+                    size="sm"
+                    headerVariant="minimal"
+                    onClose={() => setShowReconModal(false)}
+                    footer={
+                        <FormActions>
+                            <FormButton variant="secondary" onClick={() => setShowReconModal(false)}>Hủy</FormButton>
+                            <FormButton variant="primary" icon="save" onClick={handleCreateRecon}>Lưu</FormButton>
+                        </FormActions>
+                    }
+                >
+                    <div className="space-y-3">
+                        <FormField label="Loại đối chiếu">
+                            <select
+                                className="form-select"
+                                value={newRecon.recon_type}
+                                onChange={e => setNewRecon({ ...newRecon, recon_type: e.target.value })}
+                            >
+                                <option value="BANK">Ngân hàng (Sổ phụ)</option>
+                                <option value="INVENTORY">Kiểm kê kho</option>
+                                <option value="ASSET">Kiểm kê tài sản</option>
+                                <option value="RECEIVABLE">Công nợ phải thu</option>
+                                <option value="PAYABLE">Công nợ phải trả</option>
+                            </select>
+                        </FormField>
+
+                        <FormGrid cols={2}>
+                            <FormField label="Kỳ">
+                                <input type="number" className="form-input"
+                                    value={newRecon.fiscal_period}
+                                    onChange={e => setNewRecon({ ...newRecon, fiscal_period: parseInt(e.target.value) })}
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Số dư sổ sách (System)</label>
-                                <input type="number" className="w-full border rounded px-3 py-2"
+                            </FormField>
+                            <FormField label="Năm">
+                                <input type="number" className="form-input"
+                                    value={newRecon.fiscal_year}
+                                    onChange={e => setNewRecon({ ...newRecon, fiscal_year: parseInt(e.target.value) })}
+                                />
+                            </FormField>
+                        </FormGrid>
+
+                        <FormField label="Tài khoản">
+                            <input type="text" className="form-input"
+                                value={newRecon.account_code}
+                                onChange={e => setNewRecon({ ...newRecon, account_code: e.target.value })}
+                            />
+                        </FormField>
+
+                        <FormGrid cols={2}>
+                            <FormField label="Số dư sổ sách (System)">
+                                <input type="number" className="form-input"
                                     value={newRecon.book_balance}
                                     onChange={e => setNewRecon({ ...newRecon, book_balance: parseFloat(e.target.value) })}
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Số dư thực tế (External)</label>
-                                <input type="number" className="w-full border rounded px-3 py-2"
+                            </FormField>
+                            <FormField label="Số dư thực tế (External)">
+                                <input type="number" className="form-input"
                                     value={newRecon.external_balance}
                                     onChange={e => setNewRecon({ ...newRecon, external_balance: parseFloat(e.target.value) })}
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Ghi chú</label>
-                                <textarea className="w-full border rounded px-3 py-2" rows={2}
-                                    value={newRecon.notes}
-                                    onChange={e => setNewRecon({ ...newRecon, notes: e.target.value })}
-                                ></textarea>
-                            </div>
-                        </div>
-                        <div className="mt-6 flex justify-end gap-2">
-                            <button onClick={() => setShowReconModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Hủy</button>
-                            <button onClick={handleCreateRecon} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Lưu</button>
-                        </div>
+                            </FormField>
+                        </FormGrid>
+
+                        <FormField label="Ghi chú">
+                            <textarea className="form-textarea" rows={2}
+                                value={newRecon.notes}
+                                onChange={e => setNewRecon({ ...newRecon, notes: e.target.value })}
+                            ></textarea>
+                        </FormField>
                     </div>
-                </div>
+                </FormModal>
             )}
         </div>
     );
@@ -828,83 +930,78 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
         if (!selectedEntry) return null;
 
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <div className="p-4 border-b flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Chi tiết Dấu vết Kiểm toán</h3>
-                        <button onClick={() => setSelectedEntry(null)} className="text-gray-500 hover:text-gray-700">
-                            <span className="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
+            <FormModal
+                title="Chi tiết Dấu vết Kiểm toán"
+                icon="history_edu"
+                size="lg"
+                headerVariant="minimal"
+                onClose={() => setSelectedEntry(null)}
+            >
+                <div className="space-y-4">
+                    <FormGrid cols={2} gap="sm">
+                        <div>
+                            <label className="form-label">ID</label>
+                            <p className="font-mono text-sm">{selectedEntry.id}</p>
+                        </div>
+                        <div>
+                            <label className="form-label">Thời gian</label>
+                            <p className="text-sm">{new Date(selectedEntry.created_at).toLocaleString('vi-VN')}</p>
+                        </div>
+                        <div>
+                            <label className="form-label">Loại</label>
+                            <p className="text-sm">{selectedEntry.entity_type}</p>
+                        </div>
+                        <div>
+                            <label className="form-label">Hành động</label>
+                            <p className="text-sm">{selectedEntry.action}</p>
+                        </div>
+                        <div>
+                            <label className="form-label">Người dùng</label>
+                            <p className="text-sm">{selectedEntry.username} ({selectedEntry.user_role})</p>
+                        </div>
+                        <div>
+                            <label className="form-label">IP</label>
+                            <p className="text-sm font-mono">{selectedEntry.ip_address || '-'}</p>
+                        </div>
+                    </FormGrid>
 
-                    <div className="p-4 space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs text-gray-500">ID</label>
-                                <p className="font-mono text-sm">{selectedEntry.id}</p>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">Thời gian</label>
-                                <p className="text-sm">{new Date(selectedEntry.created_at).toLocaleString('vi-VN')}</p>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">Loại</label>
-                                <p className="text-sm">{selectedEntry.entity_type}</p>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">Hành động</label>
-                                <p className="text-sm">{selectedEntry.action}</p>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">Người dùng</label>
-                                <p className="text-sm">{selectedEntry.username} ({selectedEntry.user_role})</p>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">IP</label>
-                                <p className="text-sm font-mono">{selectedEntry.ip_address || '-'}</p>
+                    {selectedEntry.changed_fields?.length > 0 && (
+                        <div>
+                            <label className="form-label">Trường thay đổi</label>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                                {selectedEntry.changed_fields.map((field, i) => (
+                                    <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded text-xs">
+                                        {field}
+                                    </span>
+                                ))}
                             </div>
                         </div>
+                    )}
 
-                        {selectedEntry.changed_fields?.length > 0 && (
-                            <div>
-                                <label className="text-xs text-gray-500">Trường thay đổi</label>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                    {selectedEntry.changed_fields.map((field, i) => (
-                                        <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
-                                            {field}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                    {selectedEntry.old_values && (
+                        <FormSection title="Giá trị cũ" variant="highlight" color="red">
+                            <pre className="p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs overflow-x-auto max-h-40">
+                                {JSON.stringify(selectedEntry.old_values, null, 2)}
+                            </pre>
+                        </FormSection>
+                    )}
 
-                        {selectedEntry.old_values && (
-                            <div>
-                                <label className="text-xs text-gray-500">Giá trị cũ</label>
-                                <pre className="mt-1 p-2 bg-red-50 rounded text-xs overflow-x-auto max-h-40">
-                                    {JSON.stringify(selectedEntry.old_values, null, 2)}
-                                </pre>
-                            </div>
-                        )}
+                    {selectedEntry.new_values && (
+                        <FormSection title="Giá trị mới" variant="highlight" color="green">
+                            <pre className="p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs overflow-x-auto max-h-40">
+                                {JSON.stringify(selectedEntry.new_values, null, 2)}
+                            </pre>
+                        </FormSection>
+                    )}
 
-                        {selectedEntry.new_values && (
-                            <div>
-                                <label className="text-xs text-gray-500">Giá trị mới</label>
-                                <pre className="mt-1 p-2 bg-green-50 rounded text-xs overflow-x-auto max-h-40">
-                                    {JSON.stringify(selectedEntry.new_values, null, 2)}
-                                </pre>
-                            </div>
-                        )}
-
-                        {selectedEntry.reason && (
-                            <div>
-                                <label className="text-xs text-gray-500">Lý do</label>
-                                <p className="text-sm">{selectedEntry.reason}</p>
-                            </div>
-                        )}
-                    </div>
+                    {selectedEntry.reason && (
+                        <div>
+                            <label className="form-label">Lý do</label>
+                            <p className="text-sm">{selectedEntry.reason}</p>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </FormModal>
         );
     };
 
@@ -913,57 +1010,55 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
         if (!selectedAnomaly) return null;
 
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                    <div className="p-4 border-b flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Xử lý Bất thường</h3>
-                        <button onClick={() => { setSelectedAnomaly(null); setResolveNotes(''); }} className="text-gray-500 hover:text-gray-700">
-                            <span className="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
+            <FormModal
+                title="Xử lý Bất thường"
+                icon="warning"
+                size="sm"
+                headerVariant="minimal"
+                onClose={() => { setSelectedAnomaly(null); setResolveNotes(''); }}
+                footer={
+                    <FormActions>
+                        <FormButton
+                            variant="secondary"
+                            onClick={() => handleResolveAnomaly(selectedAnomaly, 'acknowledge')}
+                        >
+                            Ghi nhận
+                        </FormButton>
+                        <FormButton
+                            variant="secondary"
+                            onClick={() => handleResolveAnomaly(selectedAnomaly, 'false_positive')}
+                        >
+                            Cảnh báo sai
+                        </FormButton>
+                        <FormButton
+                            variant="success"
+                            icon="check_circle"
+                            onClick={() => handleResolveAnomaly(selectedAnomaly, 'resolve')}
+                        >
+                            Giải quyết
+                        </FormButton>
+                    </FormActions>
+                }
+            >
+                <div className="space-y-4">
+                    <FormSection variant="card" color="amber">
+                        <p className="font-medium text-sm text-slate-800 dark:text-white">{selectedAnomaly.description}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            {selectedAnomaly.anomaly_type} - {selectedAnomaly.severity}
+                        </p>
+                    </FormSection>
 
-                    <div className="p-4 space-y-4">
-                        <div className="bg-gray-50 p-3 rounded">
-                            <p className="font-medium text-sm">{selectedAnomaly.description}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                                {selectedAnomaly.anomaly_type} - {selectedAnomaly.severity}
-                            </p>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú xử lý</label>
-                            <textarea
-                                value={resolveNotes}
-                                onChange={(e) => setResolveNotes(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-md text-sm"
-                                rows={3}
-                                placeholder="Nhập ghi chú giải quyết..."
-                            />
-                        </div>
-
-                        <div className="flex gap-2 justify-end">
-                            <button
-                                onClick={() => handleResolveAnomaly(selectedAnomaly, 'acknowledge')}
-                                className="px-4 py-2 bg-yellow-600 text-white rounded-md text-sm hover:bg-yellow-700"
-                            >
-                                Ghi nhận
-                            </button>
-                            <button
-                                onClick={() => handleResolveAnomaly(selectedAnomaly, 'false_positive')}
-                                className="px-4 py-2 bg-gray-600 text-white rounded-md text-sm hover:bg-gray-700"
-                            >
-                                Cảnh báo sai
-                            </button>
-                            <button
-                                onClick={() => handleResolveAnomaly(selectedAnomaly, 'resolve')}
-                                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
-                            >
-                                Giải quyết
-                            </button>
-                        </div>
-                    </div>
+                    <FormField label="Ghi chú xử lý">
+                        <textarea
+                            value={resolveNotes}
+                            onChange={(e) => setResolveNotes(e.target.value)}
+                            className="form-textarea"
+                            rows={3}
+                            placeholder="Nhập ghi chú giải quyết..."
+                        />
+                    </FormField>
                 </div>
-            </div>
+            </FormModal>
         );
     };
 
@@ -988,31 +1083,35 @@ export const AuditTrailModule: React.FC<AuditTrailModuleProps> = ({ onSetHeader 
     }
 
     return (
-        <div className="p-4">
-            <div className="mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">Dấu vết Kiểm toán</h2>
-                <p className="text-sm text-gray-500">Quản lý và theo dõi lịch sử thay đổi theo TT 24/2024/TT-BTC</p>
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
+            <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0">
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Dấu vết Kiểm toán</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Quản lý và theo dõi lịch sử thay đổi</p>
             </div>
 
             {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                <div className="mx-4 mt-2 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
                     {error}
                 </div>
             )}
 
             {loading && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm flex items-center gap-2">
+                <div className="mx-4 mt-2 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm flex items-center gap-2">
                     <span className="material-symbols-outlined animate-spin">sync</span>
                     Đang tải...
                 </div>
             )}
 
-            {renderTabs()}
+            <div className="px-4 pt-2 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                {renderTabs()}
+            </div>
 
-            {activeTab === 'trail' && renderAuditTrail()}
-            {activeTab === 'anomalies' && renderAnomalies()}
-            {activeTab === 'reconciliation' && renderReconciliation()}
-            {activeTab === 'statistics' && renderStatistics()}
+            <div className="flex-1 overflow-auto">
+                {activeTab === 'trail' && renderAuditTrail()}
+                {activeTab === 'anomalies' && <div className="p-4">{renderAnomalies()}</div>}
+                {activeTab === 'reconciliation' && renderReconciliation()}
+                {activeTab === 'statistics' && <div className="p-4">{renderStatistics()}</div>}
+            </div>
 
             {renderEntryModal()}
             {renderAnomalyModal()}

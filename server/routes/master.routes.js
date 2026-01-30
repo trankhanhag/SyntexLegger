@@ -1,6 +1,6 @@
 /**
- * Master Data Routes (Accounts, Partners, Products)
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * Master Data Routes (Accounts, Partners, Products, Departments)
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
@@ -9,6 +9,118 @@ const { verifyToken, requireRole, sanitizeBody, sanitizeQuery, validatePartner, 
 
 module.exports = (db) => {
     const router = express.Router();
+
+    // ========================================
+    // DEPARTMENTS (Bộ phận/Chi nhánh)
+    // ========================================
+
+    // Ensure departments table exists
+    db.run(`CREATE TABLE IF NOT EXISTS departments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        parent_code TEXT,
+        type TEXT DEFAULT 'DEPARTMENT',
+        manager TEXT,
+        cost_center TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    /**
+     * GET /api/master/departments
+     * Get all departments/branches
+     */
+    router.get('/master/departments', verifyToken, (req, res) => {
+        const sql = `SELECT id, code, name, parent_code, type, manager, cost_center, is_active
+                     FROM departments
+                     WHERE is_active = 1
+                     ORDER BY code ASC`;
+        db.all(sql, [], (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows || []);
+        });
+    });
+
+    /**
+     * POST /api/master/departments
+     * Create or update a department
+     */
+    router.post('/master/departments', sanitizeBody, verifyToken, (req, res) => {
+        const { code, name, parent_code, type, manager, cost_center } = req.body;
+        if (!code || !name) {
+            return res.status(400).json({ error: "Mã và tên bộ phận là bắt buộc" });
+        }
+
+        db.get("SELECT id FROM departments WHERE code = ?", [code], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            if (row) {
+                // Update existing
+                const sql = `UPDATE departments SET name=?, parent_code=?, type=?, manager=?, cost_center=?, updated_at=datetime('now') WHERE code=?`;
+                db.run(sql, [name, parent_code, type || 'DEPARTMENT', manager, cost_center, code], function(updateErr) {
+                    if (updateErr) return res.status(500).json({ error: updateErr.message });
+                    res.json({ message: "Cập nhật bộ phận thành công", id: row.id });
+                });
+            } else {
+                // Insert new
+                const sql = `INSERT INTO departments (code, name, parent_code, type, manager, cost_center) VALUES (?, ?, ?, ?, ?, ?)`;
+                db.run(sql, [code, name, parent_code, type || 'DEPARTMENT', manager, cost_center], function(insertErr) {
+                    if (insertErr) return res.status(500).json({ error: insertErr.message });
+                    res.json({ message: "Tạo bộ phận thành công", id: this.lastID });
+                });
+            }
+        });
+    });
+
+    /**
+     * POST /api/master/departments/import
+     * Bulk import departments
+     */
+    router.post('/master/departments/import', sanitizeBody, verifyToken, (req, res) => {
+        const { departments } = req.body;
+        if (!departments || !Array.isArray(departments)) {
+            return res.status(400).json({ error: "Dữ liệu không hợp lệ" });
+        }
+
+        let inserted = 0, updated = 0, errors = [];
+
+        db.serialize(() => {
+            const stmt = db.prepare(`INSERT OR REPLACE INTO departments (code, name, parent_code, type, manager, cost_center, is_active, updated_at)
+                                     VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))`);
+
+            departments.forEach((d, idx) => {
+                if (!d.code || !d.name) {
+                    errors.push({ row: idx + 1, error: "Thiếu mã hoặc tên" });
+                    return;
+                }
+                stmt.run([d.code, d.name, d.parent_code, d.type || 'DEPARTMENT', d.manager, d.cost_center], function(err) {
+                    if (err) errors.push({ row: idx + 1, error: err.message });
+                    else if (this.changes > 0) updated++;
+                    else inserted++;
+                });
+            });
+
+            stmt.finalize((err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ message: "Import thành công", inserted, updated, errors: errors.length > 0 ? errors : undefined });
+            });
+        });
+    });
+
+    /**
+     * DELETE /api/master/departments/:code
+     * Delete a department (soft delete)
+     */
+    router.delete('/master/departments/:code', verifyToken, (req, res) => {
+        const { code } = req.params;
+        db.run("UPDATE departments SET is_active = 0, updated_at = datetime('now') WHERE code = ?", [code], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            if (this.changes === 0) return res.status(404).json({ error: "Không tìm thấy bộ phận" });
+            res.json({ message: "Đã xóa bộ phận", code });
+        });
+    });
 
     // ========================================
     // CHART OF ACCOUNTS

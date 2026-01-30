@@ -1,6 +1,6 @@
 /**
  * Routes Index - Export all routes
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const authRoutes = require('./auth.routes');
@@ -15,9 +15,9 @@ const commercialRoutes = require('./commercial.routes');
 const revenueRoutes = require('./revenue.routes');
 const expenseRoutes = require('./expense.routes');
 const debtRoutes = require('./debt.routes');
-const hcsnRoutes = require('./hcsn.routes');
+// REMOVED: hcsnRoutes - HCSN-specific routes
 const voucherRoutes = require('./voucher.routes');
-const treasuryRoutes = require('./treasury.routes');
+// REMOVED: treasuryRoutes - HCSN-specific routes (Kho bạc Nhà nước)
 const auditRoutes = require('./audit.routes');
 const checklistRoutes = require('./checklist.routes');
 const xmlExportRoutes = require('./xml-export.routes');
@@ -25,6 +25,8 @@ const openingBalanceRoutes = require('./opening-balance.routes');
 const budgetControlRoutes = require('./budget-control.routes');
 const closingRoutes = require('./closing.routes');
 const customReportRoutes = require('./custom-report.routes');
+const einvoiceRoutes = require('./einvoice.routes');
+const bankRoutes = require('./bank.routes');
 
 /**
  * Register all routes with Express app
@@ -63,15 +65,15 @@ const registerRoutes = (app, db) => {
     app.use('/api', revenueRoutes(db));
     app.use('/api', expenseRoutes(db));
 
-    // Debt & Advance Routes (HCSN)
+    // Debt & Advance Routes
     app.use('/api', debtRoutes(db));
-    app.use('/api', hcsnRoutes(db));
+    // REMOVED: app.use('/api', hcsnRoutes(db)); - HCSN-specific
 
     // Voucher Routes (General Vouchers, Staging)
     app.use('/api', voucherRoutes(db));
 
-    // Treasury Routes (KBNN Integration)
-    app.use('/api/treasury', treasuryRoutes(db));
+    // REMOVED: Treasury Routes (KBNN Integration) - HCSN-specific
+    // app.use('/api/treasury', treasuryRoutes(db));
 
     // Audit Routes (Health Check)
     app.use('/api', auditRoutes(db));
@@ -97,7 +99,13 @@ const registerRoutes = (app, db) => {
     app.set('knex', knex); // Knex instance for new modules
     app.use('/api/reports/custom', customReportRoutes);
 
-    console.log('[ROUTES] Registered: auth, system, master, dashboard, allocation, asset, hr, report, commercial, voucher, treasury, audit, checklist, xml-export, opening-balance, budget-control, closing, custom-report');
+    // E-Invoice Integration Routes
+    app.use('/api/einvoice', einvoiceRoutes(db));
+
+    // Bank Routes
+    app.use('/api/bank', bankRoutes(db));
+
+    console.log('[ROUTES] Registered: auth, system, master, dashboard, allocation, asset, hr, report, commercial, voucher, audit, checklist, xml-export, opening-balance, budget-control, closing, custom-report, einvoice, bank');
 };
 
 module.exports = {
@@ -112,9 +120,10 @@ module.exports = {
     reportRoutes,
     commercialRoutes,
     voucherRoutes,
-    treasuryRoutes,
+    // REMOVED: treasuryRoutes - HCSN-specific
     auditRoutes,
     budgetControlRoutes,
     closingRoutes,
-    customReportRoutes
+    customReportRoutes,
+    einvoiceRoutes
 };

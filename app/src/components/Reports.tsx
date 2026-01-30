@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import api, { reportService, settingsService } from '../api';
 import { SmartTable, type ColumnDef } from './SmartTable';
@@ -8,9 +9,55 @@ import { DateInput } from './DateInput';
 import { formatDateVN, toInputDateValue } from '../utils/dateUtils';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
-import { type PaperSize, getPaperDimensions, getPaperSizeClass, PrintConfigControls, normalizePrintConfig } from './PrintTemplates';
-import { PrintPreviewShell } from './PrintPreviewShell';
+import { type PaperSize, getPaperSizeClass } from './PrintTemplates';
 import { CustomReportGenerator } from './CustomReportGenerator';
+import { GeneralVoucherForm } from './GeneralModule/GeneralVoucherForm';
+
+/**
+ * Get CSS @page rule for paper size - used for direct browser print
+ */
+const getPageSizeCSS = (size: PaperSize): string => {
+    switch (size) {
+        case 'A4-landscape':
+            return '@page { size: A4 landscape; margin: 0; }';
+        case 'A5':
+            return '@page { size: A5 portrait; margin: 0; }';
+        case 'A5-landscape':
+            return '@page { size: A5 landscape; margin: 0; }';
+        case 'A4':
+        default:
+            return '@page { size: A4 portrait; margin: 0; }';
+    }
+};
+
+/**
+ * Inject @page CSS and trigger browser print directly
+ */
+const triggerDirectPrint = (paperSize: PaperSize): void => {
+    // Create and inject dynamic style for @page
+    const styleId = 'dynamic-print-page-size';
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        document.head.appendChild(styleEl);
+    }
+
+    // Set the @page rule based on selected paper size
+    styleEl.textContent = `@media print { ${getPageSizeCSS(paperSize)} }`;
+
+    // Add class to body for print mode
+    document.body.classList.add('direct-print-mode');
+
+    // Trigger browser print
+    setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('direct-print-mode');
+        }, 500);
+    }, 100);
+};
 
 // Types for reports are now handled as any to allow flexibility with back-end schemas
 
@@ -24,53 +71,43 @@ interface ReportsProps {
 }
 
 const REPORT_NAMES: Record<string, string> = {
-    // === BÁO CÁO TÀI CHÍNH HCSN (TT 24/2024) ===
-    balance_sheet_hcsn: 'Bảng Cân đối Tài khoản Kế toán',  // Thay: Bảng Cân đối Kế toán DN
-    activity_result: 'Báo cáo Kết quả Hoạt động',           // Thay: Báo cáo KQKD DN
-    cash_flow: 'Báo cáo Lưu chuyển Tiền tệ',                // Giữ nguyên
+    // === BÁO CÁO TÀI CHÍNH DOANH NGHIỆP (TT 99/2025) ===
+    balance_sheet_dn: 'Bảng Cân đối Kế toán (B01-DN)',
+    profit_loss: 'Báo cáo Kết quả Kinh doanh (B02-DN)',
+    cash_flow_dn: 'Báo cáo Lưu chuyển Tiền tệ (B03-DN)',
+    notes_fs: 'Thuyết minh Báo cáo Tài chính (B09-DN)',
 
-    // === BÁO CÁO QUYẾT TOÁN HCSN (MỚI - TT 24/2024) ===
-    budget_settlement_regular: 'Quyết toán Kinh phí Hoạt động Thường xuyên',
-    budget_settlement_nonregular: 'Quyết toán Kinh phí Hoạt động Không thường xuyên',
-    budget_settlement_capex: 'Quyết toán Kinh phí Đầu tư XDCB',
-    budget_performance: 'Báo cáo Tình hình Thực hiện Dự toán',
+    // === BÁO CÁO PHÂN TÍCH ===
+    budget_performance: 'Báo cáo Thực hiện Kế hoạch/Ngân sách',
+    profitability_analysis: 'Phân tích Lợi nhuận',
+    cost_analysis: 'Phân tích Chi phí',
+    financial_analysis: 'Phân tích Tài chính',
 
-    // === BÁO CÁO QUẢN LÝ HCSN (MỚI - TT 24/2024) ===
-    fund_source_report: 'Báo cáo Quản lý và Sử dụng Kinh phí',
-    infrastructure_report: 'Báo cáo Tài sản Kết cấu Hạ tầng',
-
-    // === SỔ KẾ TOÁN (GIỮ NGUYÊN) ===
+    // === SỔ KẾ TOÁN ===
     trial_balance: 'Bảng Cân đối Tài khoản',
     ledger: 'Sổ Nhật ký chung',
     general_ledger: 'Sổ Cái',
     cash_book: 'Sổ Quỹ Tiền mặt',
     bank_book: 'Sổ Tiền gửi Ngân hàng',
-    inventory_summary: 'Tổng hợp Vật tư, Công cụ',
-    inventory_ledger: 'Sổ chi tiết Vật tư',
+    inventory_summary: 'Tổng hợp Hàng tồn kho',
+    inventory_ledger: 'Sổ chi tiết Hàng tồn kho',
+    debt_ledger: 'Sổ chi tiết Công nợ',
 
     // === BÁO CÁO KHÁC ===
-    transaction_details: 'Báo cáo Chi tiết Bút toán'
-
-    // === LOẠI BỎ: Báo cáo DN không áp dụng cho HCSN ===
-    // REMOVED: balance_sheet (DN)
-    // REMOVED: pnl (DN) 
-    // REMOVED: debt_ledger (DN - HCSN không theo dõi công nợ như DN)
-    // REMOVED: vat_in (HCSN không nộp VAT)
-    // REMOVED: vat_out (HCSN không nộp VAT)
-    // REMOVED: project_pnl (DN - HCSN dùng báo cáo dự toán thay thế)
-    // REMOVED: expense_dept (DN)
+    transaction_details: 'Báo cáo Chi tiết Bút toán',
+    custom_report: 'Báo cáo Tùy biến'
 };
 
-export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'balance_sheet_hcsn', printSignal = 0, exportSignal = 0, importSignal = 0, onSetHeader }) => {
+export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'balance_sheet_dn', printSignal = 0, exportSignal = 0, importSignal = 0, onSetHeader }) => {
     const [activeSubView, setActiveSubView] = useState(initialSubView);
     const [entries, setEntries] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showPrintPreview, setShowPrintPreview] = useState(false);
-    const [paperSize, setPaperSize] = useState<PaperSize>('A4');
-    const [companyInfo, setCompanyInfo] = useState({ name: 'TÊN ĐƠN VỊ', address: 'Địa chỉ đơn vị', maDVQHNS: '', taxCode: '' });
-    const [headTitle, setHeadTitle] = useState('Thủ trưởng đơn vị');
+    const [showVoucherModal, setShowVoucherModal] = useState(false);
+    const [editingVoucherId, setEditingVoucherId] = useState<string | undefined>(undefined);
+    const [paperSize] = useState<PaperSize>('A4');
+    const [companyInfo, setCompanyInfo] = useState({ name: 'TÊN DOANH NGHIỆP', address: 'Địa chỉ trụ sở', taxCode: '' });
+    const [headTitle, setHeadTitle] = useState('Giám đốc');
     const [signatures, setSignatures] = useState({ preparer: '', chiefAccountant: '', director: '' });
-    const [printConfig, setPrintConfig] = useState({ marginTop: 12, marginBottom: 12, marginLeft: 15, marginRight: 15, scale: 100 });
     const [filters, setFilters] = useState(() => {
         const now = new Date();
         return {
@@ -82,9 +119,17 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
         };
     });
 
+    // Refs to track handled signals (prevent duplicate handling on re-renders)
+    const lastHandledExportSignal = useRef(0);
+    const lastHandledPrintSignal = useRef(0);
+
     useEffect(() => {
-        if (printSignal > 0) setShowPrintPreview(true);
-    }, [printSignal]);
+        if (printSignal > 0 && printSignal !== lastHandledPrintSignal.current) {
+            lastHandledPrintSignal.current = printSignal;
+            // In trực tiếp qua browser print dialog, bỏ qua app preview
+            triggerDirectPrint(paperSize);
+        }
+    }, [printSignal, paperSize]);
 
     const getReportTitle = (viewId: string) => REPORT_NAMES[viewId] || 'Báo cáo';
 
@@ -93,12 +138,11 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
             .then(res => {
                 const s = res.data || {};
                 setCompanyInfo({
-                    name: s.company_name || 'TÊN ĐƠN VỊ',
-                    address: s.company_address || 'Địa chỉ đơn vị',
-                    maDVQHNS: s.madvqhns || s.ma_dvqhnS || '',
-                    taxCode: s.company_tax_code || s.tax_code || ''
+                    name: s.company_name || s.unit_name || 'TÊN DOANH NGHIỆP',
+                    address: s.company_address || s.unit_address || 'Địa chỉ trụ sở',
+                    taxCode: s.company_tax_code || s.tax_code || s.unit_tax_code || ''
                 });
-                setHeadTitle(s.head_title || s.unit_head_title || s.director_title || 'Thủ trưởng đơn vị');
+                setHeadTitle(s.head_title || s.unit_head_title || s.director_title || 'Giám đốc');
                 setSignatures(prev => ({
                     preparer: s.report_preparer || s.preparer_name || prev.preparer,
                     chiefAccountant: s.chief_accountant || s.accountant_lead || prev.chiefAccountant,
@@ -111,6 +155,16 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
     useEffect(() => {
         setActiveSubView(initialSubView);
     }, [initialSubView]);
+
+    const openVoucherFromRow = useCallback((row: any) => {
+        const voucherId = row?.voucher_id || row?.voucherId;
+        if (!voucherId) {
+            window.alert('Không tìm thấy chứng từ gốc để chỉnh sửa.');
+            return;
+        }
+        setEditingVoucherId(voucherId);
+        setShowVoucherModal(true);
+    }, []);
 
     const isTraceableValue = (value: any): value is { value: any; source?: { type: 'link' | 'modal'; target: string; label?: string } } => {
         return value && typeof value === 'object' && 'value' in value;
@@ -183,7 +237,7 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                 title: getReportTitle(activeSubView),
                 icon: 'assignment_turned_in',
                 actions: [
-                    { label: 'Xem trước bản in', icon: 'print', onClick: () => setShowPrintPreview(true), primary: true },
+                    { label: 'In báo cáo', icon: 'print', onClick: () => triggerDirectPrint(paperSize), primary: true },
                     { label: 'Xuất Excel', icon: 'table_chart', onClick: exportToExcel }
                 ]
             });
@@ -192,7 +246,8 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
 
     // Handle export signal from Ribbon (for non-custom_report views)
     useEffect(() => {
-        if (exportSignal > 0 && activeSubView !== 'custom_report') {
+        if (exportSignal > 0 && exportSignal !== lastHandledExportSignal.current && activeSubView !== 'custom_report') {
+            lastHandledExportSignal.current = exportSignal;
             exportToExcel();
         }
     }, [exportSignal, activeSubView, exportToExcel]);
@@ -265,40 +320,41 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                 toDate: filters.toDate
             };
             const accountCode = filters.accountCode.trim();
-            // Removed: partnerCode, projectId (DN reports không dùng cho HCSN)
+            // Note: partnerCode, projectId được lọc ở các báo cáo chi tiết riêng
 
             switch (activeSubView) {
-                // === BÁO CÁO TÀI CHÍNH HCSN (TT 24/2024) ===
-                case 'balance_sheet_hcsn':
-                    res = await api.get('/reports/balance-sheet-hcsn', { params: rangeParams });
+                // === BÁO CÁO TÀI CHÍNH DOANH NGHIỆP (TT 99/2025) ===
+                case 'balance_sheet_dn':
+                    res = await api.get('/reports/balance-sheet-dn', { params: rangeParams });
                     break;
-                case 'activity_result':
-                    res = await api.get('/reports/activity-result', { params: rangeParams });
+                case 'profit_loss':
+                    res = await api.get('/reports/profit-loss', { params: rangeParams });
                     break;
-                case 'cash_flow':
-                    res = await reportService.getCashFlow(rangeParams);
+                case 'cash_flow_dn':
+                    res = await api.get('/reports/cash-flow-dn', { params: rangeParams });
+                    break;
+                case 'notes_fs':
+                    // Thuyết minh BCTC (B09-DN)
+                    res = await api.get('/reports/notes-fs', {
+                        params: { fiscalYear: new Date(filters.fromDate).getFullYear() }
+                    });
                     break;
 
-                // === BÁO CÁO QUYẾT TOÁN HCSN (MỚI - TT 24/2024) ===
-                case 'budget_settlement_regular':
-                    res = await api.get('/reports/budget-settlement-regular', { params: { fiscal_year: new Date(filters.fromDate).getFullYear() } });
-                    break;
-                case 'budget_settlement_nonregular':
-                    res = await api.get('/reports/budget-settlement-nonregular', { params: { fiscal_year: new Date(filters.fromDate).getFullYear() } });
-                    break;
-                case 'budget_settlement_capex':
-                    res = await api.get('/reports/budget-settlement-capex', { params: { fiscal_year: new Date(filters.fromDate).getFullYear() } });
-                    break;
+                // === BÁO CÁO KẾ HOẠCH/NGÂN SÁCH NỘI BỘ ===
                 case 'budget_performance':
                     res = await api.get('/reports/budget-performance', { params: { fiscal_year: new Date(filters.fromDate).getFullYear() } });
                     break;
 
-                // === BÁO CÁO QUẢN LÝ HCSN (MỚI - TT 24/2024) ===
-                case 'fund_source_report':
-                    res = await api.get('/reports/hcsn/fund-sources', { params: { fiscal_year: new Date(filters.fromDate).getFullYear() } });
+                // === BÁO CÁO PHÂN TÍCH ===
+                case 'cost_analysis':
+                    res = await api.get('/reports/cost-analysis', { params: rangeParams });
                     break;
-                case 'infrastructure_report':
-                    res = await api.get('/reports/hcsn/infrastructure');
+                case 'profitability_analysis':
+                    res = await api.get('/reports/profitability-analysis', { params: rangeParams });
+                    break;
+                case 'financial_analysis':
+                    // Chưa có API - hiển thị thông báo
+                    res = { data: [{ id: 'notice', note: 'Chức năng đang được phát triển. Vui lòng sử dụng Báo cáo Tùy biến để tạo báo cáo phân tích.' }] };
                     break;
 
                 // === SỔ KẾ TOÁN (GIỮ NGUYÊN) ===
@@ -333,13 +389,10 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     res = await reportService.getTransactionDetails({ from: filters.fromDate, to: filters.toDate });
                     break;
 
-                // === LOẠI BỎ: DN Reports ===
-                // REMOVED: case 'balance_sheet' (DN)
-                // REMOVED: case 'pnl' (DN)
-                // REMOVED: case 'debt_ledger' (DN - không dùng cho HCSN)
-                // REMOVED: case 'vat_in' (HCSN không nộp VAT)
-                // REMOVED: case 'vat_out' (HCSN không nộp VAT)
-                // REMOVED: case 'project_pnl' (DN)
+                // Note: Các báo cáo cũ đã được thay thế bằng báo cáo TT 99/2025
+                // - balance_sheet → balance_sheet_dn
+                // - pnl → profit_loss
+                // - cash_flow → cash_flow_dn
 
                 default:
                     res = { data: [] };
@@ -477,7 +530,27 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                 return [
                     { field: 'doc_date', headerName: 'Ngày CT', width: 'w-24', type: 'date', renderCell: (v: any) => renderDateCell(v) },
                     { field: 'type', headerName: 'Loại CT', width: 'w-24' },
-                    { field: 'doc_no', headerName: 'Số CT', width: 'w-24' },
+                    {
+                        field: 'doc_no',
+                        headerName: 'Số CT',
+                        width: 'w-24',
+                        renderCell: (v: any, r: any) => (
+                            r?.voucher_id ? (
+                                <button
+                                    className="text-blue-600 hover:text-blue-800 underline underline-offset-2 font-semibold"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openVoucherFromRow(r);
+                                    }}
+                                    title="Mở chứng từ để chỉnh sửa"
+                                >
+                                    {v}
+                                </button>
+                            ) : (
+                                <span>{v}</span>
+                            )
+                        )
+                    },
                     { field: 'voucher_desc', headerName: 'Diễn giải (Chung)', width: 'min-w-[200px]' },
                     { field: 'item_desc', headerName: 'Chi tiết', width: 'min-w-[200px]' },
                     { field: 'debit_acc', headerName: 'TK Nợ', width: 'w-16', align: 'center' as const },
@@ -485,7 +558,7 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     { field: 'amount', headerName: 'Số tiền', width: 'w-28', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.amount) },
                     { field: 'partner_code', headerName: 'Đối tượng', width: 'w-24' },
                     { field: 'item_code', headerName: 'Mục', width: 'w-20', align: 'center' as const },
-                    { field: 'sub_item_code', headerName: 'Tiểu mục', width: 'w-24', align: 'center' as const },
+                    { field: 'sub_item_code', headerName: 'Khoản mục', width: 'w-24', align: 'center' as const },
                     { field: 'contract_code', headerName: 'Hợp đồng', width: 'w-24' },
                     { field: 'project_code', headerName: 'Dự án', width: 'w-24' },
                     { field: 'debt_note', headerName: 'Khế ước', width: 'w-24' },
@@ -496,97 +569,237 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     { field: 'dim5', headerName: 'Dim 5', width: 'w-20' }
                 ];
 
-            // === HCS Reports Column Definitions ==
-            case 'budget_settlement_regular':
-            case 'budget_settlement_nonregular':
-            case 'budget_settlement_capex':
-                return [
-                    { field: 'category_code', headerName: 'Mã mục', width: 'w-24', align: 'center' as const },
-                    { field: 'category_name', headerName: 'Tên mục', width: 'min-w-[300px]' },
-                    { field: 'du_toan', headerName: 'Dự toán được giao', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.du_toan) },
-                    { field: 'thuc_hien', headerName: 'Thực hiện', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.thuc_hien) },
-                    { field: 'chenh_lech', headerName: 'Chênh lệch', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.chenh_lech) },
-                ];
-
-            case 'fund_source_report':
-                return [
-                    { field: 'code', headerName: 'Mã', width: 'w-20', align: 'center' as const },
-                    { field: 'name', headerName: 'Tên nguồn kinh phí', width: 'min-w-[250px]' },
-                    { field: 'allocated_amount', headerName: 'Được cấp', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.allocated_amount) },
-                    { field: 'spent_amount', headerName: 'Đã chi', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.spent_amount) },
-                    { field: 'remaining_amount', headerName: 'Còn lại', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.remaining_amount) },
-                    { field: 'execution_rate', headerName: 'Tỷ lệ %', width: 'w-24', align: 'right' as const, renderCell: (_: any, r: any) => `${(r.execution_rate || 0).toFixed(1)}%` },
-                ];
-
-            case 'infrastructure_report':
-                return [
-                    { field: 'category', headerName: 'Loại hạ tầng', width: 'min-w-[200px]' },
-                    { field: 'count', headerName: 'Số lượng', width: 'w-24', align: 'center' as const },
-                    { field: 'total_original_value', headerName: 'Nguyên giá', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.total_original_value) },
-                    { field: 'total_depreciation', headerName: 'Hao mòn LK', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.total_depreciation) },
-                    { field: 'total_net_value', headerName: 'Giá trị còn lại', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.total_net_value) },
-                ];
-
+            // === BÁO CÁO KẾ HOẠCH/NGÂN SÁCH NỘI BỘ DN ===
             case 'budget_performance':
                 return [
-                    { field: 'estimate_type', headerName: 'Loại dự toán', width: 'min-w-[200px]' },
-                    { field: 'du_toan_duoc_giao', headerName: 'Được giao', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.du_toan_duoc_giao) },
-                    { field: 'du_toan_dieu_chinh', headerName: 'Điều chỉnh', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.du_toan_dieu_chinh) },
-                    { field: 'da_thuc_hien', headerName: 'Đã thực hiện', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.da_thuc_hien) },
-                    { field: 'con_lai', headerName: 'Còn lại', width: 'w-40', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.con_lai) },
+                    { field: 'item_code', headerName: 'Mã', width: 'w-20', align: 'center' as const,
+                      renderCell: (v: any, r: any) => r.is_header ? '' : (v || '-')
+                    },
+                    { field: 'item_name', headerName: 'Khoản mục', width: 'min-w-[280px]',
+                      renderCell: (v: any, r: any) => {
+                        if (r.is_header) {
+                            return <span className={`font-bold uppercase text-xs tracking-wider ${r.is_total ? 'text-emerald-700 dark:text-emerald-400' : 'text-blue-700 dark:text-blue-400'}`}>{v}</span>;
+                        }
+                        return <span className={`${r.is_bold ? 'font-semibold' : ''} ${r.is_subtotal ? 'text-slate-700 dark:text-slate-300' : ''}`}>{v}</span>;
+                      }
+                    },
+                    { field: 'du_toan_goc', headerName: 'DT Gốc', width: 'w-32', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => r.is_header ? '' : renderNumberCell(r.du_toan_goc)
+                    },
+                    { field: 'du_toan_dieu_chinh', headerName: 'Điều chỉnh', width: 'w-32', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header) return '';
+                        const val = r.du_toan_dieu_chinh || 0;
+                        if (val === 0) return '-';
+                        const color = val > 0 ? 'text-green-600' : 'text-red-600';
+                        return <span className={color}>{val > 0 ? '+' : ''}{renderNumberCell(val)}</span>;
+                      }
+                    },
+                    { field: 'du_toan_tong', headerName: 'Tổng DT', width: 'w-36', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header) return '';
+                        return <span className="font-medium">{renderNumberCell(r.du_toan_tong)}</span>;
+                      }
+                    },
+                    { field: 'da_thuc_hien', headerName: 'Thực hiện', width: 'w-36', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header) return '';
+                        return <span className="text-blue-600 dark:text-blue-400 font-medium">{renderNumberCell(r.da_thuc_hien)}</span>;
+                      }
+                    },
+                    { field: 'con_lai', headerName: 'Còn lại', width: 'w-36', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header) return '';
+                        const val = r.con_lai || 0;
+                        const color = val >= 0 ? 'text-green-600' : 'text-red-600';
+                        return <span className={color}>{renderNumberCell(val)}</span>;
+                      }
+                    },
+                    { field: 'pct_hoan_thanh', headerName: '% HT', width: 'w-24', align: 'right' as const,
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header || r.pct_hoan_thanh === '-') return '';
+                        const pct = parseFloat(r.pct_hoan_thanh || '0');
+                        let color = 'text-slate-500';
+                        if (pct >= 100) color = 'text-green-600 font-semibold';
+                        else if (pct >= 80) color = 'text-blue-600';
+                        else if (pct >= 50) color = 'text-amber-600';
+                        else if (pct > 0) color = 'text-red-600';
+                        return <span className={color}>{pct.toFixed(1)}%</span>;
+                      }
+                    }
                 ];
 
-            // HCSN Financial Reports use defaultFinancial columns
-            case 'balance_sheet_hcsn':
-            case 'activity_result':
+            // === BÁO CÁO PHÂN TÍCH ===
+            case 'cost_analysis':
+                return [
+                    { field: 'cost_item', headerName: 'Khoản mục chi phí', width: 'min-w-[300px]',
+                      renderCell: (v: any, r: any) => (
+                        <span className={r.is_bold ? 'font-bold' : ''} style={{ paddingLeft: `${(r.level || 0) * 1.5}rem` }}>
+                            {v}
+                        </span>
+                      )
+                    },
+                    { field: 'current_period', headerName: 'Kỳ này', width: 'w-40', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => renderNumberCell(r.current_period)
+                    },
+                    { field: 'previous_period', headerName: 'Kỳ trước', width: 'w-40', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => renderNumberCell(r.previous_period)
+                    },
+                    { field: 'change_amount', headerName: 'Biến động', width: 'w-40', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        const val = r.change_amount || 0;
+                        const color = val > 0 ? 'text-red-600' : val < 0 ? 'text-green-600' : '';
+                        return <span className={color}>{renderNumberCell(val)}</span>;
+                      }
+                    },
+                    { field: 'change_pct', headerName: '% Biến động', width: 'w-28', align: 'right' as const,
+                      renderCell: (_: any, r: any) => {
+                        const val = parseFloat(r.change_pct || '0');
+                        const color = val > 0 ? 'text-red-600' : val < 0 ? 'text-green-600' : '';
+                        return <span className={color}>{val > 0 ? '+' : ''}{val.toFixed(2)}%</span>;
+                      }
+                    },
+                    { field: 'pct_revenue', headerName: '% Doanh thu', width: 'w-28', align: 'right' as const,
+                      renderCell: (_: any, r: any) => `${r.pct_revenue || '0.00'}%`
+                    }
+                ];
+            case 'profitability_analysis':
+                return [
+                    { field: 'item', headerName: 'Chỉ tiêu', width: 'min-w-[350px]',
+                      renderCell: (v: any, r: any) => {
+                        if (r.is_header) {
+                            return <span className="font-bold text-blue-700 dark:text-blue-400 uppercase text-xs tracking-wider">{v}</span>;
+                        }
+                        return (
+                            <span className={`${r.is_bold ? 'font-bold' : ''} ${r.is_total ? 'text-emerald-700 dark:text-emerald-400' : ''}`}
+                                  style={{ paddingLeft: `${(r.level || 0) * 1.5}rem` }}>
+                                {r.is_ratio ? <em>{v}</em> : v}
+                            </span>
+                        );
+                      }
+                    },
+                    { field: 'current_period', headerName: 'Kỳ này', width: 'w-40', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header) return '';
+                        if (r.is_ratio) return <em className="text-slate-500">{parseFloat(r.current_period || 0).toFixed(2)}%</em>;
+                        return renderNumberCell(r.current_period);
+                      }
+                    },
+                    { field: 'previous_period', headerName: 'Kỳ trước', width: 'w-40', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header) return '';
+                        if (r.is_ratio) return <em className="text-slate-500">{parseFloat(r.previous_period || 0).toFixed(2)}%</em>;
+                        return renderNumberCell(r.previous_period);
+                      }
+                    },
+                    { field: 'change_amount', headerName: 'Biến động', width: 'w-40', align: 'right' as const, type: 'number',
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header) return '';
+                        const val = r.change_amount || 0;
+                        const color = val > 0 ? 'text-green-600' : val < 0 ? 'text-red-600' : '';
+                        if (r.is_ratio) return <em className={color}>{val > 0 ? '+' : ''}{parseFloat(val).toFixed(2)}%</em>;
+                        return <span className={color}>{renderNumberCell(val)}</span>;
+                      }
+                    },
+                    { field: 'change_pct', headerName: '% Thay đổi', width: 'w-28', align: 'right' as const,
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header || r.is_ratio) return '';
+                        const val = parseFloat(r.change_pct || '0');
+                        const color = val > 0 ? 'text-green-600' : val < 0 ? 'text-red-600' : '';
+                        return <span className={color}>{val > 0 ? '+' : ''}{val.toFixed(2)}%</span>;
+                      }
+                    },
+                    { field: 'margin', headerName: '% DT thuần', width: 'w-28', align: 'right' as const,
+                      renderCell: (_: any, r: any) => {
+                        if (r.is_header || r.margin === '-') return '';
+                        return <span className="text-slate-500">{r.margin}%</span>;
+                      }
+                    }
+                ];
+            case 'financial_analysis':
+                return [
+                    { field: 'note', headerName: 'Thông báo', width: 'min-w-[600px]' }
+                ];
+
+            // === BÁO CÁO TÀI CHÍNH DN (TT 99/2025) ===
+            // Bảng cân đối kế toán (B01-DN)
+            case 'balance_sheet_dn':
                 return defaultFinancial;
+
+            // Thuyết minh BCTC (B09-DN)
+            case 'notes_fs':
+                return [
+                    { field: 'note_code', headerName: 'Mục', width: 'w-20', align: 'center' as const },
+                    { field: 'note_title', headerName: 'Nội dung thuyết minh', width: 'min-w-[400px]',
+                      renderCell: (v: any, r: any) => (
+                        <span className={r.is_bold ? 'font-bold uppercase' : ''} style={{ paddingLeft: `${(r.level || 0) * 1.5}rem` }}>
+                            {v}
+                        </span>
+                      )
+                    },
+                    { field: 'note_content', headerName: 'Chi tiết / Giải thích', width: 'min-w-[300px]',
+                      renderCell: (v: any) => v ? <span className="text-slate-600 text-xs">{v}</span> : '-'
+                    },
+                    { field: 'related_account', headerName: 'TK liên quan', width: 'w-28', align: 'center' as const,
+                      renderCell: (v: any) => v || '-'
+                    },
+                    { field: 'section', headerName: 'Phân loại', width: 'w-28', align: 'center' as const,
+                      renderCell: (v: any) => {
+                        const sectionMap: Record<string, string> = {
+                            'GENERAL': 'Chung',
+                            'POLICY': 'Chính sách',
+                            'ASSETS': 'Tài sản',
+                            'LIABILITIES': 'Nợ phải trả',
+                            'EQUITY': 'Vốn CSH',
+                            'INCOME': 'Thu nhập',
+                            'CASHFLOW': 'Tiền tệ',
+                            'OTHER': 'Khác'
+                        };
+                        return sectionMap[v] || v || '-';
+                      }
+                    }
+                ];
+
+            // Báo cáo Kết quả Kinh doanh (B02-DN)
+            case 'profit_loss':
+                return [
+                    { field: 'target', headerName: 'Chỉ tiêu', width: 'min-w-[400px]', renderCell: (v: any, r: any) => <span className={r.is_bold ? 'font-bold' : 'pl-4'} style={{ paddingLeft: `${(r.level || 0) * 1.5}rem` }}>{v}</span> },
+                    { field: 'code', headerName: 'Mã số', width: 'w-24', align: 'center' as const },
+                    { field: 'notes', headerName: 'Thuyết minh', width: 'w-28', align: 'center' as const },
+                    { field: 'current_period', headerName: 'Kỳ này', width: 'w-48', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.current_period) },
+                    { field: 'previous_period', headerName: 'Kỳ trước', width: 'w-48', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.previous_period) }
+                ];
+
+            // Báo cáo Lưu chuyển Tiền tệ (B03-DN)
+            case 'cash_flow_dn':
+                return [
+                    { field: 'target', headerName: 'Chỉ tiêu', width: 'min-w-[400px]', renderCell: (v: any, r: any) => <span className={r.is_bold ? 'font-bold' : 'pl-4'} style={{ paddingLeft: `${(r.level || 0) * 1.5}rem` }}>{v}</span> },
+                    { field: 'code', headerName: 'Mã số', width: 'w-24', align: 'center' as const },
+                    { field: 'notes', headerName: 'Thuyết minh', width: 'w-28', align: 'center' as const },
+                    { field: 'current_period', headerName: 'Kỳ này', width: 'w-48', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.current_period) },
+                    { field: 'previous_period', headerName: 'Kỳ trước', width: 'w-48', align: 'right' as const, type: 'number', renderCell: (_: any, r: any) => renderNumberCell(r.previous_period) }
+                ];
 
             default:
                 return defaultFinancial;
         }
     };
 
-    const rowsPerPage = useMemo(() => {
-        if (paperSize === 'A4-landscape') return 22;
-        if (paperSize === 'A5-landscape') return 16;
-        if (paperSize === 'A5') return 18;
-        return 28;
-    }, [paperSize]);
-
-    const normalizedConfig = normalizePrintConfig(printConfig);
-    const previewDimensions = getPaperDimensions(paperSize);
-    const paddingValue = `${normalizedConfig.marginTop}mm ${normalizedConfig.marginRight}mm ${normalizedConfig.marginBottom}mm ${normalizedConfig.marginLeft}mm`;
-    const scaleFactor = normalizedConfig.scale / 100;
-    const widthMm = Number.parseFloat(previewDimensions.width);
-    const heightMm = Number.parseFloat(previewDimensions.minHeight);
-    const contentWidthMm = Math.max(0, widthMm - normalizedConfig.marginLeft - normalizedConfig.marginRight);
-    const contentHeightMm = Math.max(0, heightMm - normalizedConfig.marginTop - normalizedConfig.marginBottom);
-    const safeScaleFactor = scaleFactor || 1;
-    const scaledWidth = `${contentWidthMm / safeScaleFactor}mm`;
-    const scaledHeight = `${contentHeightMm / safeScaleFactor}mm`;
-
-    const pagedData = useMemo(() => {
-        const pages: any[][] = [];
-        for (let i = 0; i < entries.length; i += rowsPerPage) {
-            pages.push(entries.slice(i, i + rowsPerPage));
-        }
-        return pages;
-    }, [entries, rowsPerPage]);
 
     // ModuleOverview for Reports module
     if (activeSubView === 'overview') {
         return (
             <ModuleOverview
                 title={MODULE_CONFIGS.report?.title || 'Phân hệ Báo cáo'}
-                description={MODULE_CONFIGS.report?.description || 'Báo cáo tài chính, sổ kế toán và quyết toán ngân sách'}
+                description={MODULE_CONFIGS.report?.description || 'Báo cáo tài chính, sổ kế toán theo TT 99/2025'}
                 icon={MODULE_CONFIGS.report?.icon || 'assignment'}
                 iconColor={MODULE_CONFIGS.report?.iconColor || 'blue'}
                 workflow={MODULE_CONFIGS.report?.workflow || []}
                 features={MODULE_CONFIGS.report?.features || []}
                 stats={[
-                    { icon: 'account_balance', label: 'Cân đối TK', value: '-', color: 'blue' },
-                    { icon: 'summarize', label: 'Kết quả HĐ', value: '-', color: 'green' },
-                    { icon: 'fact_check', label: 'Quyết toán', value: '-', color: 'amber' },
+                    { icon: 'account_balance', label: 'Cân đối KT', value: '-', color: 'blue' },
+                    { icon: 'summarize', label: 'Kết quả KD', value: '-', color: 'green' },
+                    { icon: 'fact_check', label: 'Lưu chuyển TT', value: '-', color: 'amber' },
                     { icon: 'book', label: 'Sổ kế toán', value: '-', color: 'purple' },
                 ]}
             />
@@ -672,187 +885,122 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                             columns={getColumns()}
                             keyField="id"
                             getRowClassName={(row: any) => row.is_bold ? 'bg-blue-50/50 dark:bg-blue-900/10 font-bold' : ''}
+                            onRowDoubleClick={activeSubView === 'transaction_details' ? openVoucherFromRow : undefined}
                         />
                     </div>
                 )}
             </div>
 
-            {/* Print Preview Overlay (shared shell for consistency) */}
-            {showPrintPreview && (
-                <PrintPreviewShell
-                    title="Xem trước bản in"
-                    onClose={() => setShowPrintPreview(false)}
-                    onPrint={() => window.print()}
-                    controls={(
-                        <PrintConfigControls
-                            paperSize={paperSize}
-                            onPaperSizeChange={setPaperSize}
-                            printConfig={printConfig}
-                            onPrintConfigChange={setPrintConfig}
-                        >
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500">Người lập:</span>
-                                <input
-                                    value={signatures.preparer}
-                                    onChange={(e) => setSignatures({ ...signatures, preparer: e.target.value })}
-                                    placeholder="Tên người lập"
-                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                                />
+            {/* Hidden Print Container - Một container duy nhất, browser tự phân trang */}
+            {createPortal(
+                <div className="hidden-print-container" style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                    <div className={`bg-white text-slate-900 printable-area font-serif ${getPaperSizeClass(paperSize)}`}>
+                        {/* Header báo cáo */}
+                        <div className="print-header flex justify-between items-start mb-4 border-b border-slate-900 pb-2">
+                            <div className="text-[11px] leading-relaxed">
+                                <p className="font-bold uppercase text-slate-900 text-sm">{companyInfo.name || 'TÊN DOANH NGHIỆP'}</p>
+                                <p className="text-slate-700">{companyInfo.address || 'Địa chỉ trụ sở'}</p>
+                                {companyInfo.taxCode && <p className="font-semibold">MST: {companyInfo.taxCode}</p>}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500">Kế toán trưởng:</span>
-                                <input
-                                    value={signatures.chiefAccountant}
-                                    onChange={(e) => setSignatures({ ...signatures, chiefAccountant: e.target.value })}
-                                    placeholder="Tên KTT"
-                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500">Giám đốc:</span>
-                                <input
-                                    value={signatures.director}
-                                    onChange={(e) => setSignatures({ ...signatures, director: e.target.value })}
-                                    placeholder="Tên thủ trưởng"
-                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500 whitespace-nowrap">Chức danh thủ trưởng:</span>
-                                <input
-                                    value={headTitle}
-                                    onChange={(e) => setHeadTitle(e.target.value)}
-                                    placeholder="Giám đốc / Hiệu trưởng / ..."
-                                    className="px-3 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                                />
-                            </div>
-                        </PrintConfigControls>
-                    )}
-                    footerHint={`Khổ giấy: ${paperSize} • Lề: ${normalizedConfig.marginTop}/${normalizedConfig.marginRight}/${normalizedConfig.marginBottom}/${normalizedConfig.marginLeft} mm • Scale: ${normalizedConfig.scale}%`}
-                >
-                    {pagedData.length > 0 ? pagedData.map((pageItems, pageIdx) => (
-                        <div
-                            key={`page-${pageIdx}`}
-                            className={`bg-white text-slate-900 relative flex flex-col shadow-2xl printable-area font-serif preview-page ${getPaperSizeClass(paperSize)} ${pageIdx < pagedData.length - 1 ? 'page-break-after' : ''}`}
-                            style={{
-                                width: previewDimensions.width,
-                                minHeight: previewDimensions.minHeight,
-                                ['--print-padding' as any]: paddingValue
-                            }}
-                        >
-                            <div
-                                className="print-scale-wrapper"
-                                style={{
-                                    transform: `scale(${scaleFactor})`,
-                                    transformOrigin: 'top left',
-                                    width: scaledWidth,
-                                    minHeight: scaledHeight
-                                }}
-                            >
-                                    <div className="flex justify-between items-start mb-6 border-b border-slate-900 pb-2">
-                                        <div className="text-[11px] leading-relaxed">
-                                            <p className="font-bold uppercase text-slate-900 text-sm">{companyInfo.name || 'ĐƠN VỊ BÁO CÁO'}</p>
-                                            <p className="text-slate-700">{companyInfo.address || 'Địa chỉ đơn vị'}</p>
-                                            {companyInfo.taxCode && <p className="font-semibold">MST: {companyInfo.taxCode}</p>}
-                                            {companyInfo.maDVQHNS && <p className="font-semibold">Mã ĐVQHNS: {companyInfo.maDVQHNS}</p>}
-                                        </div>
-                                        <div className="text-[10px] text-right">
-                                            <p className="font-bold">Mẫu báo cáo HCSN</p>
-                                            <p className="italic">Thông tư 24/2024/TT-BTC</p>
-                                        </div>
-                                    </div>
-
-                                    {pageIdx === 0 && (
-                                        <div className="mb-6 text-center">
-                                            <h1 className="text-xl font-black uppercase text-blue-900 mb-1">{getReportTitle(activeSubView)}</h1>
-                                            <p className="italic text-[11px] text-slate-600">Từ {formatDateVN(filters.fromDate)} đến {formatDateVN(filters.toDate)}</p>
-                                            <p className="text-[9px] font-bold mt-2 uppercase tracking-tighter">(Đơn vị tính: Đồng Việt Nam)</p>
-                                        </div>
-                                    )}
-
-                                    <div className="flex-1">
-                                        <table className="w-full border-collapse border border-slate-900 text-[9px] printable-table">
-                                            <thead className="bg-slate-100">
-                                                <tr>
-                                                    {getColumns().map(col => (
-                                                        <th key={col.field} className={`border border-slate-900 p-1.5 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
-                                                            {col.headerName}
-                                                        </th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {pageItems.map((row: any, rIdx: number) => (
-                                                    <tr key={row.id || rIdx} className={row.is_bold ? 'font-bold' : ''}>
-                                                        {getColumns().map(col => (
-                                                            <td key={col.field} className={`border border-slate-900 p-1.5 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
-                                                                {col.renderCell ? col.renderCell(row[col.field], row) : (row[col.field] ?? '')}
-                                                            </td>
-                                                        ))}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div className="mt-10 grid grid-cols-3 gap-8 text-center text-[11px] leading-relaxed break-inside-avoid">
-                                        <div className="flex flex-col items-center">
-                                            <div className="h-24 flex flex-col justify-between w-full">
-                                                <div>
-                                                    <span className="invisible block mb-0.5">Placeholder Date</span>
-                                                    <span className="font-bold uppercase block">NGƯỜI LẬP BIỂU</span>
-                                                    <span className="italic font-normal text-[10px]">(Ký, họ và tên)</span>
-                                                </div>
-                                                <div className="font-bold uppercase mt-auto pt-8">
-                                                    {signatures.preparer || '...........................'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <div className="h-24 flex flex-col justify-between w-full">
-                                                <div>
-                                                    <span className="invisible block mb-0.5">Placeholder Date</span>
-                                                    <span className="font-bold uppercase block">KẾ TOÁN TRƯỞNG</span>
-                                                    <span className="italic font-normal text-[10px]">(Ký, họ và tên)</span>
-                                                </div>
-                                                <div className="font-bold uppercase mt-auto pt-8">
-                                                    {signatures.chiefAccountant || '...........................'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <div className="h-24 flex flex-col justify-between w-full">
-                                                <div className="mb-1">
-                                                    <span className="italic block mb-0.5 whitespace-nowrap">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</span>
-                                                    <span className="font-bold uppercase block">{(headTitle || 'Thủ trưởng đơn vị').toUpperCase()}</span>
-                                                    <span className="italic font-normal text-[10px]">(Ký, họ tên, đóng dấu)</span>
-                                                </div>
-                                                <div className="font-bold uppercase mt-auto pt-8">
-                                                    {signatures.director || '...........................'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-auto pt-4 flex justify-between items-center border-t border-slate-100 text-[8px] text-slate-400 uppercase italic">
-                                        <span>Syntex Legger ERP System</span>
-                                        <span>Trang {pageIdx + 1} / {pagedData.length}</span>
-                                    </div>
+                            <div className="text-[10px] text-right">
+                                <p className="font-bold">Mẫu báo cáo DN</p>
+                                <p className="italic">Thông tư 99/2025/TT-BTC</p>
                             </div>
                         </div>
-                    )) : (
-                        <div
-                            className={`bg-white text-slate-600 italic printable-area preview-page text-center shadow-2xl font-serif ${getPaperSizeClass(paperSize)}`}
-                            style={{
-                                width: previewDimensions.width,
-                                minHeight: previewDimensions.minHeight,
-                                ['--print-padding' as any]: paddingValue
-                            }}
-                        >
-                            Không có dữ liệu báo cáo
+
+                        <div className="mb-4 text-center">
+                            <h1 className="text-xl font-black uppercase text-blue-900 mb-1">{getReportTitle(activeSubView)}</h1>
+                            <p className="italic text-[11px] text-slate-600">Từ {formatDateVN(filters.fromDate)} đến {formatDateVN(filters.toDate)}</p>
+                            <p className="text-[9px] font-bold mt-1 uppercase tracking-tighter">(Đơn vị tính: Đồng Việt Nam)</p>
                         </div>
-                    )}
-                </PrintPreviewShell>
+
+                        {/* Bảng dữ liệu - một table duy nhất */}
+                        {entries.length > 0 ? (
+                            <table className="w-full border-collapse border border-slate-900 text-[9px] printable-table">
+                                <thead className="bg-slate-100">
+                                    <tr>
+                                        {getColumns().map(col => (
+                                            <th key={col.field} className={`border border-slate-900 p-1.5 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
+                                                {col.headerName}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {entries.map((row: any, rIdx: number) => (
+                                        <tr key={row.id || rIdx} className={row.is_bold ? 'font-bold' : ''}>
+                                            {getColumns().map(col => (
+                                                <td key={col.field} className={`border border-slate-900 p-1.5 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
+                                                    {col.renderCell ? col.renderCell(row[col.field], row) : (row[col.field] ?? '')}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <p className="text-slate-500 italic text-center py-8">Không có dữ liệu báo cáo</p>
+                        )}
+
+                        {/* Phần ký tên */}
+                        <div className="mt-8 grid grid-cols-3 gap-4 text-center text-[10px] leading-snug print-signatures">
+                            <div className="flex flex-col items-center">
+                                <div className="h-20 flex flex-col justify-between w-full">
+                                    <div>
+                                        <span className="font-bold uppercase block">NGƯỜI LẬP BIỂU</span>
+                                        <span className="italic font-normal text-[9px]">(Ký, họ và tên)</span>
+                                    </div>
+                                    <div className="font-bold uppercase mt-auto pt-6">
+                                        {signatures.preparer || '...........................'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <div className="h-20 flex flex-col justify-between w-full">
+                                    <div>
+                                        <span className="font-bold uppercase block">KẾ TOÁN TRƯỞNG</span>
+                                        <span className="italic font-normal text-[9px]">(Ký, họ và tên)</span>
+                                    </div>
+                                    <div className="font-bold uppercase mt-auto pt-6">
+                                        {signatures.chiefAccountant || '...........................'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <div className="h-20 flex flex-col justify-between w-full">
+                                    <div>
+                                        <span className="italic block text-[9px] whitespace-nowrap">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</span>
+                                        <span className="font-bold uppercase block">{(headTitle || 'Giám đốc').toUpperCase()}</span>
+                                        <span className="italic font-normal text-[9px]">(Ký, họ tên, đóng dấu)</span>
+                                    </div>
+                                    <div className="font-bold uppercase mt-auto pt-6">
+                                        {signatures.director || '...........................'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {showVoucherModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-[95vw] h-[90vh] max-w-7xl overflow-hidden flex flex-col">
+                        <GeneralVoucherForm
+                            id={editingVoucherId}
+                            onClose={() => {
+                                setShowVoucherModal(false);
+                                setEditingVoucherId(undefined);
+                            }}
+                            onSuccess={() => {
+                                setShowVoucherModal(false);
+                                setEditingVoucherId(undefined);
+                                loadData();
+                            }}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

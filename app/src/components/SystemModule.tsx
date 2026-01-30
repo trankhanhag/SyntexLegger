@@ -6,9 +6,8 @@ import { formatDateTimeVN, formatDateVN } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
-import { BudgetControlModule } from './BudgetControlModule';
 import { AuditTrailModule } from './AuditTrailModule';
-import { useSimplePrint } from '../hooks/usePrintHandler';
+import { useSimplePrint, triggerBrowserPrint } from '../hooks/usePrintHandler';
 
 // --- MOCK DATA ---
 
@@ -120,7 +119,7 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
                 actions.push({
                     label: 'Kết xuất',
                     icon: 'print',
-                    onClick: () => window.print()
+                    onClick: () => triggerBrowserPrint()
                 });
             }
 
@@ -197,11 +196,6 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
         );
     }
 
-    // Handle Budget Control sub-view
-    if (view === 'budget_control') {
-        return <BudgetControlModule onSetHeader={onSetHeader} />;
-    }
-
     // Handle Audit Trail sub-view
     if (view === 'audit_trail') {
         return <AuditTrailModule onSetHeader={onSetHeader} />;
@@ -216,25 +210,25 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
                     <div className="h-full overflow-auto p-8">
                         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
 
-                            {/* HCSN Unit Information - New Section */}
+                            {/* Enterprise Information Section */}
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-6">
                                 <h4 className="font-black text-slate-800 dark:text-white uppercase text-xs tracking-widest flex items-center gap-2">
                                     <span className="material-symbols-outlined text-sm text-emerald-600">domain</span>
-                                    Thông tin Đơn vị HCSN (Dùng cho Báo cáo)
+                                    Thông tin Doanh nghiệp (Dùng cho Báo cáo)
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tên đơn vị</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tên doanh nghiệp</label>
                                         <input
                                             type="text"
                                             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
                                             value={params.unit_name || ''}
                                             onChange={e => setParams({ ...params, unit_name: e.target.value })}
-                                            placeholder="VD: Sở Tài chính..."
+                                            placeholder="VD: Công ty TNHH ABC..."
                                         />
                                     </div>
                                     <div className="col-span-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Địa chỉ</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Địa chỉ trụ sở</label>
                                         <input
                                             type="text"
                                             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
@@ -243,44 +237,44 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mã QHNS</label>
-                                        <input
-                                            type="text"
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-bold text-blue-600 focus:border-blue-500 transition-colors"
-                                            value={params.unit_budget_relation_code || ''}
-                                            onChange={e => setParams({ ...params, unit_budget_relation_code: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mã Chương</label>
-                                        <input
-                                            type="text"
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
-                                            value={params.unit_chapter || ''}
-                                            onChange={e => setParams({ ...params, unit_chapter: e.target.value })}
-                                            placeholder="VD: 018"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cơ quan cấp trên</label>
-                                        <input
-                                            type="text"
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
-                                            value={params.unit_parent_agency || ''}
-                                            onChange={e => setParams({ ...params, unit_parent_agency: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mã số thuế</label>
                                         <input
                                             type="text"
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-bold text-blue-600 focus:border-blue-500 transition-colors"
                                             value={params.unit_tax_code || ''}
                                             onChange={e => setParams({ ...params, unit_tax_code: e.target.value })}
+                                            placeholder="VD: 0102345678"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Thủ trưởng đơn vị</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Số điện thoại</label>
+                                        <input
+                                            type="text"
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
+                                            value={params.unit_phone || ''}
+                                            onChange={e => setParams({ ...params, unit_phone: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                                        <input
+                                            type="email"
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
+                                            value={params.unit_email || ''}
+                                            onChange={e => setParams({ ...params, unit_email: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Website</label>
+                                        <input
+                                            type="text"
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
+                                            value={params.unit_website || ''}
+                                            onChange={e => setParams({ ...params, unit_website: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Giám đốc / Người đại diện</label>
                                         <input
                                             type="text"
                                             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
@@ -312,12 +306,12 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chế độ kế toán</label>
                                             <select
                                                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none font-medium text-slate-800 dark:text-white focus:border-blue-500 transition-colors"
-                                                value={params.accounting_regime || 'CIRCULAR_24_2024'}
+                                                value={params.accounting_regime || 'CIRCULAR_99_2025'}
                                                 onChange={e => setParams({ ...params, accounting_regime: e.target.value })}
                                             >
-                                                <option value="CIRCULAR_24_2024">Thông tư 24/2024/TT-BTC (HCSN)</option>
-                                                <option value="CIRCULAR_107_2017">Thông tư 107/2017/TT-BTC (Cũ)</option>
-                                                {/* <option value="CIRCULAR_200_2014">Thông tư 200/2014/TT-BTC (DN)</option> */}
+                                                <option value="CIRCULAR_99_2025">Thông tư 99/2025/TT-BTC (Doanh nghiệp)</option>
+                                                <option value="CIRCULAR_200_2014">Thông tư 200/2014/TT-BTC (DN cũ)</option>
+                                                <option value="CIRCULAR_133_2016">Thông tư 133/2016/TT-BTC (DN nhỏ)</option>
                                             </select>
                                         </div>
                                         <div>

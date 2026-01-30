@@ -1,6 +1,6 @@
 /**
  * Unified Format Utilities
- * SyntexHCSN - Định dạng số, tiền tệ, phần trăm thống nhất
+ * SyntexLegger - Định dạng số, tiền tệ, phần trăm thống nhất
  *
  * USAGE:
  * - formatNumber(1234567)           -> "1.234.567"

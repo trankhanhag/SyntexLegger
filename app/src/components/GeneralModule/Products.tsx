@@ -1,6 +1,6 @@
 /**
  * Products Component
- * SyntexHCSN - Quản lý Sản phẩm/Vật tư với chức năng nhập Excel
+ * SyntexLegger - Quản lý Sản phẩm/Vật tư với chức năng nhập Excel
  */
 
 import React, { useRef } from 'react';

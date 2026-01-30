@@ -288,7 +288,7 @@ export const Allocation: React.FC<AllocationProps> = ({ onClose, lockedUntil }) 
                                     onChange={(e) => setTargetAcc(e.target.value)}
                                     className="text-blue-600 focus:ring-blue-500"
                                 />
-                                <span className={targetAcc === '642' ? "font-bold text-blue-700" : ""}>642 - Chi hoạt động SXKD</span>
+                                <span className={targetAcc === '642' ? "font-bold text-blue-700" : ""}>642 - Chi phí QLDN</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
@@ -299,7 +299,7 @@ export const Allocation: React.FC<AllocationProps> = ({ onClose, lockedUntil }) 
                                     onChange={(e) => setTargetAcc(e.target.value)}
                                     className="text-blue-600 focus:ring-blue-500"
                                 />
-                                <span className={targetAcc === '611' ? "font-bold text-blue-700" : ""}>611 - Chi hoạt động thường xuyên (NSNN)</span>
+                                <span className={targetAcc === '611' ? "font-bold text-blue-700" : ""}>611 - Mua hàng</span>
                             </label>
                         </div>
                     </div>

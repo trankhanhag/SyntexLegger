@@ -1,6 +1,6 @@
 /**
  * ExcelImportModal - Reusable Excel/CSV Import Component
- * SyntexHCSN - Generic import modal for any data type
+ * SyntexLegger - Generic import modal for any data type
  *
  * USAGE:
  * <ExcelImportModal
@@ -18,6 +18,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { FormModal } from './FormModal';
 import { formatNumber } from '../utils/format';
+import { downloadExcelTemplate, type TemplateDefinition } from '../utils/excelTemplates';
 
 // ============================================
 // TYPES
@@ -48,6 +49,8 @@ export interface ExcelImportModalProps<T = any> {
     templateFileName?: string;
     maxRows?: number;
     description?: string;
+    /** Enhanced template with sample data and instructions */
+    enhancedTemplate?: TemplateDefinition;
 }
 
 // ============================================
@@ -63,6 +66,7 @@ export function ExcelImportModal<T = any>({
     templateFileName = 'template',
     maxRows = 1000,
     description,
+    enhancedTemplate,
 }: ExcelImportModalProps<T>) {
     const [file, setFile] = useState<File | null>(null);
     const [items, setItems] = useState<ImportRow[]>([]);
@@ -277,6 +281,13 @@ export function ExcelImportModal<T = any>({
     };
 
     const downloadTemplate = async () => {
+        // Use enhanced template if provided
+        if (enhancedTemplate) {
+            await downloadExcelTemplate(enhancedTemplate);
+            return;
+        }
+
+        // Fallback to basic template generation
         const XLSX = await import('xlsx');
 
         // Create sample data

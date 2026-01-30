@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { voucherService, masterDataService, bankService, settingsService } from '../api';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { type RibbonAction } from './Ribbon';
@@ -8,6 +8,8 @@ import { toInputDateValue } from '../utils/dateUtils';
 import { PrintPreviewModal } from './PrintTemplates';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { ExcelImportModal } from './ExcelImportModal';
+import { CASH_RECEIPT_TEMPLATE, CASH_PAYMENT_TEMPLATE } from '../utils/excelTemplates';
 
 interface CashData {
     cash: number;
@@ -78,7 +80,7 @@ const VoucherDetailRow = React.memo(({
                     defaultValue={line.subItemCode || ''}
                     onBlur={(e) => onChange(idx, 'subItemCode', e.target.value)}
                     className="w-full bg-transparent border-none outline-none focus:ring-0 text-[13px] font-mono py-1"
-                    placeholder="Tiểu mục"
+                    placeholder="Khoản mục"
                 />
             </td>
             <td className="px-2 py-1">
@@ -149,8 +151,12 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
     const [openBankingConfig, setOpenBankingConfig] = useState({ bank: 'Vietcombank (VCB)', accNo: '', apiKey: '' });
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
     const [selectedRow, setSelectedRow] = useState<any>(null);
     const [printRecord, setPrintRecord] = useState<any>(null); // Record to print
+    const lastPrintSignalRef = React.useRef(0); // Track last handled print signal
+    const [importing, setImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
     const [voucher, setVoucher] = useState({
         objectName: '',
@@ -318,7 +324,10 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
 
     // Handle print signal from Ribbon
     useEffect(() => {
-        if (printSignal > 0) {
+        // Only respond to NEW print signals, not when other dependencies change
+        if (printSignal > 0 && printSignal !== lastPrintSignalRef.current) {
+            lastPrintSignalRef.current = printSignal;
+
             // Only allow printing for voucher views (receipt, payment, bank_in, bank_out)
             const printableViews = ['receipt', 'payment', 'bank_in', 'bank_out'];
             if (!printableViews.includes(subView)) {
@@ -351,9 +360,43 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                 return;
             }
 
-            // If a row is selected from list, print that
+            // If a row is selected from list, transform and print that
             if (selectedRow) {
-                setPrintRecord(selectedRow);
+                // Transform GL/list data to match print template expected format
+                const amount = selectedRow.debit_amount > 0
+                    ? selectedRow.debit_amount
+                    : selectedRow.credit_amount;
+                const isReceipt = subView === 'receipt' || subView === 'bank_in';
+
+                const record = {
+                    // Date fields
+                    voucher_date: selectedRow.trx_date || selectedRow.doc_date || selectedRow.voucher_date,
+                    date: selectedRow.trx_date || selectedRow.doc_date || selectedRow.voucher_date,
+                    // Document number
+                    voucher_no: selectedRow.doc_no || selectedRow.voucher_no,
+                    doc_no: selectedRow.doc_no || selectedRow.voucher_no,
+                    receipt_no: selectedRow.doc_no || selectedRow.voucher_no,
+                    // Person name - use appropriate field based on receipt/payment
+                    payer_name: isReceipt ? (selectedRow.partner_name || selectedRow.supplier_name || selectedRow.payer_name || '') : '',
+                    payee_name: !isReceipt ? (selectedRow.partner_name || selectedRow.supplier_name || selectedRow.payee_name || '') : '',
+                    receiver_name: !isReceipt ? (selectedRow.partner_name || selectedRow.supplier_name || '') : '',
+                    // Address
+                    address: selectedRow.address || selectedRow.partner_address || '',
+                    // Description
+                    description: selectedRow.description || selectedRow.notes || '',
+                    reason: selectedRow.description || selectedRow.notes || '',
+                    notes: selectedRow.notes || selectedRow.description || '',
+                    // Amount
+                    amount: amount || 0,
+                    total_amount: amount || 0,
+                    // Account codes
+                    debit_account: selectedRow.debit_amount > 0 ? selectedRow.account_code : (selectedRow.reciprocal_acc || ''),
+                    credit_account: selectedRow.credit_amount > 0 ? selectedRow.account_code : (selectedRow.reciprocal_acc || ''),
+                    account_code: selectedRow.account_code,
+                    // Additional fields
+                    attached_docs: selectedRow.attached_docs || '',
+                };
+                setPrintRecord(record);
                 setShowPrintPreview(true);
                 return;
             }
@@ -451,6 +494,14 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                     onClick: () => setShowVoucherModal(true),
                     primary: true
                 });
+                // Add import button for receipt and payment views
+                if (['receipt', 'payment'].includes(subView)) {
+                    actions.push({
+                        label: 'Nhập từ Excel',
+                        icon: 'upload_file',
+                        onClick: () => setShowImportModal(true)
+                    });
+                }
             } else if (subView === 'bank_sync') {
                 actions.push({
                     label: 'Đồng bộ ngay',
@@ -491,6 +542,109 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
             alert("Lỗi khi xóa dữ liệu.");
         }
     };
+
+    // Handle Excel import for cash receipts/payments
+    const handleImportFromExcel = useCallback(async (data: any[]) => {
+        if (!data || data.length === 0) {
+            alert('Không có dữ liệu để nhập');
+            return;
+        }
+
+        // Group by doc_no to create multiple vouchers
+        const groupedVouchers: Record<string, {
+            doc_no: string;
+            doc_date: string;
+            payer_name?: string;
+            payee_name?: string;
+            object_name?: string;
+            address?: string;
+            reason?: string;
+            lines: any[];
+        }> = {};
+
+        data.forEach(row => {
+            const docNo = row.doc_no || row['Số PT'] || row['Số PC'] || `IMP-${Date.now()}`;
+
+            if (!groupedVouchers[docNo]) {
+                groupedVouchers[docNo] = {
+                    doc_no: docNo,
+                    doc_date: row.doc_date || row['Ngày CT'] || toInputDateValue(),
+                    payer_name: row.payer_name || row['Người nộp tiền'] || '',
+                    payee_name: row.payee_name || row['Người nhận tiền'] || '',
+                    object_name: row.object_name || row['Đơn vị/Khách hàng'] || row['Đơn vị/Nhà cung cấp'] || '',
+                    address: row.address || row['Địa chỉ'] || '',
+                    reason: row.reason || row['Lý do nộp'] || row['Lý do chi'] || '',
+                    lines: []
+                };
+            }
+
+            // Add line to voucher
+            groupedVouchers[docNo].lines.push({
+                description: row.reason || row['Lý do nộp'] || row['Lý do chi'] || row.description || '',
+                debitAcc: row.debit_acc || row['TK Nợ'] || (subView === 'receipt' ? '1111' : ''),
+                creditAcc: row.credit_acc || row['TK Có'] || (subView === 'payment' ? '1111' : ''),
+                amount: parseFloat(String(row.amount || row['Số tiền'] || 0).replace(/[,\.]/g, '')) || 0,
+                itemCode: row.item_code || row['Mục'] || '',
+                subItemCode: row.sub_item_code || row['Khoản mục'] || ''
+            });
+        });
+
+        const voucherList = Object.values(groupedVouchers);
+
+        if (voucherList.length === 0) {
+            alert('Không có chứng từ hợp lệ để nhập');
+            return;
+        }
+
+        setImporting(true);
+        setImportProgress({ current: 0, total: voucherList.length });
+
+        const errors: string[] = [];
+        let successCount = 0;
+
+        for (let i = 0; i < voucherList.length; i++) {
+            const v = voucherList[i];
+            setImportProgress({ current: i + 1, total: voucherList.length });
+
+            try {
+                const vType = subView === 'receipt' ? 'CASH_IN' : 'CASH_OUT';
+                const totalAmount = v.lines.reduce((sum, l) => sum + (l.amount || 0), 0);
+
+                const payload = {
+                    doc_no: v.doc_no,
+                    doc_date: v.doc_date,
+                    post_date: v.doc_date,
+                    description: v.reason || `${subView === 'receipt' ? 'Thu' : 'Chi'} tiền - Import`,
+                    type: vType,
+                    total_amount: totalAmount,
+                    payer_name: v.payer_name,
+                    payee_name: v.payee_name,
+                    partner_name: v.object_name,
+                    address: v.address,
+                    lines: v.lines
+                };
+
+                await voucherService.save(payload);
+                successCount++;
+            } catch (err: any) {
+                const errorMsg = `${v.doc_no}: ${err.response?.data?.error || err.message}`;
+                errors.push(errorMsg);
+            }
+        }
+
+        setImporting(false);
+        setShowImportModal(false);
+
+        // Show result
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} ${subView === 'receipt' ? 'phiếu thu' : 'phiếu chi'}!`);
+        } else {
+            alert(`Nhập ${successCount}/${voucherList.length} chứng từ.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        // Refresh data
+        loadBalances();
+    }, [subView]);
 
     const formatNumber = (num: number) => {
         return new Intl.NumberFormat('vi-VN').format(num);
@@ -781,7 +935,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                         />
                     )}
                 </div>
-                {/* Print Preview Modal - HCSN Standard */}
+                {/* Print Preview Modal */}
                 {showPrintPreview && printRecord && (
                     <PrintPreviewModal
                         record={printRecord}
@@ -906,7 +1060,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-10">#</th>
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Diễn giải</th>
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-20">Mục</th>
-                                                    <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">Tiểu mục</th>
+                                                    <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">Khoản mục</th>
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">TK Nợ</th>
                                                     <th className="px-3 py-2 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">TK Có</th>
                                                     <th className="px-3 py-2 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-36">Số tiền</th>
@@ -948,6 +1102,62 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                         </div>
                     </FormModal>
                 </div >
+            )}
+
+            {/* Excel Import Modal */}
+            {showImportModal && (
+                <ExcelImportModal
+                    onClose={() => setShowImportModal(false)}
+                    onImport={handleImportFromExcel}
+                    title={subView === 'receipt' ? 'Nhập phiếu thu từ Excel' : 'Nhập phiếu chi từ Excel'}
+                    enhancedTemplate={subView === 'receipt' ? CASH_RECEIPT_TEMPLATE : CASH_PAYMENT_TEMPLATE}
+                    columns={subView === 'receipt' ? [
+                        { key: 'doc_no', label: 'Số PT', required: true },
+                        { key: 'doc_date', label: 'Ngày CT', required: true },
+                        { key: 'payer_name', label: 'Người nộp tiền' },
+                        { key: 'object_name', label: 'Đơn vị/Khách hàng' },
+                        { key: 'address', label: 'Địa chỉ' },
+                        { key: 'reason', label: 'Lý do nộp', required: true },
+                        { key: 'debit_acc', label: 'TK Nợ', required: true },
+                        { key: 'credit_acc', label: 'TK Có', required: true },
+                        { key: 'amount', label: 'Số tiền', required: true },
+                        { key: 'item_code', label: 'Mục' },
+                        { key: 'sub_item_code', label: 'Khoản mục' }
+                    ] : [
+                        { key: 'doc_no', label: 'Số PC', required: true },
+                        { key: 'doc_date', label: 'Ngày CT', required: true },
+                        { key: 'payee_name', label: 'Người nhận tiền' },
+                        { key: 'object_name', label: 'Đơn vị/Nhà cung cấp' },
+                        { key: 'address', label: 'Địa chỉ' },
+                        { key: 'reason', label: 'Lý do chi', required: true },
+                        { key: 'debit_acc', label: 'TK Nợ', required: true },
+                        { key: 'credit_acc', label: 'TK Có', required: true },
+                        { key: 'amount', label: 'Số tiền', required: true },
+                        { key: 'item_code', label: 'Mục' },
+                        { key: 'sub_item_code', label: 'Khoản mục' }
+                    ]}
+                />
+            )}
+
+            {/* Import Progress Overlay */}
+            {importing && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            Đang nhập {subView === 'receipt' ? 'phiếu thu' : 'phiếu chi'}...
+                        </p>
+                        <p className="text-2xl font-mono text-blue-600 mt-2">
+                            {importProgress.current} / {importProgress.total}
+                        </p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                            <div
+                                className="bg-blue-600 h-2 rounded-full transition-all"
+                                style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
             )}
 
         </div >

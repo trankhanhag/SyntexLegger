@@ -46,6 +46,22 @@
         @apply p-6 overflow-y-auto;
     }
 
+    .form-modal__footer {
+        @apply flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800;
+    }
+
+    .form-modal__footer--start {
+        @apply justify-start;
+    }
+
+    .form-modal__footer--center {
+        @apply justify-center;
+    }
+
+    .form-modal__footer--between {
+        @apply justify-between;
+    }
+
     .form-label {
         @apply block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1;
     }
@@ -342,16 +358,131 @@
      * HIDE NON-PRINTABLE ELEMENTS
      * ============================================ */
     /* Hide sidebar, ribbon, modals backdrop, buttons */
-    body>div:not(.print-container),
     .sidebar,
     .ribbon,
     .no-print,
     button,
     [data-no-print],
     .modal-backdrop,
-    .fixed:not(.printable-area):not(.print-container) {
+    .fixed:not(.printable-area):not(.print-container):not(.print-content) {
         display: none !important;
         visibility: hidden !important;
+    }
+
+    /* Hide print-container when using browser-print mode */
+    body.browser-print-mode .print-container {
+        display: none !important;
+    }
+
+    /* Show main app when using browser-print mode */
+    body.browser-print-mode #root {
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    /* ============================================
+     * DIRECT PRINT MODE (for reports - skip app preview)
+     * Browser tự động phân trang
+     * ============================================ */
+    body.direct-print-mode #root {
+        display: none !important;
+    }
+
+    body.direct-print-mode .hidden-print-container {
+        position: static !important;
+        left: auto !important;
+        display: block !important;
+        visibility: visible !important;
+        width: 100% !important;
+    }
+
+    body.direct-print-mode .hidden-print-container .printable-area {
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 15mm !important;
+        box-sizing: border-box !important;
+        background: white !important;
+    }
+
+    /* Table header lặp lại mỗi trang */
+    body.direct-print-mode .hidden-print-container table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+
+    body.direct-print-mode .hidden-print-container thead {
+        display: table-header-group !important;
+    }
+
+    /* Không cắt dòng giữa trang */
+    body.direct-print-mode .hidden-print-container tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    /* Giữ phần ký tên cùng nhau */
+    body.direct-print-mode .hidden-print-container .print-signatures {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    /* ============================================
+     * BROWSER PRINT MODE (for list views, reports)
+     * ============================================ */
+    .print-content {
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+        width: 100% !important;
+        background: white !important;
+        color: black !important;
+        padding: 15mm !important;
+        font-family: "Times New Roman", serif !important;
+        font-size: 11pt !important;
+    }
+
+    .print-content * {
+        visibility: visible !important;
+        color: black !important;
+    }
+
+    .print-content table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+
+    .print-content th,
+    .print-content td {
+        border: 1px solid #333 !important;
+        padding: 4px 8px !important;
+        text-align: left !important;
+    }
+
+    .print-content th {
+        background: #f0f0f0 !important;
+        font-weight: bold !important;
+    }
+
+    .print-content .print-header {
+        text-align: center !important;
+        margin-bottom: 20px !important;
+    }
+
+    .print-content .print-title {
+        font-size: 16pt !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+    }
+
+    .print-content .print-subtitle {
+        font-size: 12pt !important;
+        color: #333 !important;
     }
 
     /* ============================================
@@ -386,13 +517,14 @@
         position: relative !important;
         width: 100% !important;
         max-width: 100% !important;
-        min-height: 100vh !important;
+        height: auto !important;
+        max-height: 100vh !important;
         margin: 0 !important;
         padding: 0 !important;
         background: white !important;
         color: black !important;
         box-sizing: border-box !important;
-        overflow: visible !important;
+        overflow: hidden !important;
         box-shadow: none !important;
         border: none !important;
         transform: none !important;

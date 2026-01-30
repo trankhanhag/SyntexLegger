@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { Ribbon, type RibbonAction } from './components/Ribbon';
@@ -17,8 +17,9 @@ import { InventoryModule } from './components/InventoryModule';
 import { ContractModule } from './components/ContractModule';
 import { ProjectModule } from './components/ProjectModule';
 import { DimensionModule } from './components/DimensionModule';
-import { TreasuryDashboard } from './components/Treasury/TreasuryDashboard';
-import FundSourceModule from './components/FundSourceModule';
+// REMOVED: Treasury and FundSource modules (HCSN-specific)
+// import { TreasuryDashboard } from './components/Treasury/TreasuryDashboard';
+// import FundSourceModule from './components/FundSourceModule';
 import { GeneralModuleV2 as GeneralModule } from './components/GeneralModuleV2';
 
 import { Footer } from './components/Footer';
@@ -26,6 +27,7 @@ import { VirtualAuditHealthCheck } from './components/AuditModal';
 import { MacroSequence } from './components/MacroSequence';
 import { RightSidebar } from './components/RightSidebar';
 import { KeyboardShortcutsPanelWrapper } from './components/KeyboardShortcutsPanel';
+import { SearchCommandPalette, useSearchCommandPalette } from './components/SearchCommandPalette';
 import api from './api';
 
 function App() {
@@ -49,8 +51,9 @@ function App() {
   const [projectView, setProjectView] = useState(savedState.projectView || 'list');
   const [dimView, setDimView] = useState(savedState.dimView || 'overview');
   const [sysView, setSysView] = useState(savedState.sysView || 'params');
-  const [fundView, setFundView] = useState(savedState.fundView || 'list');
-  const [treasuryView, setTreasuryView] = useState(savedState.treasuryView || 'dashboard');
+  // REMOVED: HCSN-specific views
+  // const [fundView, setFundView] = useState(savedState.fundView || 'list');
+  // const [treasuryView, setTreasuryView] = useState(savedState.treasuryView || 'dashboard');
   const [printSignal, setPrintSignal] = useState(0);
   const [exportSignal, setExportSignal] = useState(0);
   const [importSignal, setImportSignal] = useState(0);
@@ -60,12 +63,36 @@ function App() {
     const state = {
       activeTab, dashboardView, generalView, reportView, revenueView, cashView,
       loanView, taxView, expenseView, inventoryView, assetView, hrView,
-      contractView, projectView, dimView, sysView, fundView, treasuryView
+      contractView, projectView, dimView, sysView
     };
     localStorage.setItem('app_navigation_state', JSON.stringify(state));
   }, [activeTab, dashboardView, generalView, reportView, revenueView, cashView,
     loanView, taxView, expenseView, inventoryView, assetView, hrView,
-    contractView, projectView, dimView, sysView, fundView, treasuryView]);
+    contractView, projectView, dimView, sysView]);
+
+  // Compute active view for Sidebar highlighting
+  const activeView = useMemo(() => {
+    const viewMap: Record<string, string> = {
+      dashboard: dashboardView,
+      general: generalView,
+      report: reportView,
+      revenue: revenueView,
+      cash: cashView,
+      loan: loanView,
+      tax: taxView,
+      expense: expenseView,
+      inventory: inventoryView,
+      asset: assetView,
+      hr: hrView,
+      contract: contractView,
+      project: projectView,
+      dimension: dimView,
+      system: sysView
+    };
+    return viewMap[activeTab];
+  }, [activeTab, dashboardView, generalView, reportView, revenueView, cashView,
+    loanView, taxView, expenseView, inventoryView, assetView, hrView,
+    contractView, projectView, dimView, sysView]);
 
   // Page Header State (title, icon, and actions to be shown in Ribbon)
   const [pageHeader, setPageHeader] = useState<{ title?: string; icon?: string; actions?: RibbonAction[]; onDelete?: () => void }>({});
@@ -78,6 +105,9 @@ function App() {
 
   // Mobile Sidebar State
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Search Command Palette
+  const searchPalette = useSearchCommandPalette();
 
   useEffect(() => {
     const autoLoginEnabled = import.meta.env.VITE_DISABLE_AUTO_LOGIN !== 'true';
@@ -143,38 +173,38 @@ function App() {
       'opening_balance',
     ]);
 
-    if (generalViews.has(viewId) || viewId.startsWith('cost_')) {
+    // cost_item, cost_revenue -> general; cost_analysis -> report
+    if (generalViews.has(viewId) || (viewId.startsWith('cost_') && viewId !== 'cost_analysis')) {
       setActiveTab('general');
       setGeneralView(viewId);
       return;
     }
 
     const reportViews = new Set([
-      'balance_sheet_hcsn', // HCSN
-      'activity_result', // HCSN
-      'budget_settlement_regular', // HCSN
-      'budget_settlement_nonregular', // HCSN
-      'budget_settlement_capex', // HCSN
-      'budget_performance', // HCSN
-      'fund_source_report', // HCSN
-      'infrastructure_report', // HCSN
-      'balance_sheet',
+      // === BÁO CÁO TÀI CHÍNH DN (TT 99/2025) ===
+      'balance_sheet_dn',
+      'profit_loss',
+      'cash_flow_dn',
+      'notes_fs',
+      // === BÁO CÁO PHÂN TÍCH ===
+      'budget_performance',
+      'profitability_analysis',
+      'cost_analysis',
+      'financial_analysis',
+      // === SỔ KẾ TOÁN ===
       'trial_balance',
-      'pnl',
-      'cash_flow',
       'ledger',
-      'cash_book',
-      'inventory_summary',
       'general_ledger',
+      'cash_book',
       'bank_book',
+      // === SỔ CHI TIẾT ===
+      'inventory_summary',
       'inventory_ledger',
       'debt_ledger',
-      'vat_in',
-      'vat_out',
-      'project_pnl',
-      'expense_dept',
+      // === KHÁC ===
       'transaction_details',
-      'custom_report', // Custom Report Generator
+      'custom_report',
+      'xml_export',
     ]);
 
     if (viewId === 'project_pnl' && activeTab === 'project') {
@@ -261,11 +291,12 @@ function App() {
       return;
     }
 
-    if (viewId.startsWith('treasury_') || viewId === 'treasury') {
-      setActiveTab('treasury');
-      setTreasuryView(viewId === 'treasury' ? 'dashboard' : viewId.replace('treasury_', ''));
-      return;
-    }
+    // REMOVED: Treasury navigation (HCSN-specific)
+    // if (viewId.startsWith('treasury_') || viewId === 'treasury') {
+    //   setActiveTab('treasury');
+    //   setTreasuryView(viewId === 'treasury' ? 'dashboard' : viewId.replace('treasury_', ''));
+    //   return;
+    // }
 
     // General Accounting Views
     if (['voucher', 'voucher_list', 'check', 'closing', 'allocation', 'revaluation', 'locking', 'account_list', 'cost_item', 'opening_balance'].includes(viewId)) {
@@ -281,7 +312,7 @@ function App() {
 
   return (
     <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 overflow-hidden h-screen flex flex-col group/design-root">
-      <Header />
+      <Header onSearch={searchPalette.open} />
       <Ribbon
         activeTab={activeTab}
         onTabChange={(tab) => {
@@ -302,8 +333,6 @@ function App() {
           setProjectView('overview');
           setDimView('overview');
           setSysView('overview');
-          setFundView('overview');
-          setTreasuryView('overview');
           setDashboardView('dashboard');
           setPrintSignal(0);
         }}
@@ -330,6 +359,7 @@ function App() {
 
         <Sidebar
           activeTab={activeTab}
+          activeView={activeView}
           onNavigate={(view) => {
             handleNavigate(view);
             setIsMobileSidebarOpen(false); // Close sidebar after navigation on mobile
@@ -368,8 +398,9 @@ function App() {
           {activeTab === 'system' && <SystemModule subView={sysView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
 
 
-          {activeTab === 'fund' && <FundSourceModule subView={fundView} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
-          {activeTab === 'treasury' && <TreasuryDashboard subView={treasuryView} onNavigate={handleNavigate} />}
+          {/* REMOVED: HCSN-specific modules */}
+          {/* {activeTab === 'fund' && <FundSourceModule subView={fundView} onSetHeader={setPageHeader} onNavigate={handleNavigate} />} */}
+          {/* {activeTab === 'treasury' && <TreasuryDashboard subView={treasuryView} onNavigate={handleNavigate} />} */}
         </div>
 
         <RightSidebar />
@@ -377,6 +408,9 @@ function App() {
 
       {showAuditModal && <VirtualAuditHealthCheck onClose={() => setShowAuditModal(false)} onNavigate={handleNavigate} />}
       {showMacroModal && <MacroSequence onClose={() => setShowMacroModal(false)} onNavigate={handleNavigate} />}
+
+      {/* Search Command Palette - Toggle with Ctrl+K */}
+      <SearchCommandPalette isOpen={searchPalette.isOpen} onClose={searchPalette.close} onNavigate={handleNavigate} />
 
       {/* Keyboard Shortcuts Panel - Toggle with Shift+? */}
       <KeyboardShortcutsPanelWrapper />

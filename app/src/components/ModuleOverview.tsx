@@ -1,6 +1,6 @@
 /**
  * ModuleOverview Component
- * SyntexHCSN - Component hiển thị tổng quan phân hệ
+ * SyntexLegger - Component hiển thị tổng quan phân hệ
  * 
  * Thiết kế đồng bộ, hiển thị:
  * - Tiêu đề & mô tả phân hệ

@@ -4,13 +4,13 @@ import { toVietnameseWords } from '../utils/numberToWords';
 import { PrintPreviewShell } from './PrintPreviewShell';
 
 export type PaperSize = 'A4' | 'A4-landscape' | 'A5' | 'A5-landscape';
-export type VoucherView = 'RECEIPT' | 'ISSUE' | 'CASH_RECEIPT' | 'CASH_PAYMENT' | 'TRANSFER';
+export type VoucherView = 'RECEIPT' | 'ISSUE' | 'CASH_RECEIPT' | 'CASH_PAYMENT' | 'TRANSFER' | 'ASSET_CARD' | 'ASSET_HANDOVER';
 
 export interface PrintTemplateProps {
     record: any;
     view: VoucherView;
     onClose: () => void;
-    companyInfo?: { name: string; address: string; taxCode?: string; maDVQHNS?: string };
+    companyInfo?: { name: string; address: string; taxCode?: string };
     defaultPaperSize?: PaperSize;
 }
 
@@ -38,16 +38,16 @@ export const getPaperDimensions = (size: PaperSize): { width: string; minHeight:
 
 // === HEADER COMPONENT ===
 const TemplateHeader = ({ companyInfo, formNumber, circular }: {
-    companyInfo?: { name: string; address: string; taxCode?: string; maDVQHNS?: string };
+    companyInfo?: { name: string; address: string; taxCode?: string };
     formNumber: string;
     circular: string;
 }) => (
     <div className="flex justify-between items-start mb-4 font-serif text-black">
         <div className="max-w-[55%]">
-            <p className="font-bold text-[11pt] uppercase leading-tight">{companyInfo?.name || 'TÊN ĐƠN VỊ'}</p>
-            <p className="text-[10pt] mt-1">{companyInfo?.address || 'Địa chỉ đơn vị'}</p>
-            {companyInfo?.maDVQHNS && (
-                <p className="text-[10pt] mt-0.5">Mã ĐVQHNS: <span className="font-bold">{companyInfo.maDVQHNS}</span></p>
+            <p className="font-bold text-[11pt] uppercase leading-tight">{companyInfo?.name || 'TÊN DOANH NGHIỆP'}</p>
+            <p className="text-[10pt] mt-1">{companyInfo?.address || 'Địa chỉ trụ sở'}</p>
+            {companyInfo?.taxCode && (
+                <p className="text-[10pt] mt-0.5">MST: <span className="font-bold">{companyInfo.taxCode}</span></p>
             )}
         </div>
         <div className="text-right">
@@ -351,6 +351,237 @@ const CashTemplate = ({ record, companyInfo, type, paperSize }: {
     );
 };
 
+// === MẪU C21-H: THẺ TÀI SẢN CỐ ĐỊNH ===
+const AssetCardTemplate = ({ record, companyInfo, paperSize }: {
+    record: any;
+    companyInfo?: PrintTemplateProps['companyInfo'];
+    paperSize: PaperSize;
+}) => {
+    const dimensions = getPaperDimensions(paperSize);
+    const isCompact = paperSize !== 'A4';
+
+    // Calculate depreciation info
+    const monthlyDepreciation = record.useful_life ? Math.round((record.original_value || 0) / ((record.useful_life || 1) * 12)) : 0;
+    const yearlyDepreciation = monthlyDepreciation * 12;
+
+    return (
+        <div
+            className={`bg-white text-black shadow-2xl printable-area preview-page font-serif mx-auto ${getPaperSizeClass(paperSize)}`}
+            style={{ width: dimensions.width, minHeight: dimensions.minHeight }}
+        >
+            <TemplateHeader
+                companyInfo={companyInfo}
+                formNumber="Mẫu số C21-H"
+                circular="(Ban hành theo TT số 24/2024/TT-BTC ngày 17/04/2024 của Bộ Tài chính)"
+            />
+
+            <div className="text-center mb-4">
+                <h1 className={`font-bold uppercase mb-1 ${isCompact ? 'text-lg' : 'text-xl'}`}>THẺ TÀI SẢN CỐ ĐỊNH</h1>
+                <p className="text-[10pt]">Số thẻ: <span className="font-bold">{record.code}</span></p>
+            </div>
+
+            <div className="space-y-2 text-[10pt] mb-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <p>Ngày ghi tăng TSCĐ: <span className="font-bold">{record.start_date || record.purchase_date || '..../..../........'}</span></p>
+                    <p>Ngày ghi giảm TSCĐ: {record.decrease_date || '..../..../........'}</p>
+                </div>
+                <p>Tên TSCĐ: <span className="font-bold uppercase">{record.name || '...............................................'}</span></p>
+                <div className="grid grid-cols-2 gap-4">
+                    <p>Nhãn hiệu, quy cách: {record.specification || '...............................................'}</p>
+                    <p>Số hiệu: {record.serial_no || '.................'}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <p>Nước sản xuất: {record.country || '.................'}</p>
+                    <p>Năm SX: {record.manufacture_year || '........'}</p>
+                    <p>Năm sử dụng: {record.start_year || new Date().getFullYear()}</p>
+                </div>
+                <p>Bộ phận quản lý, sử dụng: <span className="font-bold">{record.dept || record.department || '...............................................'}</span></p>
+                <p>Công suất thiết kế: {record.capacity || '...................'} | Diện tích: {record.area || '...................'}</p>
+            </div>
+
+            {/* Main Info Table */}
+            <table className="w-full text-[9pt] border-collapse mb-3">
+                <thead>
+                    <tr>
+                        <th className="border border-black p-1.5 text-center">Số hiệu chứng từ</th>
+                        <th className="border border-black p-1.5 text-center">Nguyên giá TSCĐ</th>
+                        <th className="border border-black p-1.5 text-center">Nguồn hình thành</th>
+                        <th className="border border-black p-1.5 text-center">Số năm sử dụng</th>
+                        <th className="border border-black p-1.5 text-center">Mức KH/năm</th>
+                        <th className="border border-black p-1.5 text-center">Mức KH/tháng</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td className="border border-black p-1.5 text-center">{record.voucher_no || record.doc_no || '.........'}</td>
+                        <td className="border border-black p-1.5 text-right font-bold">{formatNumber(record.original_value || 0)}</td>
+                        <td className="border border-black p-1.5 text-center">{record.fund_source_name || record.source || 'Công ty'}</td>
+                        <td className="border border-black p-1.5 text-center">{record.useful_life || '...'}</td>
+                        <td className="border border-black p-1.5 text-right">{formatNumber(yearlyDepreciation)}</td>
+                        <td className="border border-black p-1.5 text-right">{formatNumber(monthlyDepreciation)}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            {/* Depreciation History Table */}
+            <p className="font-bold text-[10pt] mb-1">GHI GIẢM TSCĐ VÀ HAO MÒN LŨY KẾ:</p>
+            <table className="w-full text-[9pt] border-collapse mb-4">
+                <thead>
+                    <tr>
+                        <th className="border border-black p-1 w-8">STT</th>
+                        <th className="border border-black p-1">Chứng từ (Số, ngày)</th>
+                        <th className="border border-black p-1">Lý do giảm</th>
+                        <th className="border border-black p-1 w-28">Giá trị hao mòn LK</th>
+                        <th className="border border-black p-1 w-28">Giá trị còn lại</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {(record.depreciation_log || []).slice(0, 4).map((log: any, i: number) => (
+                        <tr key={i}>
+                            <td className="border border-black p-1 text-center">{i + 1}</td>
+                            <td className="border border-black p-1">{log.doc_no} - {log.date}</td>
+                            <td className="border border-black p-1">{log.reason || 'Khấu hao định kỳ'}</td>
+                            <td className="border border-black p-1 text-right">{formatNumber(log.accumulated || 0)}</td>
+                            <td className="border border-black p-1 text-right">{formatNumber(log.remaining || 0)}</td>
+                        </tr>
+                    ))}
+                    {/* Empty rows */}
+                    {Array.from({ length: Math.max(0, 4 - (record.depreciation_log?.length || 0)) }).map((_, i) => (
+                        <tr key={`empty-${i}`} className="h-6">
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                        </tr>
+                    ))}
+                    {/* Current accumulated row */}
+                    <tr className="font-bold bg-slate-50">
+                        <td colSpan={3} className="border border-black p-1 text-right">Lũy kế đến hiện tại:</td>
+                        <td className="border border-black p-1 text-right text-red-600">{formatNumber(record.accumulated_depreciation || 0)}</td>
+                        <td className="border border-black p-1 text-right text-blue-600">{formatNumber(record.net_value || (record.original_value - (record.accumulated_depreciation || 0)))}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <SignatureSection
+                signatures={['Người lập thẻ', 'Kế toán trưởng']}
+                compact={isCompact}
+            />
+        </div>
+    );
+};
+
+// === MẪU C22-BB: BIÊN BẢN GIAO NHẬN TÀI SẢN CỐ ĐỊNH ===
+const AssetHandoverTemplate = ({ record, companyInfo, paperSize }: {
+    record: any;
+    companyInfo?: PrintTemplateProps['companyInfo'];
+    paperSize: PaperSize;
+}) => {
+    const dimensions = getPaperDimensions(paperSize);
+    const isCompact = paperSize !== 'A4';
+
+    return (
+        <div
+            className={`bg-white text-black shadow-2xl printable-area preview-page font-serif mx-auto ${getPaperSizeClass(paperSize)}`}
+            style={{ width: dimensions.width, minHeight: dimensions.minHeight }}
+        >
+            <TemplateHeader
+                companyInfo={companyInfo}
+                formNumber="Mẫu số C22-BB"
+                circular="(Ban hành theo TT số 24/2024/TT-BTC ngày 17/04/2024 của Bộ Tài chính)"
+            />
+
+            <div className="text-center mb-4">
+                <h1 className={`font-bold uppercase mb-1 ${isCompact ? 'text-lg' : 'text-xl'}`}>BIÊN BẢN GIAO NHẬN TÀI SẢN CỐ ĐỊNH</h1>
+                <p className="italic text-[10pt]">{formatDateVNLong(record.handover_date || record.date || new Date())}</p>
+                <p className="text-[10pt] font-bold mt-0.5">Số: {record.handover_no || record.doc_no || '.........'}</p>
+                <div className="flex justify-center gap-6 text-[9pt] mt-1">
+                    <p>Nợ: {record.debit_account || '211'}</p>
+                    <p>Có: {record.credit_account || '...........'}</p>
+                </div>
+            </div>
+
+            <div className="text-[10pt] mb-4 space-y-1.5 leading-relaxed">
+                <p>Căn cứ Quyết định số: {record.decision_no || '...................'} ngày {record.decision_date || '..../..../........'}</p>
+                <p>Của: {record.decision_by || '...............................................'} về việc giao nhận TSCĐ.</p>
+                <p className="font-bold">Bên giao: {record.from_party || record.supplier || '...............................................'}</p>
+                <p className="font-bold">Bên nhận: {record.to_party || companyInfo?.name || '...............................................'}</p>
+                <p>Địa điểm giao nhận: {record.location || '...............................................'}</p>
+            </div>
+
+            <table className="w-full text-[9pt] border-collapse mb-3">
+                <thead>
+                    <tr>
+                        <th className="border border-black p-1 w-8" rowSpan={2}>STT</th>
+                        <th className="border border-black p-1" rowSpan={2}>Tên, ký mã hiệu, quy cách (cấp hạng) TSCĐ</th>
+                        <th className="border border-black p-1 w-14" rowSpan={2}>Số hiệu TSCĐ</th>
+                        <th className="border border-black p-1 w-14" rowSpan={2}>Nước SX</th>
+                        <th className="border border-black p-1 w-12" rowSpan={2}>Năm SX</th>
+                        <th className="border border-black p-1 w-14" rowSpan={2}>Năm đưa vào SD</th>
+                        <th className="border border-black p-1" colSpan={2}>Công suất/Diện tích</th>
+                        <th className="border border-black p-1 w-24" rowSpan={2}>Nguyên giá TSCĐ</th>
+                    </tr>
+                    <tr>
+                        <th className="border border-black p-1 w-14">Thiết kế</th>
+                        <th className="border border-black p-1 w-14">Thực tế</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {(record.items || [record]).map((item: any, i: number) => (
+                        <tr key={i}>
+                            <td className="border border-black p-1 text-center">{i + 1}</td>
+                            <td className="border border-black p-1 font-bold">{item.name}</td>
+                            <td className="border border-black p-1 text-center">{item.code}</td>
+                            <td className="border border-black p-1 text-center">{item.country || 'VN'}</td>
+                            <td className="border border-black p-1 text-center">{item.manufacture_year || ''}</td>
+                            <td className="border border-black p-1 text-center">{item.start_year || new Date().getFullYear()}</td>
+                            <td className="border border-black p-1 text-center">{item.capacity_design || ''}</td>
+                            <td className="border border-black p-1 text-center">{item.capacity_actual || ''}</td>
+                            <td className="border border-black p-1 text-right font-bold">{formatNumber(item.original_value || 0)}</td>
+                        </tr>
+                    ))}
+                    {/* Empty rows */}
+                    {Array.from({ length: Math.max(0, (isCompact ? 2 : 4) - (record.items?.length || 1)) }).map((_, i) => (
+                        <tr key={`empty-${i}`} className="h-6">
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                            <td className="border border-black p-1"></td>
+                        </tr>
+                    ))}
+                    <tr className="font-bold">
+                        <td colSpan={8} className="border border-black p-1 text-right">Cộng:</td>
+                        <td className="border border-black p-1 text-right">
+                            {formatNumber((record.items || [record]).reduce((sum: number, item: any) => sum + (item.original_value || 0), 0))}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div className="text-[10pt] mb-3 space-y-1">
+                <p>Tổng số tiền (viết bằng chữ): <span className="italic font-bold">
+                    {toVietnameseWords((record.items || [record]).reduce((sum: number, item: any) => sum + (item.original_value || 0), 0))}
+                </span>.</p>
+                <p>Hồ sơ kèm theo: {record.attached_docs || '...............................................'}</p>
+            </div>
+
+            <SignatureSection
+                signatures={isCompact
+                    ? ['Bên giao', 'Bên nhận', 'Kế toán trưởng']
+                    : ['Người lập', 'Bên giao', 'Bên nhận', 'Kế toán trưởng', 'Thủ trưởng đơn vị']
+                }
+                compact={isCompact}
+            />
+        </div>
+    );
+};
+
 // === PAPER SIZE SELECTOR ===
 export const PaperSizeSelector = ({ value, onChange, allowedSizes }: {
     value: PaperSize;
@@ -486,6 +717,7 @@ export const PrintPreviewModal = ({ record, view, onClose, companyInfo, defaultP
     const getDefaultSize = (): PaperSize => {
         if (defaultPaperSize) return defaultPaperSize;
         if (view === 'CASH_RECEIPT' || view === 'CASH_PAYMENT') return 'A5';
+        if (view === 'ASSET_CARD' || view === 'ASSET_HANDOVER') return 'A4';
         return 'A4';
     };
 
@@ -515,6 +747,10 @@ export const PrintPreviewModal = ({ record, view, onClose, companyInfo, defaultP
                 return <CashTemplate record={record} companyInfo={companyInfo} type="CASH_RECEIPT" paperSize={paperSize} />;
             case 'CASH_PAYMENT':
                 return <CashTemplate record={record} companyInfo={companyInfo} type="CASH_PAYMENT" paperSize={paperSize} />;
+            case 'ASSET_CARD':
+                return <AssetCardTemplate record={record} companyInfo={companyInfo} paperSize={paperSize} />;
+            case 'ASSET_HANDOVER':
+                return <AssetHandoverTemplate record={record} companyInfo={companyInfo} paperSize={paperSize} />;
             default:
                 return (
                     <div className="flex flex-col items-center justify-center p-20 text-slate-400">
@@ -535,7 +771,7 @@ export const PrintPreviewModal = ({ record, view, onClose, companyInfo, defaultP
         <PrintPreviewShell
             title="Xem trước bản in"
             onClose={onClose}
-            onPrint={() => window.print()}
+            paperSize={paperSize}
             controls={(
                 <PrintConfigControls
                     paperSize={paperSize}

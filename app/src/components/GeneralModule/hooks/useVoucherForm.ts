@@ -1,13 +1,39 @@
 /**
  * useVoucherForm Hook
- * SyntexHCSN - Custom hook cho quản lý form voucher
- * 
+ * SyntexLegger - Custom hook cho quản lý form voucher
+ *
  * Tách logic form state management từ GeneralModule.tsx
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { voucherService } from '../../../api';
 import type { Voucher, VoucherLine } from '../types/voucher.types';
+
+/**
+ * Check if account is off-balance sheet (TK ngoài bảng)
+ * Vietnamese accounting: accounts starting with "0" are off-balance sheet
+ * Examples: 001, 002, 003, 004, 005, 007, 008, 009
+ * These use single-entry bookkeeping, not double-entry
+ */
+const isOffBalanceSheetAccount = (accountCode: string | undefined): boolean => {
+    if (!accountCode || typeof accountCode !== 'string') return false;
+    return accountCode.startsWith('0');
+};
+
+/**
+ * Balance check result interface
+ */
+export interface BalanceCheckResult {
+    isBalanced: boolean;
+    totalDebit: number;
+    totalCredit: number;
+    difference: number;
+    onBalanceSheetLines: number;
+    offBalanceSheetLines: number;
+    incompleteLines: number[];  // Line indices with missing accounts
+    status: 'balanced' | 'unbalanced' | 'incomplete';
+    message: string;
+}
 
 // Empty line template
 const EMPTY_LINE: VoucherLine = {
@@ -48,6 +74,9 @@ export interface UseVoucherFormReturn {
     isValid: boolean;
     validate: () => boolean;
 
+    // Balance Check (Real-time)
+    balanceCheck: BalanceCheckResult;
+
     // Line Operations
     addLine: () => void;
     removeLine: (index: number) => void;
@@ -68,18 +97,27 @@ export interface UseVoucherFormReturn {
     getEmptyLine: () => VoucherLine;
 }
 
+export interface DimensionConfig {
+    id: number;
+    name: string;
+    label: string;
+    isActive: number;
+    isMandatory: number;
+}
+
 export interface UseVoucherFormOptions {
     initialData?: Voucher;
     onSaveSuccess?: (voucher: Voucher) => void;
     onSaveError?: (error: string) => void;
     lockedUntil?: string;
+    dimensionConfigs?: DimensionConfig[];
 }
 
 /**
  * Custom hook để quản lý form nhập liệu voucher
  */
 export function useVoucherForm(options: UseVoucherFormOptions = {}): UseVoucherFormReturn {
-    const { initialData, onSaveSuccess, onSaveError, lockedUntil } = options;
+    const { initialData, onSaveSuccess, onSaveError, lockedUntil, dimensionConfigs = [] } = options;
 
     // Form State
     const [voucher, setVoucherState] = useState<Voucher>(
@@ -114,6 +152,90 @@ export function useVoucherForm(options: UseVoucherFormOptions = {}): UseVoucherF
     }, [voucher.lines]);
 
     /**
+     * Real-time balance check with off-balance sheet handling
+     * This is computed on every render for immediate feedback
+     */
+    const balanceCheck = useMemo((): BalanceCheckResult => {
+        const lines = voucher.lines || [];
+
+        let totalDebit = 0;
+        let totalCredit = 0;
+        let onBalanceSheetLines = 0;
+        let offBalanceSheetLines = 0;
+        const incompleteLines: number[] = [];
+
+        lines.forEach((line, idx) => {
+            const amount = line.amount || 0;
+            const debitAcc = line.debitAcc || '';
+            const creditAcc = line.creditAcc || '';
+
+            // Check if accounts are off-balance sheet
+            const isDebitOffBalance = isOffBalanceSheetAccount(debitAcc);
+            const isCreditOffBalance = isOffBalanceSheetAccount(creditAcc);
+
+            // Skip empty lines
+            if (!debitAcc && !creditAcc && amount === 0) {
+                return;
+            }
+
+            // Off-balance sheet entries (single-entry accounting)
+            if (isDebitOffBalance || isCreditOffBalance) {
+                offBalanceSheetLines++;
+                return; // No balance check for off-balance sheet
+            }
+
+            // On-balance sheet entries require BOTH debit and credit accounts
+            if (debitAcc && creditAcc) {
+                // Complete entry - amount is both debited and credited
+                totalDebit += amount;
+                totalCredit += amount;
+                onBalanceSheetLines++;
+            } else if (debitAcc || creditAcc || amount > 0) {
+                // Incomplete entry - has some data but missing account(s)
+                incompleteLines.push(idx);
+                if (debitAcc) totalDebit += amount;
+                if (creditAcc) totalCredit += amount;
+            }
+        });
+
+        const difference = Math.abs(totalDebit - totalCredit);
+        const tolerance = 0.01;
+
+        // Determine status
+        let status: 'balanced' | 'unbalanced' | 'incomplete';
+        let message: string;
+
+        if (incompleteLines.length > 0) {
+            status = 'incomplete';
+            message = `${incompleteLines.length} dòng thiếu tài khoản Nợ hoặc Có`;
+        } else if (difference > tolerance) {
+            status = 'unbalanced';
+            message = `Chênh lệch: ${difference.toLocaleString('vi-VN')} VNĐ`;
+        } else {
+            status = 'balanced';
+            message = onBalanceSheetLines > 0
+                ? `Cân đối (${onBalanceSheetLines} bút toán trong bảng)`
+                : 'Không có bút toán trong bảng';
+        }
+
+        if (offBalanceSheetLines > 0) {
+            message += ` | ${offBalanceSheetLines} bút toán ngoài bảng (không kiểm tra cân đối)`;
+        }
+
+        return {
+            isBalanced: status === 'balanced',
+            totalDebit,
+            totalCredit,
+            difference,
+            onBalanceSheetLines,
+            offBalanceSheetLines,
+            incompleteLines,
+            status,
+            message
+        };
+    }, [voucher.lines]);
+
+    /**
      * Validate the voucher form
      */
     const validate = useCallback((): boolean => {
@@ -139,25 +261,68 @@ export function useVoucherForm(options: UseVoucherFormOptions = {}): UseVoucherF
         if (!voucher.lines || voucher.lines.length === 0) {
             newErrors.lines = 'Cần ít nhất một dòng chi tiết';
         } else {
+            // Get mandatory dimensions from config
+            const mandatoryDims = dimensionConfigs
+                .filter(cfg => cfg.isActive === 1 && cfg.isMandatory === 1)
+                .map(cfg => ({ id: cfg.id, label: cfg.label || cfg.name }));
+
             voucher.lines.forEach((line, index) => {
-                if (!line.debitAcc && !line.creditAcc) {
-                    newErrors[`line_${index}_account`] = `Dòng ${index + 1}: Cần chọn tài khoản Nợ hoặc Có`;
+                const debitAcc = line.debitAcc || '';
+                const creditAcc = line.creditAcc || '';
+                const amount = line.amount || 0;
+
+                // Skip validation for completely empty lines
+                if (!debitAcc && !creditAcc && amount === 0 && !line.description) {
+                    return;
                 }
-                if (!line.amount || line.amount <= 0) {
+
+                // Check if accounts are off-balance sheet
+                const isDebitOffBalance = isOffBalanceSheetAccount(debitAcc);
+                const isCreditOffBalance = isOffBalanceSheetAccount(creditAcc);
+
+                // For on-balance sheet entries, BOTH accounts are required
+                if (!isDebitOffBalance && !isCreditOffBalance) {
+                    if (!debitAcc && !creditAcc) {
+                        newErrors[`line_${index}_account`] = `Dòng ${index + 1}: Cần chọn tài khoản Nợ và Có`;
+                    } else if (!debitAcc) {
+                        newErrors[`line_${index}_debit`] = `Dòng ${index + 1}: Thiếu tài khoản Nợ (TK trong bảng yêu cầu ghi kép)`;
+                    } else if (!creditAcc) {
+                        newErrors[`line_${index}_credit`] = `Dòng ${index + 1}: Thiếu tài khoản Có (TK trong bảng yêu cầu ghi kép)`;
+                    }
+                }
+
+                // Off-balance sheet entries can have single account (single-entry accounting)
+                // No account validation for off-balance sheet
+
+                if (amount <= 0) {
                     newErrors[`line_${index}_amount`] = `Dòng ${index + 1}: Số tiền phải lớn hơn 0`;
+                }
+
+                // Validate mandatory dimensions (only for on-balance sheet entries)
+                if (!isDebitOffBalance && !isCreditOffBalance) {
+                    mandatoryDims.forEach(dim => {
+                        const dimField = `dim${dim.id}` as keyof VoucherLine;
+                        const dimValue = line[dimField];
+                        if (!dimValue || (typeof dimValue === 'string' && !dimValue.trim())) {
+                            newErrors[`line_${index}_dim${dim.id}`] = `Dòng ${index + 1}: ${dim.label} là bắt buộc`;
+                        }
+                    });
                 }
             });
         }
 
-        // Balance check (optional warning, not blocking)
-        const { balance } = calculateTotals();
-        if (Math.abs(balance) > 0.01) {
-            newErrors.balance = `Chênh lệch Nợ/Có: ${balance.toLocaleString('vi-VN')} đ`;
+        // === BALANCE VALIDATION (Nợ = Có) ===
+        // This is a BLOCKING validation - form cannot be saved if not balanced
+        // Exception: Off-balance sheet accounts (TK ngoài bảng bắt đầu bằng "0")
+        const { totalDebit, totalCredit } = calculateTotals();
+        const difference = Math.abs(totalDebit - totalCredit);
+        if (difference > 0.01) {
+            newErrors.balance = `Chứng từ KHÔNG CÂN ĐỐI: Tổng Nợ (${totalDebit.toLocaleString('vi-VN')}) ≠ Tổng Có (${totalCredit.toLocaleString('vi-VN')}), chênh lệch: ${difference.toLocaleString('vi-VN')} VNĐ`;
         }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    }, [voucher, lockedUntil, calculateTotals]);
+    }, [voucher, lockedUntil, calculateTotals, dimensionConfigs]);
 
     const isValid = Object.keys(errors).length === 0;
 
@@ -307,6 +472,7 @@ export function useVoucherForm(options: UseVoucherFormOptions = {}): UseVoucherF
         errors,
         isValid,
         validate,
+        balanceCheck,
         addLine,
         removeLine,
         updateLine,

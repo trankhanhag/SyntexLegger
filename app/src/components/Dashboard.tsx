@@ -134,7 +134,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ subView = 'dashboard', onN
         );
     }
 
-    // MAIN DASHBOARD - HCSN VERSION
+    // MAIN DASHBOARD - Doanh nghiệp VERSION
     const fundUsagePercent = stats.fund_allocated > 0 ? Math.round((stats.fund_spent / stats.fund_allocated) * 100) : 0;
     const budgetUsagePercent = stats.budget_allocated > 0 ? Math.round((stats.budget_spent / stats.budget_allocated) * 100) : 0;
 
@@ -145,7 +145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ subView = 'dashboard', onN
                 {/* Header */}
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Tổng quan HCSN</h1>
+                        <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Tổng quan Doanh nghiệp</h1>
                         <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Dữ liệu cập nhật: {formatTimeVN()}</p>
                     </div>
                 </div>
@@ -203,7 +203,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ subView = 'dashboard', onN
                 </div>
 
 
-                {/* Metric Cards - Updated for HCSN */}
+                {/* Metric Cards - Updated for Doanh nghiệp */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Card 1: Cash - Giữ nguyên */}
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
@@ -225,40 +225,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ subView = 'dashboard', onN
                         </div>
                     </div>
 
-                    {/* Card 2: Nguồn Kinh Phí - MỚI */}
+                    {/* Card 2: Doanh thu */}
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                         <div className="absolute right-0 top-0 w-24 h-24 bg-purple-500/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                         <div className="flex justify-between items-start mb-1">
-                            <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><span className="material-symbols-outlined text-lg">account_balance</span></div>
-                            <button onClick={() => onNavigate?.('fund_list')} className="hover:text-purple-600 text-slate-300"><span className="material-symbols-outlined text-lg">open_in_new</span></button>
+                            <div className="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><span className="material-symbols-outlined text-lg">trending_up</span></div>
+                            <button onClick={() => onNavigate?.('revenue')} className="hover:text-purple-600 text-slate-300"><span className="material-symbols-outlined text-lg">open_in_new</span></button>
                         </div>
                         <div className="mt-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nguồn Kinh Phí</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Doanh Thu</p>
                             <p className="text-xl font-black text-slate-800 dark:text-white tracking-tight font-mono mt-0.5">
                                 {loading ? '...' : formatCurrency(stats.fund_allocated)} <span className="text-xs text-slate-400 font-bold">₫</span>
                             </p>
                         </div>
                         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <span className="text-[10px] text-slate-500 font-medium">Đã chi: <span className="font-bold text-purple-700">{fundUsagePercent}%</span></span>
-                            <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden"><div style={{ width: `${fundUsagePercent}%` }} className="h-full bg-purple-500"></div></div>
+                            <span className="text-[10px] text-slate-500 font-medium">Tăng trưởng: <span className="font-bold text-purple-700">+{fundUsagePercent}%</span></span>
+                            <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden"><div style={{ width: `${Math.min(fundUsagePercent, 100)}%` }} className="h-full bg-purple-500"></div></div>
                         </div>
                     </div>
 
-                    {/* Card 3: Dự Toán - MỚI */}
+                    {/* Card 3: Chi phí */}
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                         <div className="absolute right-0 top-0 w-24 h-24 bg-green-500/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                         <div className="flex justify-between items-start mb-1">
-                            <div className="p-1.5 bg-green-50 text-green-600 rounded-lg"><span className="material-symbols-outlined text-lg">request_quote</span></div>
-                            <button onClick={() => onNavigate?.('fund_budget')} className="hover:text-green-600 text-slate-300"><span className="material-symbols-outlined text-lg">open_in_new</span></button>
+                            <div className="p-1.5 bg-green-50 text-green-600 rounded-lg"><span className="material-symbols-outlined text-lg">receipt_long</span></div>
+                            <button onClick={() => onNavigate?.('expense')} className="hover:text-green-600 text-slate-300"><span className="material-symbols-outlined text-lg">open_in_new</span></button>
                         </div>
                         <div className="mt-1">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dự Toán NS</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chi Phí</p>
                             <p className="text-xl font-black text-slate-800 dark:text-white tracking-tight font-mono mt-0.5">
                                 {loading ? '...' : formatCurrency(stats.budget_allocated)} <span className="text-xs text-slate-400 font-bold">₫</span>
                             </p>
                         </div>
                         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <span className="text-[10px] text-slate-500 font-medium">Giải ngân: <span className="font-bold text-green-700">{budgetUsagePercent}%</span></span>
+                            <span className="text-[10px] text-slate-500 font-medium">Tỷ lệ: <span className="font-bold text-green-700">{budgetUsagePercent}%</span></span>
                             <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden"><div style={{ width: `${budgetUsagePercent}%` }} className="h-full bg-green-500"></div></div>
                         </div>
                     </div>
@@ -286,8 +286,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ subView = 'dashboard', onN
                     <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="font-bold text-slate-800 dark:text-white text-lg">Thu Chi Ngân Sách</h3>
-                                <p className="text-xs text-slate-500">Thu các khoản & Chi hoạt động 12 tháng</p>
+                                <h3 className="font-bold text-slate-800 dark:text-white text-lg">Doanh thu & Chi phí</h3>
+                                <p className="text-xs text-slate-500">Biểu đồ doanh thu và chi phí 12 tháng</p>
                             </div>
                             <div className="flex gap-4 text-xs font-bold">
                                 <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> Thu</div>

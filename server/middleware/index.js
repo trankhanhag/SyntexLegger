@@ -35,6 +35,8 @@ module.exports = {
     sanitizeQuery: validationMiddleware.sanitizeQuery,
     sanitizeParams: validationMiddleware.sanitizeParams,
     validateVoucher: validationMiddleware.validateVoucher,
+    validateVoucherBalance: validationMiddleware.validateVoucherBalance,
+    isOffBalanceSheetAccount: validationMiddleware.isOffBalanceSheetAccount,
     validatePartner: validationMiddleware.validatePartner,
     validateAccount: validationMiddleware.validateAccount,
     validateLogin: validationMiddleware.validateLogin,

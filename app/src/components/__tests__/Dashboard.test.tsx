@@ -59,7 +59,7 @@ describe('Dashboard Component', () => {
 
         // Wait for loading to complete
         await waitFor(() => {
-            expect(screen.getByText(/Tổng quan HCSN/i)).toBeInTheDocument();
+            expect(screen.getByText(/Bàn làm việc/i)).toBeInTheDocument();
         });
 
         // Check stats cards are rendered
@@ -117,7 +117,7 @@ describe('Dashboard Component', () => {
         render(<Dashboard onNavigate={mockNavigate} />);
 
         await waitFor(() => {
-            expect(screen.getByText(/Thu Chi Ngân Sách/i)).toBeInTheDocument();
+            expect(screen.getByText(/Doanh thu & Chi phí/i)).toBeInTheDocument();
             expect(screen.getByTestId('spark-bar-chart')).toBeInTheDocument();
         });
     });

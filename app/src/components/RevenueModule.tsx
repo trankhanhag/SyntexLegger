@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { revenueService, masterDataService, settingsService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { PrintPreviewModal } from './PrintTemplates';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { FormModal, FormSection, FormGrid, FormField, FormButton, FormActions } from './FormModal';
+import { ExcelImportModal } from './ExcelImportModal';
+import { REVENUE_TEMPLATE } from '../utils/excelTemplates';
 
 
 // ==================== RECEIPT LIST ====================
@@ -20,7 +23,7 @@ const ReceiptList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => void
     }, [refreshSignal]);
 
     const columns: ColumnDef[] = [
-        { field: 'receipt_no', headerName: 'Số biên lai', width: 'w-32', editable: false },
+        { field: 'receipt_no', headerName: 'Số hóa đơn', width: 'w-32', editable: false },
         { field: 'receipt_date', headerName: 'Ngày lập', width: 'w-32', editable: false, type: 'date', align: 'center' },
         { field: 'payer_name', headerName: 'Người nộp tiền', width: 'w-64', editable: false },
         { field: 'category_display_name', headerName: 'Loại thu', width: 'w-48', editable: false },
@@ -29,7 +32,7 @@ const ReceiptList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => void
             renderCell: (val: any) => <span className="font-bold text-green-600">{new Intl.NumberFormat('vi-VN').format(val)}</span>
         },
         { field: 'payment_method', headerName: 'HTTT', width: 'w-24', editable: false },
-        { field: 'fund_source_name', headerName: 'Nguồn KP', width: 'w-48', editable: false },
+        { field: 'fund_source_name', headerName: 'Kênh bán', width: 'w-48', editable: false },
         {
             field: 'actions', headerName: 'Thao tác', width: 'w-24', align: 'center',
             renderCell: (_: any, row: any) => (
@@ -74,7 +77,7 @@ const PaymentList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => void
             renderCell: (val: any) => <span className="font-bold text-blue-600">{new Intl.NumberFormat('vi-VN').format(val)}</span>
         },
         { field: 'payment_method', headerName: 'HTTT', width: 'w-24', editable: false },
-        { field: 'fund_source_name', headerName: 'Nguồn KP', width: 'w-48', editable: false },
+        { field: 'fund_source_name', headerName: 'Kênh bán', width: 'w-48', editable: false },
         {
             field: 'actions', headerName: 'Thao tác', width: 'w-24', align: 'center',
             renderCell: (_: any, row: any) => (
@@ -97,7 +100,7 @@ const PaymentList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => void
     );
 };
 
-// ==================== REDUCTION LIST (Giảm trừ thu SN) ====================
+// ==================== REDUCTION LIST (Giảm trừ Doanh thu) ====================
 const ReductionList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => void, refreshSignal?: number }) => {
     const [reductions, setReductions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -228,7 +231,7 @@ const RevenueReportView = () => {
 
     return (
         <div className="p-6 h-full overflow-y-auto bg-slate-50 dark:bg-slate-900">
-            <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Báo cáo Thu sự nghiệp</h2>
+            <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Báo cáo Doanh thu</h2>
 
             {/* Filters */}
             <div className="flex gap-4 mb-6">
@@ -247,7 +250,7 @@ const RevenueReportView = () => {
                 >
                     <option value="revenue_type">Theo phân loại</option>
                     <option value="category">Theo loại thu</option>
-                    <option value="fund_source">Theo nguồn kinh phí</option>
+                    <option value="fund_source">Theo kênh bán hàng</option>
                 </select>
             </div>
 
@@ -261,7 +264,7 @@ const RevenueReportView = () => {
                     <thead className="bg-slate-100 dark:bg-slate-700">
                         <tr>
                             <th className="px-4 py-3 text-left text-sm font-bold text-slate-700 dark:text-slate-300">Phân loại</th>
-                            <th className="px-4 py-3 text-center text-sm font-bold text-slate-700 dark:text-slate-300">Số biên lai</th>
+                            <th className="px-4 py-3 text-center text-sm font-bold text-slate-700 dark:text-slate-300">Số hóa đơn</th>
                             <th className="px-4 py-3 text-right text-sm font-bold text-slate-700 dark:text-slate-300">Tổng tiền (VNĐ)</th>
                         </tr>
                     </thead>
@@ -405,76 +408,91 @@ const ReceiptFormModal = ({ onClose, documentType, initialData }: { onClose: () 
 
     const getTitle = () => {
         if (documentType === 'PAYMENT') return 'Phiếu thu tiền';
-        if (documentType === 'REDUCTION') return 'Giảm trừ thu sự nghiệp';
+        if (documentType === 'REDUCTION') return 'Giảm trừ Doanh thu';
         return 'Biên lai thu tiền';
     };
 
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-700/50">
-                    <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-blue-600">
-                            {documentType === 'REDUCTION' ? 'remove_circle' : 'receipt'}
-                        </span>
-                        {initialData ? 'Sửa ' : 'Lập '} {getTitle()}
-                    </h3>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full transition-colors">
-                        <span className="material-symbols-outlined">close</span>
-                    </button>
-                </div>
+    const getIcon = () => {
+        return documentType === 'REDUCTION' ? 'remove_circle' : 'receipt';
+    };
 
-                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[80vh] space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Số chứng từ *</label>
+    const getHeaderColor = (): 'blue' | 'green' | 'red' | 'purple' | 'amber' => {
+        if (documentType === 'REDUCTION') return 'red';
+        if (documentType === 'PAYMENT') return 'green';
+        return 'blue';
+    };
+
+    return (
+        <FormModal
+            onClose={onClose}
+            title={`${initialData ? 'Sửa' : 'Lập'} ${getTitle()}`}
+            icon={getIcon()}
+            size="lg"
+            headerVariant="gradient"
+            headerColor={getHeaderColor()}
+            loading={loading}
+            footer={
+                <FormActions>
+                    <FormButton variant="secondary" onClick={onClose}>Hủy</FormButton>
+                    <FormButton variant="primary" onClick={() => handleSubmit({} as React.FormEvent)} disabled={loading}>
+                        {loading ? (
+                            <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+                        ) : (
+                            <span className="material-symbols-outlined">save</span>
+                        )}
+                        {initialData ? 'Cập nhật' : 'Lưu chứng từ'}
+                    </FormButton>
+                </FormActions>
+            }
+        >
+            <form onSubmit={handleSubmit}>
+                <FormSection title="Thông tin chứng từ" variant="card" color="blue">
+                    <FormGrid cols={2}>
+                        <FormField label="Số chứng từ" required>
                             <input
                                 required
                                 type="text"
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                                className="form-input"
                                 value={formData.receipt_no}
                                 onChange={e => setFormData({ ...formData, receipt_no: e.target.value })}
                             />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ngày lập *</label>
+                        </FormField>
+                        <FormField label="Ngày lập" required>
                             <input
                                 required
                                 type="date"
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                                className="form-input"
                                 value={formData.receipt_date}
                                 onChange={e => setFormData({ ...formData, receipt_date: e.target.value })}
                             />
-                        </div>
-                    </div>
+                        </FormField>
+                    </FormGrid>
+                </FormSection>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Họ và tên người nộp *</label>
+                <FormSection title="Thông tin người nộp" variant="card" color="slate">
+                    <FormField label="Họ và tên người nộp" required>
                         <input
                             required
                             type="text"
                             placeholder="Nhập họ tên đối tượng"
-                            className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                            className="form-input"
                             value={formData.payer_name}
                             onChange={e => setFormData({ ...formData, payer_name: e.target.value })}
                         />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">CCCD/Mã số thuế</label>
+                    </FormField>
+                    <FormGrid cols={2}>
+                        <FormField label="CCCD/Mã số thuế">
                             <input
                                 type="text"
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                                className="form-input"
                                 value={formData.payer_id_card}
                                 onChange={e => setFormData({ ...formData, payer_id_card: e.target.value })}
                             />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loại thu *</label>
+                        </FormField>
+                        <FormField label="Loại thu" required>
                             <select
                                 required
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                                className="form-select"
                                 value={formData.category_code}
                                 onChange={e => {
                                     const cat = categories.find(c => c.code === e.target.value);
@@ -484,24 +502,24 @@ const ReceiptFormModal = ({ onClose, documentType, initialData }: { onClose: () 
                                 <option value="">-- Chọn loại thu --</option>
                                 {categories.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
                             </select>
-                        </div>
-                    </div>
+                        </FormField>
+                    </FormGrid>
+                </FormSection>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Số tiền *</label>
+                <FormSection title="Số tiền và thanh toán" variant="highlight" color="green">
+                    <FormGrid cols={2}>
+                        <FormField label="Số tiền" required>
                             <input
                                 required
                                 type="number"
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all font-mono font-bold text-lg text-green-600 dark:text-green-400"
+                                className="form-input font-mono font-bold text-lg text-green-600 dark:text-green-400"
                                 value={formData.amount}
                                 onChange={e => setFormData({ ...formData, amount: Number(e.target.value) })}
                             />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phương thức HTTT</label>
+                        </FormField>
+                        <FormField label="Phương thức HTTT">
                             <select
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                                className="form-select"
                                 value={formData.payment_method}
                                 onChange={e => setFormData({ ...formData, payment_method: e.target.value })}
                             >
@@ -509,74 +527,54 @@ const ReceiptFormModal = ({ onClose, documentType, initialData }: { onClose: () 
                                 <option value="BANK">Chuyển khoản</option>
                                 <option value="POS">Quẹt thẻ (POS)</option>
                             </select>
-                        </div>
-                    </div>
+                        </FormField>
+                    </FormGrid>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nguồn kinh phí</label>
+                    <FormField label="Bộ phận/Chi nhánh">
                         <select
-                            className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                            className="form-select"
                             value={formData.fund_source_id}
                             onChange={e => setFormData({ ...formData, fund_source_id: e.target.value })}
                         >
                             <option value="">-- Không liên kết --</option>
                             {fundSources.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
-                    </div>
+                    </FormField>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mục</label>
+                    <FormGrid cols={2}>
+                        <FormField label="Mục">
                             <input
                                 type="text"
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all font-mono"
+                                className="form-input font-mono"
                                 value={formData.item_code}
                                 onChange={e => setFormData({ ...formData, item_code: e.target.value })}
                                 placeholder="Ví dụ: 511"
                             />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tiểu mục</label>
+                        </FormField>
+                        <FormField label="Khoản mục">
                             <input
                                 type="text"
-                                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all font-mono"
+                                className="form-input font-mono"
                                 value={formData.sub_item_code}
                                 onChange={e => setFormData({ ...formData, sub_item_code: e.target.value })}
                                 placeholder="Ví dụ: 5111"
                             />
-                        </div>
-                    </div>
+                        </FormField>
+                    </FormGrid>
+                </FormSection>
 
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ghi chú</label>
+                <FormSection>
+                    <FormField label="Ghi chú">
                         <textarea
                             rows={2}
-                            className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:ring-2 focus:ring-blue-500 transition-all"
+                            className="form-textarea"
                             value={formData.notes}
                             onChange={e => setFormData({ ...formData, notes: e.target.value })}
                         />
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-6 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 font-bold rounded-xl transition-all"
-                        >
-                            Hủy
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
-                        >
-                            {loading ? <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : <span className="material-symbols-outlined">save</span>}
-                            {initialData ? 'Cập nhật' : 'Lưu chứng từ'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                    </FormField>
+                </FormSection>
+            </form>
+        </FormModal>
     );
 };
 
@@ -603,40 +601,38 @@ const CategoryFormModal = ({ onClose }: { onClose: () => void }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                    <h3 className="font-bold flex items-center gap-2">
-                        <span className="material-symbols-outlined text-green-600">category</span>
-                        Thêm loại thu mới
-                    </h3>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                        <span className="material-symbols-outlined">close</span>
-                    </button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Mã loại thu *</label>
-                        <input required type="text" className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Tên loại thu *</label>
-                        <input required type="text" className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Phân loại</label>
-                        <select className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg" value={formData.revenue_type} onChange={e => setFormData({ ...formData, revenue_type: e.target.value })}>
-                            <option value="RECURRENT">Thu phí, lệ phí (Thường xuyên)</option>
-                            <option value="NON_RECURRENT">Thu khác (Không thường xuyên)</option>
-                            <option value="PRODUCTION">Thu hoạt động SXKD, DV</option>
+        <FormModal
+            onClose={onClose}
+            title="Thêm loại thu mới"
+            icon="category"
+            size="md"
+            headerVariant="gradient"
+            headerColor="green"
+            footer={
+                <FormActions>
+                    <FormButton variant="secondary" onClick={onClose}>Hủy</FormButton>
+                    <FormButton variant="success" onClick={() => handleSubmit({} as React.FormEvent)}>Lưu danh mục</FormButton>
+                </FormActions>
+            }
+        >
+            <form onSubmit={handleSubmit}>
+                <FormSection title="Thông tin loại thu" variant="card" color="green">
+                    <FormField label="Mã loại thu" required>
+                        <input required type="text" className="form-input" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
+                    </FormField>
+                    <FormField label="Tên loại thu" required>
+                        <input required type="text" className="form-input" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                    </FormField>
+                    <FormField label="Phân loại">
+                        <select className="form-select" value={formData.revenue_type} onChange={e => setFormData({ ...formData, revenue_type: e.target.value })}>
+                            <option value="RECURRENT">Doanh thu bán hàng (Thường xuyên)</option>
+                            <option value="NON_RECURRENT">Thu nhập khác (Không thường xuyên)</option>
+                            <option value="PRODUCTION">Doanh thu dịch vụ</option>
                         </select>
-                    </div>
-                    <div className="flex gap-3 pt-4">
-                        <button type="submit" className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all">Lưu danh mục</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                    </FormField>
+                </FormSection>
+            </form>
+        </FormModal>
     );
 };
 
@@ -664,36 +660,34 @@ const PayerFormModal = ({ onClose }: { onClose: () => void }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                    <h3 className="font-bold flex items-center gap-2">
-                        <span className="material-symbols-outlined text-purple-600">person_add</span>
-                        Thêm đối tượng nộp tiền
-                    </h3>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                        <span className="material-symbols-outlined">close</span>
-                    </button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Họ và tên *</label>
-                        <input required type="text" className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg" value={formData.partner_name} onChange={e => setFormData({ ...formData, partner_name: e.target.value })} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">CMND/MST</label>
-                        <input type="text" className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg" value={formData.tax_code} onChange={e => setFormData({ ...formData, tax_code: e.target.value })} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Địa chỉ</label>
-                        <input type="text" className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
-                    </div>
-                    <div className="flex gap-3 pt-4">
-                        <button type="submit" className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all">Lưu đối tượng</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <FormModal
+            onClose={onClose}
+            title="Thêm đối tượng nộp tiền"
+            icon="person_add"
+            size="md"
+            headerVariant="gradient"
+            headerColor="blue"
+            footer={
+                <FormActions>
+                    <FormButton variant="secondary" onClick={onClose}>Hủy</FormButton>
+                    <FormButton variant="primary" onClick={() => handleSubmit({} as React.FormEvent)}>Lưu đối tượng</FormButton>
+                </FormActions>
+            }
+        >
+            <form onSubmit={handleSubmit}>
+                <FormSection title="Thông tin đối tượng" variant="card" color="blue">
+                    <FormField label="Họ và tên" required>
+                        <input required type="text" className="form-input" value={formData.partner_name} onChange={e => setFormData({ ...formData, partner_name: e.target.value })} />
+                    </FormField>
+                    <FormField label="CMND/MST">
+                        <input type="text" className="form-input" value={formData.tax_code} onChange={e => setFormData({ ...formData, tax_code: e.target.value })} />
+                    </FormField>
+                    <FormField label="Địa chỉ">
+                        <input type="text" className="form-input" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                    </FormField>
+                </FormSection>
+            </form>
+        </FormModal>
     );
 };
 const ModuleView = ({ data, columns, setData, onSelectionChange, keyField = "id" }: any) => {
@@ -729,11 +723,18 @@ interface RevenueModuleProps {
 export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt', printSignal = 0, onSetHeader, onNavigate }) => {
     const [showPrintPreview, setShowPrintPreview] = React.useState(false);
     const [showReceiptModal, setShowReceiptModal] = React.useState(false);
-    const [showCategoryModal, setShowCategoryModal] = React.useState(false); // TODO: Implement later
-    const [showPayerModal, setShowPayerModal] = React.useState(false); // TODO: Implement later
+    const [showCategoryModal, setShowCategoryModal] = React.useState(false);
+    const [showPayerModal, setShowPayerModal] = React.useState(false);
     const [selectedRow, setSelectedRow] = React.useState<any>(null);
     const [refreshSignal, setRefreshSignal] = React.useState(0);
     const [companyInfo, setCompanyInfo] = useState({ name: '', address: '' });
+    const [printRecord, setPrintRecord] = React.useState<any>(null);
+    const lastPrintSignalRef = React.useRef(0); // Track last handled print signal
+
+    // Import states
+    const [showImportModal, setShowImportModal] = React.useState(false);
+    const [importing, setImporting] = React.useState(false);
+    const [importProgress, setImportProgress] = React.useState({ current: 0, total: 0 });
 
     // Fetch company info
     useEffect(() => {
@@ -747,9 +748,61 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
             .catch(console.error);
     }, []);
 
+    // Excel import handler
+    const handleImportFromExcel = useCallback(async (rows: any[]) => {
+        if (rows.length === 0) return;
+
+        setImporting(true);
+        setImportProgress({ current: 0, total: rows.length });
+        setShowImportModal(false);
+
+        let successCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            setImportProgress({ current: i + 1, total: rows.length });
+
+            try {
+                await revenueService.createReceipt({
+                    receipt_no: rows[i].receipt_no || rows[i]['Số hóa đơn (*)'] || `BL-${Date.now()}-${i}`,
+                    receipt_date: rows[i].receipt_date || rows[i]['Ngày lập (*)'] || new Date().toISOString().split('T')[0],
+                    payer_name: rows[i].payer_name || rows[i]['Người nộp (*)'],
+                    payer_id_card: rows[i].payer_id_card || rows[i]['CCCD/MST'],
+                    payer_address: rows[i].payer_address || rows[i]['Địa chỉ'],
+                    category_code: rows[i].category_code || rows[i]['Mã loại thu'],
+                    category_name: rows[i].category_name || rows[i]['Tên loại thu'],
+                    amount: parseFloat(rows[i].amount || rows[i]['Số tiền (*)'] || 0),
+                    fund_source_id: rows[i].fund_source_id || rows[i]['Kênh bán'],
+                    item_code: rows[i].item_code || rows[i]['Mục'],
+                    sub_item_code: rows[i].sub_item_code || rows[i]['Khoản mục'],
+                    payment_method: rows[i].payment_method || rows[i]['Hình thức'] || 'CASH',
+                    notes: rows[i].notes || rows[i]['Nội dung thu'] || '',
+                    document_type: subView === 'reduction' ? 'REDUCTION' : (subView === 'payment' ? 'PAYMENT' : 'RECEIPT')
+                });
+                successCount++;
+            } catch (err: any) {
+                const docNo = rows[i].receipt_no || rows[i]['Số hóa đơn (*)'] || `Dòng ${i + 1}`;
+                errors.push(`${docNo}: ${err.response?.data?.error || err.message}`);
+            }
+        }
+
+        setImporting(false);
+
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} hóa đơn!`);
+        } else {
+            alert(`Nhập ${successCount}/${rows.length} hóa đơn.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        setRefreshSignal(s => s + 1);
+    }, [subView]);
+
     // Handle print signal from Ribbon
     React.useEffect(() => {
-        if (printSignal > 0) {
+        // Only respond to NEW print signals, not when other dependencies change
+        if (printSignal > 0 && printSignal !== lastPrintSignalRef.current) {
+            lastPrintSignalRef.current = printSignal;
+
             // Print not available for report/budget views
             if (subView === 'report' || subView === 'budget') {
                 alert('Chức năng in không áp dụng cho màn hình Báo cáo và Dự toán. Vui lòng sử dụng chức năng Xuất Excel.');
@@ -757,10 +810,40 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
             }
 
             if (!selectedRow) {
-                alert('Vui lòng chọn một biên lai từ danh sách trước khi in.');
+                alert('Vui lòng chọn một hóa đơn từ danh sách trước khi in.');
                 return;
             }
 
+            // Transform data for print template (CASH_RECEIPT - Phiếu thu)
+            const record = {
+                // Date fields
+                voucher_date: selectedRow.receipt_date || selectedRow.voucher_date || selectedRow.date,
+                date: selectedRow.receipt_date || selectedRow.voucher_date || selectedRow.date,
+                // Document number
+                voucher_no: selectedRow.receipt_no || selectedRow.voucher_no || selectedRow.doc_no,
+                doc_no: selectedRow.receipt_no || selectedRow.voucher_no || selectedRow.doc_no,
+                receipt_no: selectedRow.receipt_no || selectedRow.voucher_no,
+                // Person name (Phiếu thu - người nộp tiền)
+                payer_name: selectedRow.payer_name || selectedRow.customer_name || selectedRow.partner_name || '',
+                payee_name: selectedRow.payer_name || selectedRow.customer_name || '',
+                // Address
+                address: selectedRow.address || selectedRow.payer_address || selectedRow.customer_address || '',
+                // Description
+                description: selectedRow.description || selectedRow.notes || selectedRow.category_name || '',
+                reason: selectedRow.description || selectedRow.notes || selectedRow.category_name || '',
+                notes: selectedRow.notes || selectedRow.description || '',
+                // Amount
+                amount: selectedRow.amount || selectedRow.total_amount || 0,
+                total_amount: selectedRow.amount || selectedRow.total_amount || 0,
+                // Account codes
+                debit_account: selectedRow.debit_account || '111', // Tiền mặt
+                credit_account: selectedRow.credit_account || selectedRow.revenue_account || '',
+                account_code: selectedRow.account_code || '',
+                // Additional fields
+                attached_docs: selectedRow.attached_docs || '',
+                category_name: selectedRow.category_name || '',
+            };
+            setPrintRecord(record);
             setShowPrintPreview(true);
         }
     }, [printSignal, subView, selectedRow]);
@@ -771,10 +854,15 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
 
             if (subView === 'receipt') {
                 actions.push({
-                    label: 'Lập biên lai mới',
+                    label: 'Tạo hóa đơn mới',
                     icon: 'add_circle',
                     onClick: () => { setSelectedRow(null); setShowReceiptModal(true); },
                     primary: true
+                });
+                actions.push({
+                    label: 'Nhập từ Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowImportModal(true)
                 });
             } else if (subView === 'payment') {
                 actions.push({
@@ -783,12 +871,22 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
                     onClick: () => { setSelectedRow(null); setShowReceiptModal(true); },
                     primary: true
                 });
+                actions.push({
+                    label: 'Nhập từ Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowImportModal(true)
+                });
             } else if (subView === 'reduction') {
                 actions.push({
                     label: 'Lập phiếu giảm trừ',
                     icon: 'remove_circle',
                     onClick: () => { setSelectedRow(null); setShowReceiptModal(true); },
                     primary: true
+                });
+                actions.push({
+                    label: 'Nhập từ Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowImportModal(true)
                 });
             } else if (subView === 'categories') {
                 actions.push({
@@ -851,12 +949,12 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
         switch (subView) {
             case 'receipt': return 'Biên lai Thu tiền';
             case 'payment': return 'Phiếu Thu tiền';
-            case 'reduction': return 'Giảm trừ Thu SN';
+            case 'reduction': return 'Giảm trừ Doanh thu';
             case 'categories': return 'Danh mục Loại thu';
             case 'payer': return 'Đối tượng Nộp tiền';
-            case 'report': return 'Báo cáo Thu sự nghiệp';
-            case 'budget': return 'So sánh Dự toán/Thực hiện';
-            default: return 'Quản lý Thu Sự nghiệp';
+            case 'report': return 'Báo cáo Doanh thu';
+            case 'budget': return 'So sánh Kế hoạch/Thực hiện';
+            default: return 'Quản lý Doanh thu';
         }
     };
 
@@ -902,13 +1000,60 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
             {showPayerModal && <PayerFormModal onClose={() => { setShowPayerModal(false); setRefreshSignal(s => s + 1); }} />}
 
             {/* Print Preview Modal - Shared */}
-            {showPrintPreview && selectedRow && (
+            {showPrintPreview && printRecord && (
                 <PrintPreviewModal
-                    record={selectedRow}
+                    record={printRecord}
                     view={subView === 'receipt' || subView === 'payment' ? 'CASH_RECEIPT' : 'CASH_PAYMENT'}
-                    onClose={() => setShowPrintPreview(false)}
+                    onClose={() => {
+                        setShowPrintPreview(false);
+                        setPrintRecord(null);
+                    }}
                     companyInfo={companyInfo}
                 />
+            )}
+
+            {/* Excel Import Modal */}
+            {showImportModal && (
+                <ExcelImportModal
+                    onClose={() => setShowImportModal(false)}
+                    onImport={handleImportFromExcel}
+                    title="Nhập hóa đơn từ Excel"
+                    enhancedTemplate={REVENUE_TEMPLATE}
+                    columns={[
+                        { key: 'receipt_no', label: 'Số hóa đơn', required: true },
+                        { key: 'receipt_date', label: 'Ngày lập', required: true },
+                        { key: 'payer_name', label: 'Người nộp', required: true },
+                        { key: 'payer_id_card', label: 'CCCD/MST' },
+                        { key: 'payer_address', label: 'Địa chỉ' },
+                        { key: 'category_code', label: 'Mã loại thu' },
+                        { key: 'amount', label: 'Số tiền', required: true },
+                        { key: 'item_code', label: 'Mục' },
+                        { key: 'sub_item_code', label: 'Khoản mục' },
+                        { key: 'payment_method', label: 'Hình thức' },
+                        { key: 'notes', label: 'Nội dung thu' }
+                    ]}
+                />
+            )}
+
+            {/* Import Progress Overlay */}
+            {importing && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                        <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            Đang nhập hóa đơn...
+                        </p>
+                        <p className="text-2xl font-mono text-green-600 mt-2">
+                            {importProgress.current} / {importProgress.total}
+                        </p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                            <div
+                                className="bg-green-600 h-2 rounded-full transition-all"
+                                style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

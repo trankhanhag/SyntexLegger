@@ -1,6 +1,20 @@
 import { useEffect, useCallback, useState } from 'react';
 import type { VoucherView } from '../components/PrintTemplates';
 
+/**
+ * Helper function to trigger browser print with proper styling
+ * Adds browser-print-mode class to ensure content is visible during print
+ */
+export function triggerBrowserPrint(): void {
+    document.body.classList.add('browser-print-mode');
+    setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('browser-print-mode');
+        }, 500);
+    }, 100);
+}
+
 export interface PrintHandlerConfig {
     /** The printSignal from App.tsx - triggers print when changed */
     printSignal: number;
@@ -127,7 +141,7 @@ export function usePrintHandler({
     }, []);
 
     const triggerPrint = useCallback(() => {
-        window.print();
+        triggerBrowserPrint();
     }, []);
 
     return {
@@ -184,7 +198,7 @@ export function usePrintFromDetail({
     }, []);
 
     const triggerPrint = useCallback(() => {
-        window.print();
+        triggerBrowserPrint();
     }, []);
 
     return {
@@ -249,8 +263,8 @@ export function useSimplePrint(
     useEffect(() => {
         if (printSignal > 0) {
             if (options?.allowBrowserPrint) {
-                // For list views, use browser print with current page
-                window.print();
+                // For list views, use browser print with proper styling
+                triggerBrowserPrint();
             } else {
                 // Show informative message
                 const message = options?.message ||

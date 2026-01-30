@@ -88,7 +88,7 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
             // 3. Surplus/Deficit (911 to 4212)
             if (profit !== 0) {
                 lines.push({
-                    description: profit > 0 ? "Kết chuyển Thặng dư năm nay" : "Kết chuyển Thâm hụt năm nay",
+                    description: profit > 0 ? "Kết chuyển Lãi năm nay" : "Kết chuyển Lỗ năm nay",
                     debitAcc: profit > 0 ? '911' : '4212',
                     creditAcc: profit > 0 ? '4212' : '911',
                     amount: Math.abs(profit)
@@ -127,7 +127,7 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
     const formatNum = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
     return (
-        <Modal title={`Kết chuyển Thặng dư/Thâm hụt - Kỳ ${new Date().getMonth() + 1}/${new Date().getFullYear()}`} onClose={onClose}>
+        <Modal title={`Kết chuyển Lãi/Lỗ - Kỳ ${new Date().getMonth() + 1}/${new Date().getFullYear()}`} onClose={onClose}>
             {step === 1 && (
                 <div className="space-y-6">
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded border border-blue-100 dark:border-blue-900 flex justify-between items-center text-sm">
@@ -135,14 +135,14 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
                             <div><span className="text-slate-500">Mã kỳ:</span> <span className="font-bold">{new Date().getFullYear()}.{(new Date().getMonth() + 1).toString().padStart(2, '0')}</span></div>
                             <div><span className="text-slate-500">Người thực hiện:</span> <span className="font-bold">Admin</span></div>
                         </div>
-                        <div className="text-blue-700 dark:text-blue-300 font-medium">Báo cáo kết quả hoạt động tạm tính kỳ này</div>
+                        <div className="text-blue-700 dark:text-blue-300 font-medium">Báo cáo Kết quả Kinh doanh tạm tính kỳ này</div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">
-                        {/* Thu các khoản */}
+                        {/* Doanh thu */}
                         <div>
                             <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-green-600">trending_up</span> Thu các khoản (Có 911)
+                                <span className="material-symbols-outlined text-green-600">trending_up</span> Doanh thu (Có 911)
                             </h4>
                             <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
                                 <table className="w-full text-sm">
@@ -170,10 +170,10 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
                             </div>
                         </div>
 
-                        {/* Chi hoạt động */}
+                        {/* Chi phí */}
                         <div>
                             <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-red-600">trending_down</span> Chi hoạt động (Nợ 911)
+                                <span className="material-symbols-outlined text-red-600">trending_down</span> Chi phí (Nợ 911)
                             </h4>
                             <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
                                 <table className="w-full text-sm">
@@ -205,7 +205,7 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
                     <div className={`p-4 rounded-lg flex justify-between items-center border font-bold ${profit >= 0 ? 'bg-green-100 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800' : 'bg-red-100 border-red-200 text-red-800'}`}>
                         <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined">{profit >= 0 ? 'verified' : 'warning'}</span>
-                            Kết quả hoạt động: {profit >= 0 ? 'Thặng dư' : 'Thâm hụt'}
+                            Kết quả Kinh doanh: {profit >= 0 ? 'Lãi' : 'Lỗ'}
                         </div>
                         <div className="text-xl">{formatNum(profit)} VNĐ</div>
                     </div>
@@ -256,7 +256,7 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
                                     </tr>
                                 ))}
                                 <tr className="border-t-2 border-slate-200 dark:border-slate-600 font-bold">
-                                    <td className="p-3 text-slate-800 dark:text-white">{profit >= 0 ? "Kết chuyển Thặng dư năm nay" : "Kết chuyển Thâm hụt năm nay"}</td>
+                                    <td className="p-3 text-slate-800 dark:text-white">{profit >= 0 ? "Kết chuyển Lãi năm nay" : "Kết chuyển Lỗ năm nay"}</td>
                                     <td className="p-3">{profit >= 0 ? '911' : '4212'}</td>
                                     <td className="p-3">{profit >= 0 ? '4212' : '911'}</td>
                                     <td className="p-3 text-right text-purple-600">{formatNum(Math.abs(profit))}</td>

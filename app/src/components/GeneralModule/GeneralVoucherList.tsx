@@ -93,16 +93,15 @@ export const GeneralVoucherList: React.FC<GeneralVoucherListProps> = ({
             </div>
 
             {/* Table Content */}
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-800">
                 {error && (
-                    <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg border border-red-100 flex items-center gap-2">
+                    <div className="mx-4 mt-4 p-4 bg-red-50 text-red-600 rounded-lg border border-red-100 flex items-center gap-2 shrink-0">
                         <span className="material-symbols-outlined">error</span>
                         {error}
                     </div>
                 )}
 
-                <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="overflow-x-auto">
+                <div className="flex-1 overflow-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium border-b border-slate-200 dark:border-slate-700">
                                 <VoucherTableHeader
@@ -158,7 +157,6 @@ export const GeneralVoucherList: React.FC<GeneralVoucherListProps> = ({
                             )}
                         </table>
                     </div>
-                </div>
             </div>
         </div>
     );

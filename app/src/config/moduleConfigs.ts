@@ -1,6 +1,6 @@
 /**
  * Module Overview Configurations
- * SyntexHCSN - Cấu hình tổng quan cho từng phân hệ
+ * SyntexLegger - Cấu hình tổng quan cho từng phân hệ
  */
 
 export interface ModuleConfig {
@@ -27,17 +27,17 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ KẾ TOÁN TỔNG HỢP
     general: {
         title: 'Phân hệ Kế toán Tổng hợp',
-        description: 'Quản lý ngân sách, chứng từ, sổ cái và báo cáo tài chính theo TT 24/2024/TT-BTC. Trung tâm xử lý số liệu của đơn vị.',
+        description: 'Quản lý ngân sách, chứng từ, sổ cái và báo cáo tài chính theo TT 99/2025/TT-BTC. Trung tâm xử lý số liệu doanh nghiệp.',
         icon: 'account_balance',
         iconColor: 'blue',
         workflow: [
             { icon: 'edit_document', title: 'Lập Dự toán', description: 'Xây dựng và phân bổ dự toán năm', color: 'blue', targetView: 'fund_budget' },
             { icon: 'upload_file', title: 'Nhập Chứng từ', description: 'Ghi nhận nghiệp vụ phát sinh', color: 'amber', targetView: 'voucher_list' },
             { icon: 'published_with_changes', title: 'Kết chuyển', description: 'Xử lý cuối kỳ và khóa sổ', color: 'purple', targetView: 'closing' },
-            { icon: 'summarize', title: 'Báo cáo', description: 'Lập BCTC và Quyết toán', color: 'green', targetView: 'balance_sheet_hcsn' },
+            { icon: 'summarize', title: 'Báo cáo', description: 'Lập BCTC theo TT 99/2025', color: 'green', targetView: 'balance_sheet_dn' },
         ],
         features: [
-            { icon: 'account_balance_wallet', title: 'Nguồn Kinh phí', description: 'Quản lý danh mục nguồn', targetView: 'fund_list' },
+            { icon: 'account_balance_wallet', title: 'Trung tâm Chi phí', description: 'Quản lý danh mục trung tâm', targetView: 'fund_list' },
             { icon: 'edit_note', title: 'Quản lý Dự toán', description: 'Lập, phân bổ, điều chỉnh', targetView: 'fund_budget' },
             { icon: 'receipt_long', title: 'Chứng từ Kế toán', description: 'Quản lý toàn bộ chứng từ', targetView: 'voucher_list' },
             { icon: 'visibility_off', title: 'TK Ngoài bảng', description: 'Theo dõi TK 008, 00... (Dự toán)', targetView: 'fund_off_balance' },
@@ -49,7 +49,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ TIỀN MẶT & NGÂN HÀNG
     cash: {
         title: 'Phân hệ Tiền mặt & Ngân hàng',
-        description: 'Theo dõi thu chi tiền mặt, tiền gửi ngân hàng theo từng quỹ và nguồn kinh phí. Hỗ trợ đối chiếu sổ quỹ, bank statement.',
+        description: 'Theo dõi thu chi tiền mặt, tiền gửi ngân hàng theo từng quỹ và trung tâm chi phí. Hỗ trợ đối chiếu sổ quỹ, bank statement.',
         icon: 'account_balance_wallet',
         iconColor: 'green',
         workflow: [
@@ -68,10 +68,10 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         ],
     },
 
-    // PHÂN HỆ THU SỰ NGHIỆP
+    // PHÂN HỆ DOANH THU
     revenue: {
-        title: 'Phân hệ Thu Sự nghiệp',
-        description: 'Quản lý các nguồn thu sự nghiệp theo loại hình (học phí, lệ phí, dịch vụ...). Theo dõi công nợ phải thu và đối chiếu với ngân sách.',
+        title: 'Phân hệ Doanh thu',
+        description: 'Quản lý doanh thu bán hàng và cung cấp dịch vụ theo TT 99/2025. Theo dõi công nợ phải thu và đối chiếu với ngân sách.',
         icon: 'trending_up',
         iconColor: 'teal',
         workflow: [
@@ -81,7 +81,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
             { icon: 'analytics', title: 'Tổng hợp', description: 'Báo cáo tình hình thu', color: 'teal', targetView: 'revenue_report' },
         ],
         features: [
-            { icon: 'category', title: 'Loại Thu', description: 'Danh mục nguồn thu sự nghiệp', targetView: 'revenue_categories' },
+            { icon: 'category', title: 'Loại Thu', description: 'Danh mục nguồn doanh thu', targetView: 'revenue_categories' },
             { icon: 'receipt_long', title: 'Chứng từ Thu', description: 'Quản lý hóa đơn, biên lai', targetView: 'revenue_receipt' },
             { icon: 'group', title: 'Đối tượng Thu', description: 'Quản lý học sinh, khách hàng', targetView: 'revenue_payer' },
             { icon: 'credit_score', title: 'Công nợ Phải thu', description: 'Theo dõi và đôn đốc nợ', targetView: 'loan_receivables' },
@@ -90,10 +90,10 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         ],
     },
 
-    // PHÂN HỆ CHI HOẠT ĐỘNG
+    // PHÂN HỆ CHI PHÍ
     expense: {
-        title: 'Phân hệ Chi Hoạt động',
-        description: 'Quản lý chi thường xuyên và chi không thường xuyên theo nguồn kinh phí. Kiểm soát định mức chi, quy chế chi tiêu nội bộ.',
+        title: 'Phân hệ Chi phí',
+        description: 'Quản lý chi phí sản xuất kinh doanh, chi phí bán hàng và quản lý doanh nghiệp. Kiểm soát định mức chi theo TT 99/2025.',
         icon: 'shopping_cart',
         iconColor: 'amber',
         workflow: [
@@ -103,11 +103,11 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
             { icon: 'receipt_long', title: 'Hoàn ứng/Quyết toán', description: 'Hoàn chứng từ, quyết toán', color: 'teal', targetView: 'loan_temp_advances' },
         ],
         features: [
-            { icon: 'category', title: 'Loại Chi', description: 'Danh mục khoản chi theo MLNS', targetView: 'expense_categories' },
+            { icon: 'category', title: 'Loại Chi', description: 'Danh mục khoản mục chi phí', targetView: 'expense_categories' },
             { icon: 'rule', title: 'Định mức Chi', description: 'Thiết lập định mức theo quy chế', targetView: 'cost_settings' },
             { icon: 'article', title: 'Chứng từ Chi', description: 'Quản lý phiếu đề nghị, thanh toán', targetView: 'expense_voucher' },
             { icon: 'groups', title: 'Công nợ Phải trả', description: 'Theo dõi nợ nhà cung cấp', targetView: 'loan_payables' },
-            { icon: 'pie_chart', title: 'Phân bổ Chi phí', description: 'Phân bổ theo nguồn kinh phí', targetView: 'allocation' },
+            { icon: 'pie_chart', title: 'Phân bổ Chi phí', description: 'Phân bổ theo trung tâm chi phí', targetView: 'allocation' },
             { icon: 'shield', title: 'Kiểm soát Chi', description: 'Cảnh báo vượt định mức', targetView: 'sys_budget_control' },
         ],
     },
@@ -115,7 +115,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ TÀI SẢN
     asset: {
         title: 'Phân hệ Tài sản Cố định & CCDC',
-        description: 'Quản lý tài sản cố định, công cụ dụng cụ, tài sản kết cấu hạ tầng theo TT 24/2024. Hỗ trợ tính khấu hao, theo dõi nguồn hình thành.',
+        description: 'Quản lý tài sản cố định, công cụ dụng cụ theo TT 99/2025. Hỗ trợ tính khấu hao, theo dõi nguồn hình thành.',
         icon: 'apartment',
         iconColor: 'purple',
         workflow: [
@@ -143,7 +143,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         workflow: [
             { icon: 'input', title: 'Nhập Kho', description: 'Nhập vật tư từ mua, sản xuất', color: 'blue', targetView: 'inventory_receipt' },
             { icon: 'output', title: 'Xuất Kho', description: 'Xuất dùng, bán, điều chuyển', color: 'amber', targetView: 'inventory_issue' },
-            { icon: 'inventory_2', title: 'Tồn Kho', description: 'Theo dõi tồn theo lô/vị trí', color: 'green', targetView: 'inventory_summary' },
+            { icon: 'inventory_2', title: 'Tồn Kho', description: 'Theo dõi tồn theo lô/vị trí', color: 'green', targetView: 'inventory_status' },
             { icon: 'checklist', title: 'Kiểm Kho', description: 'Kiểm kê và xử lý chênh lệch', color: 'teal', targetView: 'inventory_check' },
         ],
         features: [
@@ -151,15 +151,15 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
             { icon: 'add_shopping_cart', title: 'Phiếu Nhập', description: 'Nhập kho từ mua, ĐCNB', targetView: 'inventory_receipt' },
             { icon: 'local_shipping', title: 'Phiếu Xuất', description: 'Xuất kho bán, sử dụng', targetView: 'inventory_issue' },
             { icon: 'format_list_numbered', title: 'Thẻ Kho', description: 'Theo dõi chi tiết từng mã', targetView: 'inventory_ledger' },
-            { icon: 'calculate', title: 'Tính Giá XK', description: 'FIFO, Bình quân gia quyền', targetView: 'inventory_items' }, // Tạm trỏ về items
-            { icon: 'summarize', title: 'Báo cáo NXT', description: 'Báo cáo nhập xuất tồn', targetView: 'inventory_report' },
+            { icon: 'sync_alt', title: 'Điều chuyển', description: 'Điều chuyển kho nội bộ', targetView: 'inventory_transfer' },
+            { icon: 'summarize', title: 'Báo cáo NXT', description: 'Báo cáo nhập xuất tồn', targetView: 'inventory_status' },
         ],
     },
 
     // PHÂN HỆ NHÂN SỰ - TIỀN LƯƠNG
     hr: {
         title: 'Phân hệ Nhân sự & Tiền lương',
-        description: 'Quản lý hồ sơ nhân sự, tính lương, BHXH, thuế TNCN theo quy định HCSN. Hỗ trợ kết nối C&B, BHXH điện tử.',
+        description: 'Quản lý hồ sơ nhân sự, tính lương, BHXH, thuế TNCN theo quy định DN. Hỗ trợ kết nối C&B, BHXH điện tử.',
         icon: 'groups',
         iconColor: 'blue',
         workflow: [
@@ -184,19 +184,19 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ BÁO CÁO
     report: {
         title: 'Phân hệ Báo cáo',
-        description: 'Lập báo cáo tài chính, báo cáo quyết toán theo mẫu biểu TT 24/2024. Hỗ trợ xuất XML theo chuẩn CSDL quốc gia.',
+        description: 'Lập báo cáo tài chính theo mẫu biểu TT 99/2025. Hỗ trợ xuất XML, PDF theo chuẩn Việt Nam.',
         icon: 'summarize',
         iconColor: 'indigo',
         workflow: [
             { icon: 'check_circle', title: 'Kiểm tra Số liệu', description: 'Đối chiếu, cân đối số liệu', color: 'blue', targetView: 'check' },
-            { icon: 'table_chart', title: 'Chọn Mẫu', description: 'Chọn mẫu báo cáo cần lập', color: 'amber', targetView: 'balance_sheet_hcsn' },
-            { icon: 'preview', title: 'Xem trước', description: 'Xem và kiểm tra báo cáo', color: 'green', targetView: 'balance_sheet_hcsn' },
-            { icon: 'download', title: 'Xuất File', description: 'Xuất PDF, Excel, XML', color: 'teal', targetView: 'balance_sheet_hcsn' },
+            { icon: 'table_chart', title: 'Chọn Mẫu', description: 'Chọn mẫu báo cáo cần lập', color: 'amber', targetView: 'balance_sheet_dn' },
+            { icon: 'preview', title: 'Xem trước', description: 'Xem và kiểm tra báo cáo', color: 'green', targetView: 'balance_sheet_dn' },
+            { icon: 'download', title: 'Xuất File', description: 'Xuất PDF, Excel, XML', color: 'teal', targetView: 'balance_sheet_dn' },
         ],
         features: [
-            { icon: 'account_balance', title: 'BCTC', description: 'Báo cáo tài chính theo TT24', targetView: 'balance_sheet_hcsn' },
+            { icon: 'account_balance', title: 'BCTC', description: 'Báo cáo tài chính theo TT 99/2025', targetView: 'balance_sheet_dn' },
             { icon: 'receipt_long', title: 'Sổ Kế toán', description: 'In sổ cái, sổ chi tiết', targetView: 'general_ledger' },
-            { icon: 'request_quote', title: 'Báo cáo Ngân sách', description: 'Báo cáo thu chi NS', targetView: 'budget_settlement_regular' },
+            { icon: 'request_quote', title: 'Báo cáo Nội bộ', description: 'So sánh kế hoạch - thực hiện', targetView: 'budget_performance' },
             { icon: 'assessment', title: 'Báo cáo Quản trị', description: 'Phân tích, thống kê', targetView: 'financial_analysis' },
             { icon: 'upload_file', title: 'Xuất XML', description: 'Xuất CSDL quốc gia', targetView: 'xml_export' },
             { icon: 'schedule', title: 'In Định kỳ', description: 'Lập lịch xuất báo cáo tự động', targetView: 'report_scheduler' },
@@ -225,47 +225,23 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         ],
     },
 
-    // PHÂN HỆ KHO BẠC NHÀ NƯỚC
-    treasury: {
-        title: 'Phân hệ Kho bạc Nhà nước',
-        description: 'Kết nối KBNN để đối chiếu số dư, nhận lệnh chi, tra cứu giao dịch. Đảm bảo đồng bộ số liệu giữa đơn vị và Kho bạc.',
-        icon: 'assured_workload',
-        iconColor: 'green',
-        workflow: [
-            { icon: 'cloud_sync', title: 'Kết nối KBNN', description: 'Thiết lập kết nối với hệ thống KB', color: 'blue', targetView: 'treasury_connect' },
-            { icon: 'download', title: 'Nhận Dữ liệu', description: 'Tải giao dịch từ Kho bạc', color: 'amber', targetView: 'treasury_import' },
-            { icon: 'compare', title: 'Đối chiếu', description: 'So sánh với số liệu nội bộ', color: 'green', targetView: 'treasury_reconcile' },
-            { icon: 'send', title: 'Gửi Lệnh chi', description: 'Đẩy yêu cầu thanh toán', color: 'teal', targetView: 'treasury_payment_order' },
-        ],
-        features: [
-            { icon: 'cloud_done', title: 'Trạng thái Kết nối', description: 'Kiểm tra kết nối KBNN', targetView: 'treasury_connect' },
-            { icon: 'account_balance', title: 'Số dư Tài khoản', description: 'Tra cứu số dư tại KB', targetView: 'treasury_balance' },
-            { icon: 'receipt_long', title: 'Lệnh Chi Tiền', description: 'Lập và gửi lệnh chi', targetView: 'treasury_payment_order' },
-            { icon: 'history', title: 'Lịch sử Giao dịch', description: 'Tra cứu giao dịch đã thực hiện', targetView: 'treasury_history' },
-            { icon: 'sync', title: 'Đồng bộ Dữ liệu', description: 'Import giao dịch từ KBNN', targetView: 'treasury_import' },
-            { icon: 'fact_check', title: 'Đối chiếu Số dư', description: 'So sánh và điều chỉnh chênh lệch', targetView: 'treasury_reconcile' },
-        ],
-    },
-
-    // PHÂN HỆ CÔNG NỢ
-    debt: {
-        title: 'Phân hệ Quản lý Công nợ',
+    // PHÂN HỆ CÔNG NỢ & TẠM ỨNG
+    loan: {
+        title: 'Phân hệ Công nợ & Tạm ứng',
         description: 'Theo dõi công nợ phải thu, phải trả theo đối tượng. Quản lý tạm ứng, ứng trước ngân sách và đôn đốc thu hồi nợ.',
         icon: 'account_balance_wallet',
         iconColor: 'amber',
         workflow: [
-            { icon: 'add_card', title: 'Ghi nhận Nợ', description: 'Tạo công nợ từ chứng từ', color: 'blue', targetView: 'loan_receivables' },
-            { icon: 'person_search', title: 'Theo dõi', description: 'Theo dõi theo đối tượng, kỳ hạn', color: 'amber', targetView: 'loan_aging' },
-            { icon: 'payments', title: 'Thu hồi/Thanh toán', description: 'Ghi nhận thu hồi hoặc thanh toán', color: 'green', targetView: 'loan_payment' },
-            { icon: 'analytics', title: 'Phân tích', description: 'Báo cáo tuổi nợ, rủi ro', color: 'teal', targetView: 'loan_report' },
+            { icon: 'savings', title: 'Tạm ứng', description: 'Quản lý tạm ứng TK 141', color: 'blue', targetView: 'loan_temp_advances' },
+            { icon: 'currency_exchange', title: 'Phải thu nội bộ', description: 'Theo dõi phải thu nội bộ', color: 'amber', targetView: 'loan_receivables' },
+            { icon: 'payments', title: 'Phải thu', description: 'Công nợ phải thu TK 136, 138', color: 'green', targetView: 'loan_receivables' },
+            { icon: 'receipt_long', title: 'Phải trả', description: 'Công nợ phải trả TK 331, 336, 338', color: 'teal', targetView: 'loan_payables' },
         ],
         features: [
-            { icon: 'credit_score', title: 'Công nợ Phải thu', description: 'TK 131, 136, 138 - Phải thu', targetView: 'loan_receivables' },
-            { icon: 'credit_card', title: 'Công nợ Phải trả', description: 'TK 331, 336, 338 - Phải trả', targetView: 'loan_payables' },
             { icon: 'savings', title: 'Tạm ứng (TK 141)', description: 'Quản lý tạm ứng nội bộ', targetView: 'loan_temp_advances' },
-            { icon: 'account_balance', title: 'Ứng trước NSNN (TK 161)', description: 'Theo dõi ứng trước ngân sách', targetView: 'loan_advance_payment' },
-            { icon: 'schedule', title: 'Báo cáo Tuổi nợ', description: 'Phân tích nợ theo thời gian', targetView: 'loan_aging' },
-            { icon: 'notification_important', title: 'Cảnh báo Nợ', description: 'Nhắc nhở nợ quá hạn', targetView: 'loan_warning' },
+            { icon: 'currency_exchange', title: 'Phải thu Nội bộ (TK 136)', description: 'Theo dõi phải thu nội bộ DN', targetView: 'loan_receivables' },
+            { icon: 'credit_score', title: 'Công nợ Phải thu', description: 'TK 136, 138 - Phải thu', targetView: 'loan_receivables' },
+            { icon: 'credit_card', title: 'Công nợ Phải trả', description: 'TK 331, 336, 338 - Phải trả', targetView: 'loan_payables' },
         ],
     },
 
@@ -321,15 +297,15 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         iconColor: 'purple',
         workflow: [
             { icon: 'add', title: 'Tạo Hợp đồng', description: 'Soạn thảo, ký kết HĐ', color: 'blue', targetView: 'contract_sales' },
-            { icon: 'fact_check', title: 'Theo dõi', description: 'Giám sát tiến độ thực hiện', color: 'amber', targetView: 'contract_progress' },
-            { icon: 'payments', title: 'Thanh toán', description: 'Ghi nhận thanh toán theo đợt', color: 'green', targetView: 'contract_progress' },
+            { icon: 'fact_check', title: 'Theo dõi', description: 'Giám sát tiến độ thực hiện', color: 'amber', targetView: 'contract_tracking' },
+            { icon: 'payments', title: 'Thanh toán', description: 'Ghi nhận thanh toán theo đợt', color: 'green', targetView: 'contract_tracking' },
             { icon: 'check_circle', title: 'Thanh lý', description: 'Nghiệm thu, thanh lý HĐ', color: 'teal', targetView: 'contract_liquidation' },
         ],
         features: [
             { icon: 'assignment', title: 'Hợp đồng Mua', description: 'HĐ với nhà cung cấp', targetView: 'contract_purchase' },
             { icon: 'sell', title: 'Hợp đồng Bán', description: 'HĐ với khách hàng', targetView: 'contract_sales' },
-            { icon: 'attach_file', title: 'Phụ lục HĐ', description: 'Quản lý phụ lục, điều chỉnh', targetView: 'contract_addendum' },
-            { icon: 'schedule', title: 'Tiến độ Thanh toán', description: 'Theo dõi đợt thanh toán', targetView: 'contract_progress' },
+            { icon: 'attach_file', title: 'Phụ lục HĐ', description: 'Quản lý phụ lục, điều chỉnh', targetView: 'contract_appendix' },
+            { icon: 'schedule', title: 'Tiến độ Thanh toán', description: 'Theo dõi đợt thanh toán', targetView: 'contract_tracking' },
             { icon: 'notifications', title: 'Nhắc nhở', description: 'Cảnh báo HĐ sắp hết hạn', targetView: 'contract_warning' },
             { icon: 'analytics', title: 'Báo cáo HĐ', description: 'Tổng hợp HĐ theo kỳ', targetView: 'contract_report' },
         ],
@@ -343,16 +319,14 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         iconColor: 'indigo',
         workflow: [
             { icon: 'add_box', title: 'Tạo Dự án', description: 'Khai báo dự án, dự toán', color: 'blue', targetView: 'project_list' },
-            { icon: 'assignment', title: 'Phân công', description: 'Phân công nhiệm vụ, nhân sự', color: 'amber', targetView: 'project_task' },
-            { icon: 'trending_up', title: 'Theo dõi', description: 'Giám sát chi phí, tiến độ', color: 'green', targetView: 'project_cost' },
-            { icon: 'summarize', title: 'Quyết toán', description: 'Tổng hợp, báo cáo kết quả', color: 'teal', targetView: 'project_settlement' },
+            { icon: 'assignment', title: 'Phân công', description: 'Phân công nhiệm vụ, nhân sự', color: 'amber', targetView: 'project_tracking' },
+            { icon: 'trending_up', title: 'Theo dõi', description: 'Giám sát chi phí, tiến độ', color: 'green', targetView: 'project_budget' },
+            { icon: 'summarize', title: 'Quyết toán', description: 'Tổng hợp, báo cáo kết quả', color: 'teal', targetView: 'project_report' },
         ],
         features: [
             { icon: 'folder', title: 'Danh mục Dự án', description: 'Tạo và quản lý dự án', targetView: 'project_list' },
-            { icon: 'list', title: 'Công việc', description: 'Chia nhỏ, theo dõi task', targetView: 'project_task' },
-            { icon: 'paid', title: 'Chi phí DA', description: 'Tập hợp chi phí dự án', targetView: 'project_cost' },
-            { icon: 'calculate', title: 'Lãi/Lỗ DA', description: 'Tính kết quả dự án', targetView: 'project_result' },
-            { icon: 'share', title: 'Phân bổ CP', description: 'Phân bổ chi phí chung', targetView: 'project_allocation' },
+            { icon: 'analytics', title: 'Tiến độ', description: 'Theo dõi tiến độ thực hiện', targetView: 'project_tracking' },
+            { icon: 'paid', title: 'Ngân sách & Chi phí', description: 'Tập hợp chi phí dự án', targetView: 'project_budget' },
             { icon: 'assessment', title: 'Báo cáo DA', description: 'Báo cáo tiến độ, tài chính', targetView: 'project_report' },
         ],
     },
@@ -360,7 +334,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ DANH MỤC
     master: {
         title: 'Phân hệ Danh mục Dùng chung',
-        description: 'Quản lý các danh mục dùng chung cho toàn hệ thống: tài khoản, đối tác, sản phẩm, nguồn kinh phí, mục lục ngân sách.',
+        description: 'Quản lý các danh mục dùng chung cho toàn hệ thống: tài khoản, đối tác, sản phẩm, trung tâm chi phí.',
         icon: 'folder_shared',
         iconColor: 'blue',
         workflow: [
@@ -370,11 +344,11 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
             { icon: 'download', title: 'Export', description: 'Xuất ra Excel', color: 'teal', targetView: 'master_export' },
         ],
         features: [
-            { icon: 'account_tree', title: 'Hệ thống Tài khoản', description: 'Danh mục TK theo TT24', targetView: 'account_list' },
+            { icon: 'account_tree', title: 'Hệ thống Tài khoản', description: 'Danh mục TK theo TT 99/2025', targetView: 'account_list' },
             { icon: 'groups', title: 'Đối tác', description: 'Khách hàng, NCC, nhân viên', targetView: 'partner_list' },
             { icon: 'inventory_2', title: 'Sản phẩm/Vật tư', description: 'Danh mục hàng hóa, dịch vụ', targetView: 'product_list' },
-            { icon: 'account_balance', title: 'Nguồn Kinh phí', description: 'NSNN, XDSN, Khác', targetView: 'funding_source' },
-            { icon: 'list', title: 'Mục lục NS', description: 'Loại, khoản, chương, mục', targetView: 'budget_item' },
+            { icon: 'account_balance', title: 'Trung tâm Chi phí', description: 'Sản xuất, Bán hàng, QLDN', targetView: 'funding_source' },
+            { icon: 'list', title: 'Khoản mục CP', description: 'Chi phí theo loại', targetView: 'budget_item' },
             { icon: 'tune', title: 'Tham số Hệ thống', description: 'Cấu hình chung', targetView: 'sys_params' },
         ],
     },
@@ -382,7 +356,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ HỆ THỐNG
     system: {
         title: 'Phân hệ Quản trị Hệ thống',
-        description: 'Quản lý người dùng, phân quyền, cấu hình hệ thống và kiểm soát ngân sách đơn vị theo TT 24/2024.',
+        description: 'Quản lý người dùng, phân quyền, cấu hình hệ thống và kiểm soát ngân sách doanh nghiệp theo TT 99/2025.',
         icon: 'settings',
         iconColor: 'purple',
         workflow: [
@@ -404,7 +378,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ MÃ THỐNG KÊ
     dimension: {
         title: 'Phân hệ Mã Thống kê',
-        description: 'Quản lý 5 chiều thống kê tùy chỉnh giúp phân tích số liệu chi tiết theo TT 24/2024/TT-BTC. Hỗ trợ cấu hình linh hoạt tên gọi và tính bắt buộc cho từng chiều.',
+        description: 'Quản lý 5 chiều thống kê tùy chỉnh giúp phân tích số liệu chi tiết theo TT 99/2025/TT-BTC. Hỗ trợ cấu hình linh hoạt tên gọi và tính bắt buộc cho từng chiều.',
         icon: 'list_alt',
         iconColor: 'purple',
         workflow: [
@@ -419,7 +393,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
             { icon: 'rule', title: 'Tính Bắt buộc', description: 'Ràng buộc nhập liệu theo từng tài khoản', targetView: 'dim_config' },
             { icon: 'group_work', title: 'Nhóm Mã TK', description: 'Phân cấp mã thống kê theo nhiều cấp', targetView: 'dim_group' },
             { icon: 'history', title: 'Nhật ký Thay đổi', description: 'Lưu trữ lịch sử chỉnh sửa cấu hình', targetView: 'sys_audit_trail' },
-            { icon: 'table_chart', title: 'Báo cáo Đa chiều', description: 'Tổng hợp số liệu theo nhiều tiêu chí', targetView: 'balance_sheet_hcsn' },
+            { icon: 'pivot_table_chart', title: 'Báo cáo Đa chiều', description: 'Tổng hợp số liệu theo nhiều tiêu chí', targetView: 'dim_report' },
         ],
     },
 };

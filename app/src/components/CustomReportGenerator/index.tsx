@@ -1,9 +1,9 @@
 /**
  * Custom Report Generator Module
- * SyntexHCSN - Import Excel templates and generate custom reports
+ * SyntexLegger - Import Excel templates and generate custom reports
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TemplateUploader } from './TemplateUploader';
 import { FieldMappingEditor } from './FieldMappingEditor';
 import { ReportPreview } from './ReportPreview';
@@ -96,6 +96,10 @@ export const CustomReportGenerator: React.FC<CustomReportGeneratorProps> = ({ on
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Refs to track handled signals (prevent duplicate handling on re-renders)
+    const lastHandledExportSignal = useRef(0);
+    const lastHandledImportSignal = useRef(0);
+
     // Set header
     useEffect(() => {
         onSetHeader?.({
@@ -113,18 +117,20 @@ export const CustomReportGenerator: React.FC<CustomReportGeneratorProps> = ({ on
 
     // Handle import signal from Ribbon - go to upload step
     useEffect(() => {
-        if (importSignal > 0) {
+        if (importSignal > 0 && importSignal !== lastHandledImportSignal.current) {
+            lastHandledImportSignal.current = importSignal;
             setCurrentStep('upload');
         }
     }, [importSignal]);
 
     // Handle export signal from Ribbon - trigger export if in preview with template
     useEffect(() => {
-        if (exportSignal > 0 && currentStep === 'preview' && selectedTemplate) {
+        if (exportSignal > 0 && exportSignal !== lastHandledExportSignal.current && currentStep === 'preview' && selectedTemplate) {
+            lastHandledExportSignal.current = exportSignal;
             // Trigger Excel export
             handleExportExcel();
         }
-    }, [exportSignal]);
+    }, [exportSignal, currentStep, selectedTemplate]);
 
     const handleExportExcel = async () => {
         if (!selectedTemplate) {

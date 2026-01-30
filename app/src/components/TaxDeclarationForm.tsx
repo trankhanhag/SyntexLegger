@@ -173,8 +173,14 @@ export const TaxDeclarationForm: React.FC<TaxDeclarationFormProps> = ({ type, da
                             <th className="border border-slate-300 p-2 w-12 text-center">STT</th>
                             <th className="border border-slate-300 p-2 text-left">Chỉ tiêu</th>
                             <th className="border border-slate-300 p-2 w-16 text-center">Mã số</th>
-                            <th className="border border-slate-300 p-2 w-40 text-right">Giá trị HHDV</th>
-                            <th className="border border-slate-300 p-2 w-40 text-right">Thuế GTGT</th>
+                            {type === 'vat' ? (
+                                <>
+                                    <th className="border border-slate-300 p-2 w-40 text-right">Giá trị HHDV</th>
+                                    <th className="border border-slate-300 p-2 w-40 text-right">Thuế GTGT</th>
+                                </>
+                            ) : (
+                                <th className="border border-slate-300 p-2 w-48 text-right">Số tiền</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
@@ -575,21 +581,21 @@ export const TaxDeclarationForm: React.FC<TaxDeclarationFormProps> = ({ type, da
                             <>
                                 <tr>
                                     <td className="border border-slate-300 p-2 text-center italic">1</td>
-                                    <td className="border border-slate-300 p-2 font-bold" colSpan={2}>Doanh thu bán hàng và cung cấp dịch vụ</td>
+                                    <td className="border border-slate-300 p-2 font-bold">Doanh thu bán hàng và cung cấp dịch vụ</td>
                                     <td className="border border-slate-300 p-2 text-center">[01]</td>
-                                    <td className="border border-slate-300 p-2 text-right font-mono" colSpan={2}>{formatNumber(data.a1)}</td>
+                                    <td className="border border-slate-300 p-2 text-right font-mono">{formatNumber(data.a1)}</td>
                                 </tr>
                                 <tr>
                                     <td className="border border-slate-300 p-2 text-center italic">2</td>
-                                    <td className="border border-slate-300 p-2 font-bold pl-8 text-slate-500" colSpan={2}>Các khoản giảm trừ doanh thu</td>
+                                    <td className="border border-slate-300 p-2 font-bold pl-8 text-slate-500">Các khoản giảm trừ doanh thu</td>
                                     <td className="border border-slate-300 p-2 text-center">[02]</td>
-                                    <td className="border border-slate-300 p-2 text-right font-mono" colSpan={2}>0</td>
+                                    <td className="border border-slate-300 p-2 text-right font-mono">0</td>
                                 </tr>
                                 <tr>
                                     <td className="border border-slate-300 p-2 text-center italic">3</td>
-                                    <td className="border border-slate-300 p-2 font-black text-blue-700" colSpan={2}>Doanh thu thuần về bán hàng và cung cấp dịch vụ</td>
+                                    <td className="border border-slate-300 p-2 font-black text-blue-700">Doanh thu thuần về bán hàng và cung cấp dịch vụ</td>
                                     <td className="border border-slate-300 p-2 text-center">[10]</td>
-                                    <td className="border border-slate-300 p-2 text-right font-mono font-bold text-blue-700" colSpan={2}>{formatNumber(data.a1)}</td>
+                                    <td className="border border-slate-300 p-2 text-right font-mono font-bold text-blue-700">{formatNumber(data.a1)}</td>
                                 </tr>
                             </>
                         )}

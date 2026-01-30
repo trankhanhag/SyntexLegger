@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { dimensionService } from '../api';
 import { type RibbonAction } from './Ribbon';
-import { FormModal } from './FormModal';
+import { FormModal, FormSection, FormGrid, FormField, FormButton, FormActions, FormAlert } from './FormModal';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { useSimplePrint } from '../hooks/usePrintHandler';
-
-// Mock data removed
+import { PivotReportModule } from './PivotReportModule';
+import { ExcelImportModal } from './ExcelImportModal';
+import { DIMENSION_TEMPLATE } from '../utils/excelTemplates';
 
 interface DimensionModuleProps {
     subView?: string;
@@ -16,8 +17,20 @@ interface DimensionModuleProps {
     onNavigate?: (viewId: string) => void;
 }
 
+// Helper to normalize view names (dim_list -> list, dim_config -> config, etc.)
+const normalizeView = (v: string): string => {
+    const viewMap: Record<string, string> = {
+        'dim_list': 'list',
+        'dim_config': 'config',
+        'dim_group': 'group',
+        'dim_report': 'report',
+        'dimension_overview': 'overview'
+    };
+    return viewMap[v] || v;
+};
+
 export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'list', printSignal = 0, onSetHeader, onNavigate }) => {
-    const [view, setView] = useState(subView);
+    const [view, setView] = useState(normalizeView(subView));
     const [dimTab, setDimTab] = useState(1);
     const [showModal, setShowModal] = useState<string | null>(null);
 
@@ -26,11 +39,15 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
     const [groups, setGroups] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedRow, setSelectedRow] = useState<any>(null);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
     const getModuleInfo = () => {
         switch (view) {
             case 'config': return { title: 'Cấu hình Loại TK', icon: 'settings_suggest', desc: 'Thiết lập tham số và thuộc tính cho các chiều thống kê' };
             case 'group': return { title: 'Nhóm Mã thống kê', icon: 'group_work', desc: 'Phân nhóm các mã thống kê để phục vụ báo cáo tổng hợp' };
+            case 'report': return { title: 'Báo cáo Đa chiều', icon: 'pivot_table_chart', desc: 'Phân tích số liệu theo nhiều chiều thống kê' };
             default: return { title: 'Danh mục Mã thống kê', icon: 'list', desc: 'Quản lý 5 chiều thống kê tùy chỉnh cho các hạch toán kế toán' };
         }
     };
@@ -38,43 +55,10 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
     const info = getModuleInfo();
 
     useEffect(() => {
-        if (subView) setView(subView);
+        if (subView) setView(normalizeView(subView));
     }, [subView]);
 
-    useEffect(() => {
-        if (onSetHeader) {
-            const actions: RibbonAction[] = [];
-            const actionLabel = view === 'list' ? 'Khai báo mã mới' : view === 'config' ? 'Sửa cấu hình' : 'Tạo nhóm mới';
-            const actionIcon = view === 'list' ? 'add_task' : view === 'config' ? 'tune' : 'group_add';
-
-            actions.push({
-                label: actionLabel,
-                icon: actionIcon,
-                onClick: () => setShowModal(view === 'list' ? 'new' : view === 'config' ? 'config' : 'group'),
-                primary: true
-            });
-
-            onSetHeader({ title: info.title, icon: info.icon, actions, onDelete: handleDeleteSelected });
-        }
-    }, [view, onSetHeader, info.title, info.icon, selectedRow]);
-
-    const handleDeleteSelected = async () => {
-        if (!selectedRow) return;
-        if (view !== 'list') return; // Only allow delete in list for now
-        if (!confirm(`Bạn có chắc muốn xóa mã thống kê ${selectedRow.code}?`)) return;
-
-        try {
-            await dimensionService.deleteDimension(selectedRow.id);
-            alert("Đã xóa thành công.");
-            fetchData();
-            setSelectedRow(null);
-        } catch (err) {
-            console.error(err);
-            alert("Lỗi khi xóa dữ liệu.");
-        }
-    };
-
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         setLoading(true);
         try {
             if (view === 'list') {
@@ -92,11 +76,118 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
         } finally {
             setLoading(false);
         }
-    };
+    }, [view, dimTab]);
+
+    const handleDeleteSelected = React.useCallback(async () => {
+        if (!selectedRow) return;
+        if (view !== 'list') return; // Only allow delete in list for now
+        if (!confirm(`Bạn có chắc muốn xóa mã thống kê ${selectedRow.code}?`)) return;
+
+        try {
+            await dimensionService.deleteDimension(selectedRow.id);
+            alert("Đã xóa thành công.");
+            fetchData();
+            setSelectedRow(null);
+        } catch (err) {
+            console.error(err);
+            alert("Lỗi khi xóa dữ liệu.");
+        }
+    }, [selectedRow, view, fetchData]);
+
+    // Handle Excel import for dimensions
+    const handleImportFromExcel = useCallback(async (data: any[]) => {
+        if (!data || data.length === 0) {
+            alert('Không có dữ liệu để nhập');
+            return;
+        }
+
+        setImporting(true);
+        setImportProgress({ current: 0, total: data.length });
+
+        const errors: string[] = [];
+        let successCount = 0;
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            setImportProgress({ current: i + 1, total: data.length });
+
+            try {
+                const code = row.code || row['Mã'] || row['Mã (*)'];
+                const name = row.name || row['Tên'] || row['Tên (*)'];
+                const type = row.type || row['Chiều'] || dimTab;
+                const description = row.description || row['Mô tả'] || '';
+
+                if (!code || !name) {
+                    errors.push(`Dòng ${i + 1}: Thiếu mã hoặc tên`);
+                    continue;
+                }
+
+                await dimensionService.saveDimension({
+                    code,
+                    name,
+                    type: parseInt(String(type)) || dimTab,
+                    description
+                });
+                successCount++;
+            } catch (err: any) {
+                const code = row.code || row['Mã'] || `Dòng ${i + 1}`;
+                const errorMsg = `${code}: ${err.response?.data?.error || err.message}`;
+                errors.push(errorMsg);
+            }
+        }
+
+        setImporting(false);
+        setShowImportModal(false);
+
+        // Show result
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} mã thống kê!`);
+        } else {
+            alert(`Nhập ${successCount}/${data.length} mã thống kê.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        // Refresh data
+        fetchData();
+    }, [dimTab, fetchData]);
+
+    useEffect(() => {
+        if (onSetHeader) {
+            const actions: RibbonAction[] = [];
+
+            // Different actions based on view
+            if (view === 'report') {
+                // Report view has no primary action in header (config is inside the report)
+            } else if (view !== 'overview') {
+                const actionLabel = view === 'list' ? 'Khai báo mã mới' : view === 'config' ? 'Sửa cấu hình' : 'Tạo nhóm mới';
+                const actionIcon = view === 'list' ? 'add_task' : view === 'config' ? 'tune' : 'group_add';
+
+                actions.push({
+                    label: actionLabel,
+                    icon: actionIcon,
+                    onClick: () => setShowModal(view === 'list' ? 'new' : view === 'config' ? 'config' : 'group'),
+                    primary: true
+                });
+
+                // Add import button for list view
+                if (view === 'list') {
+                    actions.push({
+                        label: 'Nhập từ Excel',
+                        icon: 'upload_file',
+                        onClick: () => setShowImportModal(true)
+                    });
+                }
+            }
+
+            onSetHeader({ title: info.title, icon: info.icon, actions, onDelete: view === 'list' ? handleDeleteSelected : undefined });
+        }
+    }, [view, onSetHeader, info.title, info.icon, handleDeleteSelected]);
+
+
+
 
     useEffect(() => {
         fetchData();
-    }, [view, dimTab]);
+    }, [fetchData]);
 
     // Initial fetch for configs to show labels in tabs
     useEffect(() => {
@@ -146,8 +237,13 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
 
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
+            {/* Pivot Report View */}
+            {view === 'report' && (
+                <PivotReportModule />
+            )}
+
             {/* Module Overview - Default Landing Page */}
-            {(view === 'overview' || view === 'dimension_overview') && (
+            {view === 'overview' && (
                 <ModuleOverview
                     title={MODULE_CONFIGS.dimension.title}
                     description={MODULE_CONFIGS.dimension.description}
@@ -166,7 +262,7 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
             )}
 
             {/* Action Bar & Tabs */}
-            <div className={`px-6 py-3 bg-white/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 backdrop-blur-md ${(view === 'overview' || view === 'dimension_overview') ? 'hidden' : ''}`}>
+            <div className={`px-6 py-3 bg-white/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 backdrop-blur-md ${(view === 'overview' || view === 'report') ? 'hidden' : ''}`}>
                 <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-lg">
                     {view === 'list' ? (
                         [1, 2, 3, 4, 5].map(t => (
@@ -186,7 +282,7 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
                 </div>
             </div>
 
-            <div className={`flex-1 overflow-auto relative ${(view === 'overview' || view === 'dimension_overview') ? 'hidden' : ''}`}>
+            <div className={`flex-1 overflow-auto relative ${(view === 'overview' || view === 'report') ? 'hidden' : ''}`}>
                 {loading && (
                     <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 flex items-center justify-center z-10 transition-opacity">
                         <div className="w-10 h-10 border-4 border-violet-600 border-t-transparent rounded-full animate-spin"></div>
@@ -197,7 +293,10 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
                         data={dimensions}
                         columns={listColumns}
                         keyField="id"
+                        loading={loading}
                         onSelectionChange={setSelectedRow}
+                        onRowDoubleClick={(row) => { setSelectedRow(row); setShowModal('new'); }}
+                        showTotalRow={false}
                         minRows={15}
                         emptyMessage={`Không có dữ liệu cho Mã thống kê ${dimTab}`}
                     />
@@ -222,9 +321,10 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
 
             {showModal === 'new' && (
                 <DimensionFormModal
-                    onClose={() => setShowModal(null)}
+                    onClose={() => { setShowModal(null); setSelectedRow(null); }}
                     tab={dimTab}
-                    onSave={() => { fetchData(); setShowModal(null); }}
+                    initialData={selectedRow}
+                    onSave={() => { fetchData(); setShowModal(null); setSelectedRow(null); }}
                 />
             )}
             {showModal === 'config' && (
@@ -241,25 +341,57 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
                     onSave={() => { fetchData(); setShowModal(null); }}
                 />
             )}
+
+            {/* Excel Import Modal */}
+            {showImportModal && (
+                <ExcelImportModal
+                    onClose={() => setShowImportModal(false)}
+                    onImport={handleImportFromExcel}
+                    title={`Nhập mã thống kê chiều ${dimTab}`}
+                    enhancedTemplate={DIMENSION_TEMPLATE}
+                    columns={[
+                        { key: 'code', label: 'Mã', required: true },
+                        { key: 'name', label: 'Tên', required: true },
+                        { key: 'type', label: 'Chiều' },
+                        { key: 'description', label: 'Mô tả' }
+                    ]}
+                />
+            )}
+
+            {/* Import Progress Overlay */}
+            {importing && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                        <div className="w-16 h-16 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            Đang nhập mã thống kê...
+                        </p>
+                        <p className="text-2xl font-mono text-violet-600 mt-2">
+                            {importProgress.current} / {importProgress.total}
+                        </p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                            <div
+                                className="bg-violet-600 h-2 rounded-full transition-all"
+                                style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 // --- SUB-COMPONENTS ---
 
-const Modal = ({ title, icon, onClose, children }: { title: string, icon: string, onClose: () => void, children: React.ReactNode }) => (
-    <FormModal title={title} onClose={onClose} sizeClass="max-w-xl" icon={icon}>
-        {children}
-    </FormModal>
-);
-
-const DimensionFormModal = ({ onClose, tab, onSave }: { onClose: () => void, tab: number, onSave: () => void }) => {
+const DimensionFormModal = ({ onClose, tab, onSave, initialData }: { onClose: () => void, tab: number, onSave: () => void, initialData?: any }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        code: '',
-        name: '',
-        type: tab,
-        description: ''
+        id: initialData?.id || '',
+        code: initialData?.code || '',
+        name: initialData?.name || '',
+        type: initialData?.type || tab,
+        description: initialData?.description || ''
     });
 
     const handleSave = async () => {
@@ -279,40 +411,62 @@ const DimensionFormModal = ({ onClose, tab, onSave }: { onClose: () => void, tab
     };
 
     return (
-        <Modal title={`Thêm Mã thống kê chiều ${tab}`} icon="new_window" onClose={onClose}>
-            <div className="space-y-6">
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="form-label">Mã Thống kê</label>
-                            <input type="text" className="form-input font-bold"
-                                value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="form-label">Chiều thống kê</label>
-                            <input type="text" disabled className="form-input bg-slate-100 dark:bg-slate-800 opacity-50"
-                                value={`Dimension ${tab}`} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="form-label">Tên Mã thống kê</label>
-                        <input type="text" className="form-input"
-                            value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-                    </div>
-                    <div>
-                        <label className="form-label">Diễn giải / Mục đích sử dụng</label>
-                        <textarea rows={4} className="form-textarea"
-                            value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-                    </div>
-                </div>
-                <div className="form-actions">
-                    <button onClick={onClose} className="form-button-secondary">Bỏ qua</button>
-                    <button onClick={handleSave} disabled={loading} className="form-button-primary bg-violet-600 hover:bg-violet-700 uppercase tracking-wide">
+        <FormModal
+            title={initialData ? `Sửa Mã thống kê chiều ${tab}` : `Thêm Mã thống kê chiều ${tab}`}
+            icon={initialData ? "edit" : "new_window"}
+            onClose={onClose}
+            size="md"
+            headerVariant="gradient"
+            headerColor="purple"
+            footer={
+                <FormActions>
+                    <FormButton variant="secondary" onClick={onClose}>Bỏ qua</FormButton>
+                    <FormButton variant="primary" onClick={handleSave} disabled={loading}>
                         {loading ? 'Đang lưu...' : 'Lưu khai báo'}
-                    </button>
-                </div>
-            </div>
-        </Modal>
+                    </FormButton>
+                </FormActions>
+            }
+        >
+            <FormSection title="Thông tin cơ bản" variant="card" color="blue">
+                <FormGrid cols={2}>
+                    <FormField label="Mã Thống kê" required>
+                        <input
+                            type="text"
+                            className="form-input font-bold"
+                            value={formData.code}
+                            onChange={e => setFormData({ ...formData, code: e.target.value })}
+                        />
+                    </FormField>
+                    <FormField label="Chiều thống kê">
+                        <input
+                            type="text"
+                            disabled
+                            className="form-input bg-slate-100 dark:bg-slate-800 opacity-50"
+                            value={`Dimension ${tab}`}
+                        />
+                    </FormField>
+                </FormGrid>
+                <FormField label="Tên Mã thống kê" required>
+                    <input
+                        type="text"
+                        className="form-input"
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    />
+                </FormField>
+            </FormSection>
+
+            <FormSection title="Thông tin bổ sung" variant="card" color="slate">
+                <FormField label="Diễn giải / Mục đích sử dụng">
+                    <textarea
+                        rows={3}
+                        className="form-textarea"
+                        value={formData.description}
+                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    />
+                </FormField>
+            </FormSection>
+        </FormModal>
     );
 };
 
@@ -337,44 +491,64 @@ const DimensionConfigModal = ({ onClose, configs, onSave }: { onClose: () => voi
     };
 
     return (
-        <Modal title="Cấu hình hệ thống Dimension" icon="tune" onClose={onClose}>
-            <div className="space-y-6">
-                <div className="p-4 bg-violet-50 dark:bg-violet-900/10 rounded-xl border border-violet-100 dark:border-violet-900/30">
-                    <div className="flex gap-3">
-                        <span className="material-symbols-outlined text-violet-600">info</span>
-                        <p className="text-xs text-violet-800 dark:text-violet-300 leading-relaxed">
-                            Việc thay đổi **Tên hiển thị** sẽ ảnh hưởng đến giao diện nhập liệu tại tất cả các phân hệ. Hãy cân nhắc khi tắt trạng thái **Đang dùng** của các chiều đã có dữ liệu.
-                        </p>
-                    </div>
-                </div>
-                <div className="space-y-4">
+        <FormModal
+            title="Cấu hình hệ thống Dimension"
+            icon="tune"
+            onClose={onClose}
+            size="lg"
+            headerVariant="gradient"
+            headerColor="purple"
+            footer={
+                <FormActions>
+                    <FormButton variant="secondary" onClick={onClose}>Bỏ qua</FormButton>
+                    <FormButton variant="primary" onClick={handleSave} disabled={loading}>
+                        {loading ? 'Đang cập nhật...' : 'Cập nhật cấu hình'}
+                    </FormButton>
+                </FormActions>
+            }
+        >
+            <FormAlert variant="info">
+                Việc thay đổi <strong>Tên hiển thị</strong> sẽ ảnh hưởng đến giao diện nhập liệu tại tất cả các phân hệ.
+                Hãy cân nhắc khi tắt trạng thái <strong>Đang dùng</strong> của các chiều đã có dữ liệu.
+            </FormAlert>
+
+            <FormSection title="Danh sách chiều thống kê" variant="card" color="slate">
+                <div className="space-y-3">
                     {localConfigs.map(cfg => (
-                        <div key={cfg.id} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                        <div key={cfg.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                             <div className="flex-1">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase">{cfg.name}</p>
-                                <input value={cfg.label} onChange={e => handleUpdate(cfg.id, 'label', e.target.value)} className="text-sm font-bold bg-transparent outline-none border-b border-transparent focus:border-violet-500 w-full" />
+                                <input
+                                    value={cfg.label}
+                                    onChange={e => handleUpdate(cfg.id, 'label', e.target.value)}
+                                    className="text-sm font-bold bg-transparent outline-none border-b border-transparent focus:border-blue-500 w-full dark:text-white"
+                                />
                             </div>
                             <div className="flex items-center gap-6 ml-4">
-                                <div className="flex flex-col items-end">
+                                <div className="flex flex-col items-center">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">Dùng</span>
-                                    <input type="checkbox" checked={cfg.isActive === 1} onChange={e => handleUpdate(cfg.id, 'isActive', e.target.checked ? 1 : 0)} className="w-4 h-4 accent-violet-600" />
+                                    <input
+                                        type="checkbox"
+                                        checked={cfg.isActive === 1}
+                                        onChange={e => handleUpdate(cfg.id, 'isActive', e.target.checked ? 1 : 0)}
+                                        className="w-5 h-5 accent-green-600 rounded"
+                                    />
                                 </div>
-                                <div className="flex flex-col items-end">
+                                <div className="flex flex-col items-center">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">Bắt buộc</span>
-                                    <input type="checkbox" checked={cfg.isMandatory === 1} onChange={e => handleUpdate(cfg.id, 'isMandatory', e.target.checked ? 1 : 0)} className="w-4 h-4 accent-rose-600" />
+                                    <input
+                                        type="checkbox"
+                                        checked={cfg.isMandatory === 1}
+                                        onChange={e => handleUpdate(cfg.id, 'isMandatory', e.target.checked ? 1 : 0)}
+                                        className="w-5 h-5 accent-red-600 rounded"
+                                    />
                                 </div>
                             </div>
                         </div>
                     ))}
                 </div>
-                <div className="form-actions">
-                    <button onClick={onClose} className="form-button-secondary">Bỏ qua</button>
-                    <button onClick={handleSave} disabled={loading} className="form-button-primary bg-violet-600 hover:bg-violet-700 uppercase tracking-wide">
-                        {loading ? 'Đang cập nhật...' : 'Cập nhật cấu hình'}
-                    </button>
-                </div>
-            </div>
-        </Modal>
+            </FormSection>
+        </FormModal>
     );
 };
 
@@ -417,53 +591,84 @@ const DimensionGroupModal = ({ onClose, dimType, onSave }: { onClose: () => void
     };
 
     return (
-        <Modal title="Thiết lập Nhóm thống kê" icon="group_add" onClose={onClose}>
-            <div className="space-y-6">
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="form-label">Mã Nhóm</label>
-                            <input type="text" className="form-input font-bold"
-                                value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="form-label">Chiều thống kê</label>
-                            <input type="text" disabled className="form-input bg-slate-100 dark:bg-slate-800 opacity-50"
-                                value={`Dimension ${dimType}`} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="form-label">Tên Nhóm thống kê</label>
-                        <input type="text" className="form-input"
-                            value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-                    </div>
-                    <div className="p-4 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Chọn thành viên trong nhóm</p>
-                        <div className="flex flex-wrap gap-2 text-xs">
-                            {availableMembers.map(m => {
-                                const isSelected = formData.members.includes(m.id);
-                                return (
-                                    <span
-                                        key={m.id}
-                                        onClick={() => toggleMember(m.id)}
-                                        className={`px-2 py-1 rounded-md flex items-center gap-2 cursor-pointer transition-colors ${isSelected ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-violet-50'}`}
-                                    >
-                                        {m.name}
-                                        <span className="material-symbols-outlined text-[14px]">{isSelected ? 'close' : 'add'}</span>
-                                    </span>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-                <div className="form-actions">
-                    <button onClick={onClose} className="form-button-secondary">Bỏ qua</button>
-                    <button onClick={handleSave} disabled={loading} className="form-button-primary bg-violet-600 hover:bg-violet-700 uppercase tracking-wide">
+        <FormModal
+            title="Thiết lập Nhóm thống kê"
+            icon="group_add"
+            onClose={onClose}
+            size="lg"
+            headerVariant="gradient"
+            headerColor="green"
+            footer={
+                <FormActions>
+                    <FormButton variant="secondary" onClick={onClose}>Bỏ qua</FormButton>
+                    <FormButton variant="success" onClick={handleSave} disabled={loading}>
                         {loading ? 'Đang lưu...' : 'Lưu nhóm'}
-                    </button>
+                    </FormButton>
+                </FormActions>
+            }
+        >
+            <FormSection title="Thông tin nhóm" variant="card" color="green">
+                <FormGrid cols={2}>
+                    <FormField label="Mã Nhóm" required>
+                        <input
+                            type="text"
+                            className="form-input font-bold"
+                            value={formData.code}
+                            onChange={e => setFormData({ ...formData, code: e.target.value })}
+                        />
+                    </FormField>
+                    <FormField label="Chiều thống kê">
+                        <input
+                            type="text"
+                            disabled
+                            className="form-input bg-slate-100 dark:bg-slate-800 opacity-50"
+                            value={`Dimension ${dimType}`}
+                        />
+                    </FormField>
+                </FormGrid>
+                <FormField label="Tên Nhóm thống kê" required>
+                    <input
+                        type="text"
+                        className="form-input"
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    />
+                </FormField>
+            </FormSection>
+
+            <FormSection title="Thành viên trong nhóm" variant="highlight" color="slate">
+                <div className="flex flex-wrap gap-2">
+                    {availableMembers.length === 0 ? (
+                        <p className="text-sm text-slate-400 italic">Chưa có mã thống kê nào trong chiều này</p>
+                    ) : (
+                        availableMembers.map(m => {
+                            const isSelected = formData.members.includes(m.id);
+                            return (
+                                <span
+                                    key={m.id}
+                                    onClick={() => toggleMember(m.id)}
+                                    className={`px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer transition-all text-sm ${
+                                        isSelected
+                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-2 ring-green-500'
+                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                    }`}
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">
+                                        {isSelected ? 'check_circle' : 'add_circle_outline'}
+                                    </span>
+                                    {m.code} - {m.name}
+                                </span>
+                            );
+                        })
+                    )}
                 </div>
-            </div>
-        </Modal>
+                {formData.members.length > 0 && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-medium">
+                        Đã chọn {formData.members.length} mã thống kê
+                    </p>
+                )}
+            </FormSection>
+        </FormModal>
     );
 };
 

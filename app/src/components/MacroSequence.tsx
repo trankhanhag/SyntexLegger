@@ -18,14 +18,14 @@ export const MacroSequence: React.FC<MacroSequenceProps> = ({ onClose, onNavigat
     const [isRunning, setIsRunning] = useState(false);
     const [steps, setSteps] = useState<Step[]>([
         { id: 'valuation', name: 'Tính giá vốn (Stock Valuation)', status: 'wait' },
-        { id: 'depreciation', name: 'Trích hao mòn/khấu hao (HCSN)', status: 'wait' },
-        { id: 'revenue_recognition', name: 'Ghi thu từ nguồn tạm thu (366)', status: 'wait' },
+        { id: 'depreciation', name: 'Trích khấu hao TSCĐ (214)', status: 'wait' },
+        { id: 'revenue_recognition', name: 'Ghi nhận Doanh thu (511)', status: 'wait' },
         { id: 'allocation', name: 'Phân bổ chi phí (Allocation)', status: 'wait' },
         { id: 'fx', name: 'Đánh giá tỷ giá (FX Revaluation)', status: 'wait' },
         { id: 'vat', name: 'Kết chuyển VAT (nếu có)', status: 'wait' },
-        { id: 'payroll', name: 'Hạch toán Lương & Bảo hiểm (334, 332)', status: 'wait' },
-        { id: 'pl', name: 'Kết chuyển thặng dư/thâm hụt (811)', status: 'wait' },
-        { id: 'fund_distribution', name: 'Trích lập các Quỹ (431)', status: 'wait' },
+        { id: 'payroll', name: 'Hạch toán Lương & Bảo hiểm (334, 338)', status: 'wait' },
+        { id: 'pl', name: 'Kết chuyển Lãi/Lỗ (911 → 421)', status: 'wait' },
+        { id: 'fund_distribution', name: 'Trích lập các Quỹ (414, 418)', status: 'wait' },
     ]);
     const [result, setResult] = useState<{ success: boolean; message: string; vouchers?: any[] } | null>(null);
 
@@ -223,7 +223,7 @@ export const MacroSequence: React.FC<MacroSequenceProps> = ({ onClose, onNavigat
                             <button
                                 onClick={() => {
                                     onClose();
-                                    onNavigate?.('balance_sheet_hcsn');
+                                    onNavigate?.('balance_sheet_dn');
                                 }}
                                 className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl font-bold shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all flex items-center gap-2"
                             >

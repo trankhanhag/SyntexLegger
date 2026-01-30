@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SmartTable, type ColumnDef } from './SmartTable';
-import { purchaseService, masterDataService, productService, taxService, expenseService, hcsnService, settingsService } from '../api';
+import { purchaseService, masterDataService, productService, taxService, expenseService, settingsService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { toInputDateValue } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
@@ -9,6 +9,8 @@ import { DateInput } from './DateInput';
 import { PrintPreviewModal } from './PrintTemplates';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { ExcelImportModal } from './ExcelImportModal';
+import { EXPENSE_TEMPLATE } from '../utils/excelTemplates';
 
 
 // --- SHARED MODAL COMPONENT ---
@@ -519,7 +521,7 @@ const ExpenseReportView = () => {
         <div className="h-full p-6 overflow-auto">
             <div className="mb-4 flex gap-2">
                 <button onClick={() => setGroupBy('category')} className={`px-4 py-2 rounded text-sm ${groupBy === 'category' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>Theo Khoản mục</button>
-                <button onClick={() => setGroupBy('fund_source')} className={`px-4 py-2 rounded text-sm ${groupBy === 'fund_source' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>Theo Nguồn KP</button>
+                <button onClick={() => setGroupBy('fund_source')} className={`px-4 py-2 rounded text-sm ${groupBy === 'fund_source' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>Theo Trung tâm CP</button>
                 <button onClick={() => setGroupBy('type')} className={`px-4 py-2 rounded text-sm ${groupBy === 'type' ? 'bg-blue-600 text-white' : 'bg-slate-200'}`}>Theo Loại chi</button>
             </div>
 
@@ -640,6 +642,13 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
     const [selectedRow, setSelectedRow] = useState<any>(null);
     const [refreshSignal, setRefreshSignal] = useState(0);
     const [companyInfo, setCompanyInfo] = useState({ name: '', address: '' });
+    const [printRecord, setPrintRecord] = useState<any>(null);
+    const lastPrintSignalRef = React.useRef(0); // Track last handled print signal
+
+    // Import states
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
     // Fetch company info from settings
     useEffect(() => {
@@ -682,12 +691,65 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
         setSelectedRow(null);
     }, [view, refreshSignal]);
 
+    // Excel import handler
+    const handleImportFromExcel = useCallback(async (rows: any[]) => {
+        if (rows.length === 0) return;
+
+        setImporting(true);
+        setImportProgress({ current: 0, total: rows.length });
+        setShowImportModal(false);
+
+        let successCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            setImportProgress({ current: i + 1, total: rows.length });
+
+            try {
+                await expenseService.createVoucher({
+                    voucher_no: rows[i].voucher_no || rows[i]['Số phiếu (*)'] || `PC-${Date.now()}-${i}`,
+                    voucher_date: rows[i].voucher_date || rows[i]['Ngày phiếu (*)'] || toInputDateValue(),
+                    fiscal_year: new Date().getFullYear(),
+                    payee_name: rows[i].payee_name || rows[i]['Người nhận (*)'],
+                    payee_tax_code: rows[i].payee_tax_code || rows[i]['MST'],
+                    payee_address: rows[i].payee_address || rows[i]['Địa chỉ'],
+                    expense_type: view === 'reduction' ? 'REDUCTION' : (view === 'payment' ? 'PAYMENT' : 'EXPENSE'),
+                    category_code: rows[i].category_code || rows[i]['Mã khoản mục'],
+                    category_name: rows[i].category_name || rows[i]['Tên khoản mục'],
+                    amount: parseFloat(rows[i].amount || rows[i]['Số tiền (*)'] || 0),
+                    fund_source_id: rows[i].fund_source_id || rows[i]['Bộ phận'],
+                    item_code: rows[i].item_code || rows[i]['Mục'],
+                    sub_item_code: rows[i].sub_item_code || rows[i]['Khoản mục'],
+                    account_code: rows[i].account_code || rows[i]['TK Nợ'] || '611',
+                    notes: rows[i].notes || rows[i]['Nội dung chi'] || ''
+                });
+                successCount++;
+            } catch (err: any) {
+                const docNo = rows[i].voucher_no || rows[i]['Số phiếu (*)'] || `Dòng ${i + 1}`;
+                errors.push(`${docNo}: ${err.response?.data?.error || err.message}`);
+            }
+        }
+
+        setImporting(false);
+
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} phiếu chi!`);
+        } else {
+            alert(`Nhập ${successCount}/${rows.length} phiếu chi.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        setRefreshSignal(s => s + 1);
+    }, [view]);
+
     // Handle print signal from Ribbon
     useEffect(() => {
-        if (printSignal > 0) {
-            const printableViews = ['order', 'inbound', 'service', 'return', 'payment'];
+        // Only respond to NEW print signals, not when other dependencies change
+        if (printSignal > 0 && printSignal !== lastPrintSignalRef.current) {
+            lastPrintSignalRef.current = printSignal;
+
+            const printableViews = ['order', 'inbound', 'service', 'return', 'payment', 'voucher', 'reduction'];
             if (!printableViews.includes(view)) {
-                alert('Chức năng in chỉ áp dụng cho: Đề xuất mua sắm, Phiếu nhập hàng, Dịch vụ, Trả hàng, và Thanh toán.');
+                alert('Chức năng in chỉ áp dụng cho: Đề xuất mua sắm, Phiếu nhập hàng, Dịch vụ, Trả hàng, Thanh toán, Phiếu chi.');
                 return;
             }
 
@@ -696,6 +758,35 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
                 return;
             }
 
+            // Transform data for print template
+            const record = {
+                // Date fields
+                voucher_date: selectedRow.voucher_date || selectedRow.date || selectedRow.created_at,
+                date: selectedRow.voucher_date || selectedRow.date || selectedRow.created_at,
+                // Document number
+                voucher_no: selectedRow.voucher_no || selectedRow.doc_no,
+                doc_no: selectedRow.voucher_no || selectedRow.doc_no,
+                // Person name
+                payee_name: selectedRow.payee_name || selectedRow.partner_name || selectedRow.supplier_name || '',
+                receiver_name: selectedRow.payee_name || selectedRow.partner_name || '',
+                // Address
+                address: selectedRow.address || selectedRow.payee_address || selectedRow.partner_address || '',
+                // Description
+                description: selectedRow.description || selectedRow.notes || selectedRow.category_name || '',
+                reason: selectedRow.description || selectedRow.notes || selectedRow.category_name || '',
+                notes: selectedRow.notes || selectedRow.description || '',
+                // Amount
+                amount: selectedRow.amount || selectedRow.total_amount || 0,
+                total_amount: selectedRow.amount || selectedRow.total_amount || 0,
+                // Account codes
+                debit_account: selectedRow.debit_account || selectedRow.expense_account || '',
+                credit_account: selectedRow.credit_account || selectedRow.payment_account || '111',
+                account_code: selectedRow.account_code || '',
+                // Additional fields
+                attached_docs: selectedRow.attached_docs || '',
+                category_name: selectedRow.category_name || '',
+            };
+            setPrintRecord(record);
             setShowPrintPreview(true);
         }
     }, [printSignal, view, selectedRow]);
@@ -714,9 +805,9 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
                     case 'categories': return 'Danh mục Khoản mục chi';
                     case 'payee':
                     case 'partner': return 'Đối tượng Chi';
-                    case 'report': return 'Báo cáo Chi sự nghiệp';
-                    case 'budget': return 'So sánh Dự toán Chi';
-                    default: return 'Quản lý Chi sự nghiệp';
+                    case 'report': return 'Báo cáo Chi phí';
+                    case 'budget': return 'So sánh Kế hoạch Chi';
+                    default: return 'Quản lý Chi phí';
                 }
             };
 
@@ -728,6 +819,11 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
                     icon: 'add_circle',
                     onClick: () => { setSelectedRow(null); setShowExpenseModal(true); },
                     primary: true
+                });
+                actions.push({
+                    label: 'Nhập từ Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowImportModal(true)
                 });
             } else if (view === 'payee' || view === 'partner') {
                 actions.push({
@@ -771,13 +867,11 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
                 case 'voucher':
                 case 'payment':
                 case 'reduction':
-                    // TODO: Use expenseService.deleteVoucher when API ready
-                    await purchaseService.deletePayment(selectedRow.id);
+                    await expenseService.deleteVoucher(selectedRow.id);
                     break;
                 case 'payee':
                 case 'partner': await masterDataService.deletePartner(selectedRow.id || selectedRow.partner_code); break;
                 case 'categories':
-                    // TODO: Use expenseService.deleteCategory when API ready
                     await productService.deleteProduct(selectedRow.id || selectedRow.code);
                     break;
                 default: return;
@@ -840,7 +934,7 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
             )}
 
             <div className={`${(view === 'overview' || view === 'expense_overview') ? 'hidden' : 'contents'}`}>
-                {/* Action Bar - Tabs cho Chi sự nghiệp HCSN */}
+                {/* Action Bar - Tabs cho Chi phí hoạt động */}
                 <div className="px-6 py-3 bg-white/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 backdrop-blur-md z-10">
                     <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-lg">
                         {[
@@ -944,15 +1038,61 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
 
                 {/* Print Preview Modal */}
                 {
-                    showPrintPreview && selectedRow && (
+                    showPrintPreview && printRecord && (
                         <PrintPreviewModal
-                            record={selectedRow}
-                            view={view === 'voucher' || view === 'payment' ? 'CASH_PAYMENT' : 'CASH_PAYMENT'}
-                            onClose={() => setShowPrintPreview(false)}
+                            record={printRecord}
+                            view="CASH_PAYMENT"
+                            onClose={() => {
+                                setShowPrintPreview(false);
+                                setPrintRecord(null);
+                            }}
                             companyInfo={companyInfo}
                         />
                     )
                 }
+
+                {/* Excel Import Modal */}
+                {showImportModal && (
+                    <ExcelImportModal
+                        onClose={() => setShowImportModal(false)}
+                        onImport={handleImportFromExcel}
+                        title="Nhập phiếu chi từ Excel"
+                        enhancedTemplate={EXPENSE_TEMPLATE}
+                        columns={[
+                            { key: 'voucher_no', label: 'Số phiếu', required: true },
+                            { key: 'voucher_date', label: 'Ngày phiếu', required: true },
+                            { key: 'payee_name', label: 'Người nhận', required: true },
+                            { key: 'payee_tax_code', label: 'MST' },
+                            { key: 'payee_address', label: 'Địa chỉ' },
+                            { key: 'category_code', label: 'Mã khoản mục' },
+                            { key: 'amount', label: 'Số tiền', required: true },
+                            { key: 'item_code', label: 'Mục' },
+                            { key: 'sub_item_code', label: 'Khoản mục' },
+                            { key: 'notes', label: 'Nội dung chi' }
+                        ]}
+                    />
+                )}
+
+                {/* Import Progress Overlay */}
+                {importing && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                        <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                            <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                                Đang nhập phiếu chi...
+                            </p>
+                            <p className="text-2xl font-mono text-red-600 mt-2">
+                                {importProgress.current} / {importProgress.total}
+                            </p>
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                                <div
+                                    className="bg-red-600 h-2 rounded-full transition-all"
+                                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -984,13 +1124,11 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
 
     const [categories, setCategories] = useState<any[]>([]);
     const [fundSources, setFundSources] = useState<any[]>([]);
-    const [budgetEstimates, setBudgetEstimates] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         expenseService.getCategories({ active: true }).then(res => setCategories(Array.isArray(res.data) ? res.data : (res.data?.data || [])));
         masterDataService.getFundSources().then((res: any) => setFundSources(Array.isArray(res.data) ? res.data : (res.data?.data || [])));
-        hcsnService.getBudgetEstimates({ budget_type: 'EXPENSE' }).then(res => setBudgetEstimates(Array.isArray(res.data) ? res.data : (res.data?.data || [])));
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -1087,7 +1225,7 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <label className="form-label">Nguồn kinh phí</label>
+                        <label className="form-label">Trung tâm chi phí</label>
                         <select
                             className="form-select"
                             value={formData.fund_source_id}
@@ -1095,17 +1233,6 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
                         >
                             <option value="">-- Không liên kết --</option>
                             {fundSources.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="form-label">Chỉ tiêu dự toán</label>
-                        <select
-                            className="form-select"
-                            value={formData.budget_estimate_id}
-                            onChange={e => setFormData({ ...formData, budget_estimate_id: e.target.value })}
-                        >
-                            <option value="">-- Không liên kết --</option>
-                            {budgetEstimates.map(b => <option key={b.id} value={b.id}>{b.item_name} ({b.fiscal_year})</option>)}
                         </select>
                     </div>
                 </div>
@@ -1121,7 +1248,7 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="form-label">Tiểu mục</label>
+                        <label className="form-label">Khoản mục</label>
                         <input
                             className="form-input font-mono"
                             value={formData.sub_item_code}

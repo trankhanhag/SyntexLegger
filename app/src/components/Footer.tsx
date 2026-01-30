@@ -19,7 +19,7 @@ export const Footer: React.FC = () => {
 
             {/* Right: Version & Copyright */}
             <div className="flex items-center gap-6">
-                <span className="opacity-60 hidden sm:inline">© 2025 SyntexHCSN Corp.</span>
+                <span className="opacity-60 hidden sm:inline">© 2025 SyntexLegger Corp.</span>
                 <span className="opacity-80">v2.5.0 (Build 20251230)</span>
 
                 {/* Zoom Controls (Visual only for now, keeps the Excel feel) */}

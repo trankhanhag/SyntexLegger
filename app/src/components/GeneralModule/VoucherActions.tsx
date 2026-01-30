@@ -1,6 +1,6 @@
 /**
  * VoucherActions Component
- * SyntexHCSN - Toolbar actions cho quản lý chứng từ
+ * SyntexLegger - Toolbar actions cho quản lý chứng từ
  */
 
 import React from 'react';

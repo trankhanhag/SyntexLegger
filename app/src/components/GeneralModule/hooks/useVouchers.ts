@@ -1,6 +1,6 @@
 /**
  * useVouchers Hook
- * SyntexHCSN - Custom hook cho quản lý voucher data
+ * SyntexLegger - Custom hook cho quản lý voucher data
  * 
  * Tách logic data fetching từ GeneralModule.tsx
  */

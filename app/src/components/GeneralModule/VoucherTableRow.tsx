@@ -1,6 +1,6 @@
 /**
  * VoucherTableRow Component
- * SyntexHCSN - Dòng trong bảng danh sách chứng từ
+ * SyntexLegger - Dòng trong bảng danh sách chứng từ
  *
  * Updated: Using unified styles and Badge components
  */

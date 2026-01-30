@@ -90,6 +90,82 @@ const isValidCode = (code) => {
 };
 
 /**
+ * Check if account is off-balance sheet (TK ngoài bảng)
+ * Vietnamese accounting: accounts starting with "0" are off-balance sheet
+ * Examples: 001, 002, 003, 004, 005, 007, 008, 009
+ * These use single-entry bookkeeping, not double-entry
+ * @param {string} accountCode - Account code to check
+ * @returns {boolean}
+ */
+const isOffBalanceSheetAccount = (accountCode) => {
+    if (!accountCode || typeof accountCode !== 'string') return false;
+    return accountCode.startsWith('0');
+};
+
+/**
+ * Validate voucher balance (Nợ = Có)
+ * Ensures total debits equal total credits for on-balance sheet entries
+ * @param {Array} items - Voucher items
+ * @returns {{ isValid: boolean, totalDebit: number, totalCredit: number, difference: number, error?: string }}
+ */
+const validateVoucherBalance = (items) => {
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return { isValid: true, totalDebit: 0, totalCredit: 0, difference: 0 };
+    }
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    let hasOnBalanceSheetEntry = false;
+
+    for (const item of items) {
+        const amount = parseFloat(item.amount) || 0;
+        const debitAcc = item.debit_acc || '';
+        const creditAcc = item.credit_acc || '';
+
+        // Skip validation for off-balance sheet accounts (TK ngoài bảng)
+        const isOffBalanceDebit = isOffBalanceSheetAccount(debitAcc);
+        const isOffBalanceCred = isOffBalanceSheetAccount(creditAcc);
+
+        // If both accounts are off-balance sheet, skip this item
+        if (isOffBalanceDebit && isOffBalanceCred) {
+            continue;
+        }
+
+        // If only one account is off-balance sheet (single-entry), skip balance validation for this item
+        if (isOffBalanceDebit || isOffBalanceCred) {
+            continue;
+        }
+
+        // On-balance sheet entry: accumulate for balance check
+        hasOnBalanceSheetEntry = true;
+        if (debitAcc) {
+            totalDebit += amount;
+        }
+        if (creditAcc) {
+            totalCredit += amount;
+        }
+    }
+
+    // If no on-balance sheet entries, no balance validation needed
+    if (!hasOnBalanceSheetEntry) {
+        return { isValid: true, totalDebit: 0, totalCredit: 0, difference: 0 };
+    }
+
+    // Check balance with small tolerance for floating point
+    const difference = Math.abs(totalDebit - totalCredit);
+    const tolerance = 0.01; // 1 cent tolerance for rounding
+    const isValid = difference <= tolerance;
+
+    return {
+        isValid,
+        totalDebit,
+        totalCredit,
+        difference,
+        error: isValid ? undefined : `Chứng từ không cân đối: Tổng Nợ (${totalDebit.toLocaleString('vi-VN')}) ≠ Tổng Có (${totalCredit.toLocaleString('vi-VN')}), chênh lệch: ${difference.toLocaleString('vi-VN')}`
+    };
+};
+
+/**
  * Middleware to sanitize request body
  */
 const sanitizeBody = (req, res, next) => {
@@ -136,6 +212,8 @@ const sanitizeAll = (req, res, next) => {
 
 /**
  * Validate voucher request body
+ * Includes balance validation: Total Debits must equal Total Credits
+ * Exception: Off-balance sheet accounts (TK ngoài bảng - accounts starting with "0")
  */
 const validateVoucher = (req, res, next) => {
     const { doc_no, doc_date, post_date, type, items } = req.body;
@@ -171,6 +249,14 @@ const validateVoucher = (req, res, next) => {
                     errors.push(`Item ${idx + 1}: Invalid credit account code`);
                 }
             });
+
+            // === BALANCE VALIDATION (Nợ = Có) ===
+            // Validate that total debits equal total credits
+            // Exception: Off-balance sheet accounts (TK ngoài bảng) starting with "0"
+            const balanceResult = validateVoucherBalance(items);
+            if (!balanceResult.isValid) {
+                errors.push(balanceResult.error);
+            }
         }
     }
 
@@ -324,6 +410,8 @@ module.exports = {
     isValidNumber,
     isValidAccountCode,
     isValidCode,
+    isOffBalanceSheetAccount,
+    validateVoucherBalance,
     validateVoucher,
     validatePartner,
     validateAccount,

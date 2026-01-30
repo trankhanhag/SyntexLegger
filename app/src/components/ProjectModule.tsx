@@ -289,8 +289,6 @@ const Modal = ({ title, onClose, widthClass = "max-w-4xl", children }: { title: 
 const ProjectFormModal = ({ onClose, onSave }: { onClose: () => void, onSave: () => void }) => {
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState<any[]>([]);
-    const [fundSources, setFundSources] = useState<any[]>([]);
-    const [budgetEstimates, setBudgetEstimates] = useState<any[]>([]);
     const [formData, setFormData] = useState({
         code: '',
         name: '',
@@ -300,10 +298,8 @@ const ProjectFormModal = ({ onClose, onSave }: { onClose: () => void, onSave: ()
         end: '',
         progress: 0,
         status: 'Mới khởi tạo',
-        // HCSN fields
-        project_type: 'PUBLIC_SERVICE',
-        fund_source_id: '',
-        budget_estimate_id: '',
+        // Project fields
+        project_type: 'INTERNAL',
         approval_no: '',
         approval_date: '',
         managing_agency: '',
@@ -315,16 +311,8 @@ const ProjectFormModal = ({ onClose, onSave }: { onClose: () => void, onSave: ()
     });
 
     useEffect(() => {
-        import('../api').then(({ masterDataService, hcsnService }) => {
+        import('../api').then(({ masterDataService }) => {
             masterDataService.getPartners().then(res => setCustomers(res.data || [])).catch(err => console.error(err));
-            hcsnService.getFundSources().then(res => {
-                const d = res.data;
-                setFundSources(Array.isArray(d) ? d : (d?.data || []));
-            }).catch(err => console.error(err));
-            hcsnService.getBudgetEstimates().then(res => {
-                const d = res.data;
-                setBudgetEstimates(Array.isArray(d) ? d : (d?.data || []));
-            }).catch(err => console.error(err));
         });
     }, []);
 
@@ -346,7 +334,7 @@ const ProjectFormModal = ({ onClose, onSave }: { onClose: () => void, onSave: ()
     };
 
     return (
-        <Modal title="Khởi tạo Dự án / Vụ việc mới (HCSN)" onClose={onClose} widthClass="max-w-5xl">
+        <Modal title="Khởi tạo Dự án / Vụ việc mới" onClose={onClose} widthClass="max-w-5xl">
             <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -387,35 +375,15 @@ const ProjectFormModal = ({ onClose, onSave }: { onClose: () => void, onSave: ()
                         </div>
                     </div>
                     <div className="space-y-4">
-                        {/* HCSN Fields */}
+                        {/* Project Fields */}
                         <div>
-                            <label className="form-label">Loại dự án HCSN</label>
+                            <label className="form-label">Loại dự án</label>
                             <select className="form-select" value={formData.project_type}
                                 onChange={e => setFormData({ ...formData, project_type: e.target.value })}>
                                 <option value="INVESTMENT">Đầu tư</option>
-                                <option value="PUBLIC_SERVICE">Sự nghiệp công</option>
-                                <option value="RESEARCH">Nghiên cứu khoa học</option>
-                                <option value="INFRASTRUCTURE">Hạ tầng</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="form-label">Nguồn kinh phí</label>
-                            <select className="form-select" value={formData.fund_source_id}
-                                onChange={e => setFormData({ ...formData, fund_source_id: e.target.value })}>
-                                <option value="">-- Chọn nguồn kinh phí --</option>
-                                {fundSources.map(fs => (
-                                    <option key={fs.id} value={fs.id}>{fs.code} - {fs.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="form-label">Dự toán ngân sách</label>
-                            <select className="form-select" value={formData.budget_estimate_id}
-                                onChange={e => setFormData({ ...formData, budget_estimate_id: e.target.value })}>
-                                <option value="">-- Chọn dự toán --</option>
-                                {budgetEstimates.map(be => (
-                                    <option key={be.id} value={be.id}>{be.category_code} - {be.category_name}</option>
-                                ))}
+                                <option value="SALES">Kinh doanh</option>
+                                <option value="RESEARCH">Nghiên cứu phát triển</option>
+                                <option value="INTERNAL">Nội bộ</option>
                             </select>
                         </div>
                         <div className="grid grid-cols-2 gap-4">

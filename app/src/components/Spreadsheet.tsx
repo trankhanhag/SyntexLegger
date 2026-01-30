@@ -212,7 +212,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
         { field: 'debit_acc', headerName: 'TK Nợ', width: 'w-20', align: 'center', editable: true, dataListId: 'account-list' },
         { field: 'credit_acc', headerName: 'TK Có', width: 'w-20', align: 'center', editable: true, dataListId: 'account-list' },
         { field: 'item_code', headerName: 'Mục', width: 'w-20', align: 'center', editable: true },
-        { field: 'sub_item_code', headerName: 'Tiểu mục', width: 'w-24', align: 'center', editable: true },
+        { field: 'sub_item_code', headerName: 'Khoản mục', width: 'w-24', align: 'center', editable: true },
         { field: 'amount', headerName: 'Số tiền', width: 'w-32', align: 'right', editable: true, type: 'number' },
         { field: 'partner_code', headerName: 'Đối tượng', width: 'w-40', editable: true },
         { field: 'error_log', headerName: 'Ghi chú', width: 'w-40', editable: false } // Readonly

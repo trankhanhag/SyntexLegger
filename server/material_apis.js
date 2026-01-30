@@ -1137,6 +1137,254 @@ function updateInventoryCard(db, material_id, fund_source_id, fiscal_year, wareh
     });
 }
 
+// ==================== BULK IMPORT ====================
+
+/**
+ * POST /api/hcsn/materials/import
+ * Nhập hàng loạt danh mục vật tư từ Excel
+ */
+function importMaterials(db) {
+    return (req, res) => {
+        const { materials } = req.body;
+
+        if (!materials || !Array.isArray(materials) || materials.length === 0) {
+            return res.status(400).json({ error: 'Missing or empty materials array' });
+        }
+
+        const now = new Date().toISOString();
+        let inserted = 0, updated = 0;
+        const errors = [];
+
+        db.serialize(() => {
+            materials.forEach((mat, index) => {
+                // Validate required fields
+                if (!mat.code || !mat.name) {
+                    errors.push({ row: index + 1, error: 'Thiếu mã hoặc tên vật tư' });
+                    return;
+                }
+
+                // Auto-assign account code based on category
+                let acc = mat.account_code;
+                if (!acc) {
+                    if (mat.category === 'MATERIAL' || mat.category === 'VẬT TƯ') acc = '152';
+                    else if (mat.category === 'TOOLS' || mat.category === 'CÔNG CỤ') acc = '153';
+                    else if (mat.category === 'GOODS' || mat.category === 'HÀNG HÓA') acc = '155';
+                    else acc = '152'; // Default
+                }
+
+                // Normalize category
+                let category = mat.category || 'MATERIAL';
+                if (category === 'VẬT TƯ') category = 'MATERIAL';
+                else if (category === 'CÔNG CỤ') category = 'TOOLS';
+                else if (category === 'HÀNG HÓA') category = 'GOODS';
+
+                // Check if material exists by code
+                db.get('SELECT id FROM materials WHERE code = ?', [mat.code], (err, existing) => {
+                    if (err) {
+                        errors.push({ row: index + 1, error: err.message });
+                        return;
+                    }
+
+                    if (existing) {
+                        // Update existing
+                        const updateSql = `UPDATE materials SET
+                            name = ?, category = ?, unit = ?, account_code = ?,
+                            unit_price = ?, min_stock = ?, max_stock = ?, notes = ?, updated_at = ?
+                            WHERE code = ?`;
+                        db.run(updateSql, [
+                            mat.name, category, mat.unit || 'Cái', acc,
+                            mat.unit_price || 0, mat.min_stock || 0, mat.max_stock || 0,
+                            mat.notes || '', now, mat.code
+                        ], function (err) {
+                            if (err) errors.push({ row: index + 1, error: err.message });
+                            else updated++;
+                        });
+                    } else {
+                        // Insert new
+                        const id = uuidv4();
+                        const insertSql = `INSERT INTO materials
+                            (id, code, name, category, unit, account_code, unit_price, min_stock, max_stock, status, notes, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`;
+                        db.run(insertSql, [
+                            id, mat.code, mat.name, category, mat.unit || 'Cái', acc,
+                            mat.unit_price || 0, mat.min_stock || 0, mat.max_stock || 0,
+                            mat.notes || '', now, now
+                        ], function (err) {
+                            if (err) errors.push({ row: index + 1, error: err.message });
+                            else inserted++;
+                        });
+                    }
+                });
+            });
+
+            // Use setTimeout to allow all async db operations to complete
+            setTimeout(() => {
+                res.json({
+                    success: true,
+                    message: `Nhập vật tư thành công`,
+                    inserted,
+                    updated,
+                    errors: errors.length > 0 ? errors : undefined
+                });
+            }, 100);
+        });
+    };
+}
+
+/**
+ * POST /api/hcsn/fund-sources/import
+ * Nhập hàng loạt nguồn vốn từ Excel
+ */
+function importFundSources(db) {
+    return (req, res) => {
+        const { fundSources } = req.body;
+
+        if (!fundSources || !Array.isArray(fundSources) || fundSources.length === 0) {
+            return res.status(400).json({ error: 'Missing or empty fundSources array' });
+        }
+
+        const now = new Date().toISOString();
+        let inserted = 0, updated = 0;
+        const errors = [];
+
+        db.serialize(() => {
+            fundSources.forEach((fs, index) => {
+                // Validate required fields
+                if (!fs.code || !fs.name) {
+                    errors.push({ row: index + 1, error: 'Thiếu mã hoặc tên nguồn vốn' });
+                    return;
+                }
+
+                // Check if fund source exists
+                db.get('SELECT id FROM fund_sources WHERE code = ?', [fs.code], (err, existing) => {
+                    if (err) {
+                        errors.push({ row: index + 1, error: err.message });
+                        return;
+                    }
+
+                    if (existing) {
+                        // Update existing
+                        const updateSql = `UPDATE fund_sources SET
+                            name = ?, category = ?, description = ?, is_active = ?, updated_at = ?
+                            WHERE code = ?`;
+                        db.run(updateSql, [
+                            fs.name, fs.category || 'NGÂN SÁCH', fs.description || '',
+                            fs.is_active !== false ? 1 : 0, now, fs.code
+                        ], function (err) {
+                            if (err) errors.push({ row: index + 1, error: err.message });
+                            else updated++;
+                        });
+                    } else {
+                        // Insert new
+                        const id = `fs_${fs.code.toLowerCase().replace(/\s+/g, '_')}`;
+                        const insertSql = `INSERT INTO fund_sources
+                            (id, code, name, category, description, is_active, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, 1, ?, ?)`;
+                        db.run(insertSql, [
+                            id, fs.code, fs.name, fs.category || 'NGÂN SÁCH',
+                            fs.description || '', now, now
+                        ], function (err) {
+                            if (err) errors.push({ row: index + 1, error: err.message });
+                            else inserted++;
+                        });
+                    }
+                });
+            });
+
+            setTimeout(() => {
+                res.json({
+                    success: true,
+                    message: `Nhập nguồn vốn thành công`,
+                    inserted,
+                    updated,
+                    errors: errors.length > 0 ? errors : undefined
+                });
+            }, 100);
+        });
+    };
+}
+
+/**
+ * POST /api/hcsn/budget-estimates/import
+ * Nhập hàng loạt dự toán từ Excel
+ */
+function importBudgetEstimates(db) {
+    return (req, res) => {
+        const { estimates, fiscal_year } = req.body;
+
+        if (!estimates || !Array.isArray(estimates) || estimates.length === 0) {
+            return res.status(400).json({ error: 'Missing or empty estimates array' });
+        }
+
+        const year = fiscal_year || new Date().getFullYear();
+        const now = new Date().toISOString();
+        let inserted = 0, updated = 0;
+        const errors = [];
+
+        db.serialize(() => {
+            estimates.forEach((est, index) => {
+                // Validate required fields
+                if (!est.chapter_code || !est.budget_type) {
+                    errors.push({ row: index + 1, error: 'Thiếu mã chương hoặc loại ngân sách' });
+                    return;
+                }
+
+                // Check if estimate exists for this year and chapter
+                const checkSql = `SELECT id FROM budget_estimates
+                    WHERE fiscal_year = ? AND chapter_code = ? AND budget_type = ?
+                    AND COALESCE(fund_source_id, '') = COALESCE(?, '')`;
+
+                db.get(checkSql, [year, est.chapter_code, est.budget_type, est.fund_source_id || ''], (err, existing) => {
+                    if (err) {
+                        errors.push({ row: index + 1, error: err.message });
+                        return;
+                    }
+
+                    if (existing) {
+                        // Update existing
+                        const updateSql = `UPDATE budget_estimates SET
+                            opening_amount = ?, annual_amount = ?, adjusted_amount = ?,
+                            description = ?, updated_at = ?
+                            WHERE id = ?`;
+                        db.run(updateSql, [
+                            est.opening_amount || 0, est.annual_amount || 0, est.adjusted_amount || 0,
+                            est.description || '', now, existing.id
+                        ], function (err) {
+                            if (err) errors.push({ row: index + 1, error: err.message });
+                            else updated++;
+                        });
+                    } else {
+                        // Insert new
+                        const id = uuidv4();
+                        const insertSql = `INSERT INTO budget_estimates
+                            (id, fiscal_year, chapter_code, budget_type, fund_source_id,
+                             opening_amount, annual_amount, adjusted_amount, description, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                        db.run(insertSql, [
+                            id, year, est.chapter_code, est.budget_type, est.fund_source_id || null,
+                            est.opening_amount || 0, est.annual_amount || 0, est.adjusted_amount || 0,
+                            est.description || '', now, now
+                        ], function (err) {
+                            if (err) errors.push({ row: index + 1, error: err.message });
+                            else inserted++;
+                        });
+                    }
+                });
+            });
+
+            setTimeout(() => {
+                res.json({
+                    success: true,
+                    message: `Nhập dự toán năm ${year} thành công`,
+                    inserted,
+                    updated,
+                    errors: errors.length > 0 ? errors : undefined
+                });
+            }, 100);
+        });
+    };
+}
+
 // ==================== EXPORTS ====================
 
 module.exports = {
@@ -1144,6 +1392,9 @@ module.exports = {
     createMaterial,
     updateMaterial,
     deleteMaterial,
+    importMaterials,
+    importFundSources,
+    importBudgetEstimates,
     getReceipts,
     getReceiptDetail,
     createReceipt,

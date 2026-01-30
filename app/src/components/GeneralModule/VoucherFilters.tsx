@@ -1,6 +1,6 @@
 /**
  * VoucherFilters Component
- * SyntexHCSN - Bộ lọc chứng từ theo loại, ngày
+ * SyntexLegger - Bộ lọc chứng từ theo loại, ngày
  */
 
 import React from 'react';

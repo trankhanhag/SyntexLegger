@@ -6,7 +6,7 @@
 const express = require('express');
 const fs = require('fs');
 
-const { verifyToken, requireRole, checkDateLock, logAction, sanitizeBody, sanitizeQuery, validateVoucher, validateDateRange } = require('../middleware');
+const { verifyToken, requireRole, checkDateLock, logAction, sanitizeBody, sanitizeQuery, validateVoucher, validateVoucherBalance, isOffBalanceSheetAccount, validateDateRange } = require('../middleware');
 const auditService = require('../services/audit.service');
 const budgetService = require('../services/budget.service');
 
@@ -502,6 +502,23 @@ module.exports = (db) => {
                 if (!grouped[r.doc_no]) grouped[r.doc_no] = [];
                 grouped[r.doc_no].push(r);
             });
+
+            // === BALANCE VALIDATION (Nợ = Có) for each voucher group ===
+            const balanceErrors = [];
+            Object.keys(grouped).forEach(docNo => {
+                const items = grouped[docNo];
+                const balanceResult = validateVoucherBalance(items);
+                if (!balanceResult.isValid) {
+                    balanceErrors.push(`Chứng từ ${docNo}: ${balanceResult.error}`);
+                }
+            });
+
+            if (balanceErrors.length > 0) {
+                return res.status(400).json({
+                    error: 'Validation failed - Chứng từ không cân đối',
+                    details: balanceErrors
+                });
+            }
 
             db.serialize(() => {
                 db.run("BEGIN TRANSACTION");

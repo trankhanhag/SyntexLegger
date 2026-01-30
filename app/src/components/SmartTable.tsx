@@ -6,15 +6,20 @@ export interface ColumnDef {
     field: string;
     headerName: string;
     width?: string;
+    minWidth?: string; // Minimum width for column
     align?: 'left' | 'center' | 'right';
-    renderCell?: (value: any, row: any) => React.ReactNode;
+    renderCell?: (value: any, row: any, rowIndex?: number) => React.ReactNode;
+    renderHeader?: () => React.ReactNode; // Custom header renderer
     editable?: boolean;
-    type?: 'text' | 'number' | 'select' | 'date'; // Added 'date'
+    type?: 'text' | 'number' | 'select' | 'date' | 'actions'; // Added 'actions' for action buttons
     selectOptions?: { value: string; label: string }[];
     dataListId?: string;
     validator?: (value: any) => string | null; // Custom validator
     numberFormat?: { locale?: string; decimals?: number }; // Optional config for numbers
     fontClass?: string; // CSS classes for font styling
+    cellClassName?: string | ((value: any, row: any) => string); // Custom cell class
+    sortable?: boolean; // Enable/disable sorting for this column (default: true)
+    filterable?: boolean; // Enable/disable filtering for this column (default: true)
 }
 
 export interface TraceableValue {
@@ -57,6 +62,15 @@ interface SmartTableProps {
     contextMenuItems?: ContextMenuItem[]; // New: Custom Context Menu
     selectedRow?: any; // New: Selected row to highlight
     onRowClick?: (row: any) => void; // Alias for consistency
+    // Display modes
+    readOnly?: boolean; // If true, disable all editing - display only mode
+    compact?: boolean; // Compact mode with smaller padding
+    showFormulaBar?: boolean; // Show/hide formula bar (default: true in edit mode, false in readOnly)
+    showStatusBar?: boolean; // Show/hide status bar (default: true)
+    showRowNumbers?: boolean; // Show/hide row number column (default: true)
+    stickyHeader?: boolean; // Make header sticky (default: true)
+    striped?: boolean; // Alternate row colors (default: false)
+    bordered?: boolean; // Show cell borders (default: true)
 }
 
 export const SmartTable: React.FC<SmartTableProps> = ({
@@ -78,8 +92,19 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     showTotalRow = true,
     contextMenuItems,
     selectedRow,
-    onRowClick
+    onRowClick,
+    // New display options
+    readOnly = false,
+    compact = false,
+    showFormulaBar,
+    showStatusBar = true,
+    showRowNumbers = true,
+    stickyHeader = true,
+    striped = false,
+    bordered = true
 }) => {
+    // Determine if formula bar should show (default: true if editable, false if readOnly)
+    const shouldShowFormulaBar = showFormulaBar ?? !readOnly;
     // --- Types for Interleaved Structure ---
     type TableColType = {
         id: string; // Unique ID (Real: field name, Draft: UUID)
@@ -100,12 +125,23 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     const [scratchpadData, setScratchpadData] = useState<Record<string, string>>({}); // Key: `${RowID}:${ColID}`
 
     // Selection & Error State
-    // Selection Selection State
-    // Selection Selection State
     const [activeCell, setActiveCell] = useState<{ rIdx: number, cIdx: number } | null>(null);
     const [selectionRanges, setSelectionRanges] = useState<{ start: { rIdx: number, cIdx: number }, end: { rIdx: number, cIdx: number } }[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
+
+    // Excel-like: Edit mode (F2 to toggle)
+    const [isEditMode, setIsEditMode] = useState(false);
+
+    // Excel-like: Column widths for resize
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+    const [resizingCol, setResizingCol] = useState<{ colId: string; startX: number; startWidth: number } | null>(null);
+
+    // Excel-like: Clipboard
+    const [clipboard, setClipboard] = useState<{ data: string[][]; startCell: { rIdx: number; cIdx: number } } | null>(null);
+
+    // Excel-like: Name Box input
+    const [nameBoxValue, setNameBoxValue] = useState('');
 
     // Trigger onSelectionChange when activeCell updates
     useEffect(() => {
@@ -121,10 +157,33 @@ export const SmartTable: React.FC<SmartTableProps> = ({
 
     // Global Mouse Up Config
     useEffect(() => {
-        const handleGlobalMouseUp = () => setIsDragging(false);
+        const handleGlobalMouseUp = () => {
+            setIsDragging(false);
+            setResizingCol(null);
+        };
+        const handleGlobalMouseMove = (e: MouseEvent) => {
+            if (resizingCol) {
+                const diff = e.clientX - resizingCol.startX;
+                const newWidth = Math.max(50, resizingCol.startWidth + diff);
+                setColumnWidths(prev => ({ ...prev, [resizingCol.colId]: newWidth }));
+            }
+        };
         window.addEventListener('mouseup', handleGlobalMouseUp);
-        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-    }, []);
+        window.addEventListener('mousemove', handleGlobalMouseMove);
+        return () => {
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+            window.removeEventListener('mousemove', handleGlobalMouseMove);
+        };
+    }, [resizingCol]);
+
+    // Update nameBox when activeCell changes
+    useEffect(() => {
+        if (activeCell) {
+            setNameBoxValue(`${getColumnLabel(activeCell.cIdx)}${activeCell.rIdx + 1}`);
+        } else {
+            setNameBoxValue('');
+        }
+    }, [activeCell]);
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, rIdx: number, cIdx: number } | null>(null);
@@ -885,9 +944,156 @@ export const SmartTable: React.FC<SmartTableProps> = ({
         if (formatted !== value) setCellValue(rIdx, cIdx, formatted);
     };
 
+    // --- Excel-like Copy/Paste ---
+    const handleCopy = () => {
+        if (selectionRanges.length === 0 || !activeCell) return;
+
+        const range = selectionRanges[selectionRanges.length - 1];
+        const rMin = Math.min(range.start.rIdx, range.end.rIdx);
+        const rMax = Math.max(range.start.rIdx, range.end.rIdx);
+        const cMin = Math.min(range.start.cIdx, range.end.cIdx);
+        const cMax = Math.max(range.start.cIdx, range.end.cIdx);
+
+        const data: string[][] = [];
+        for (let r = rMin; r <= rMax; r++) {
+            const rowData: string[] = [];
+            for (let c = cMin; c <= cMax; c++) {
+                rowData.push(getCellValue(r, c));
+            }
+            data.push(rowData);
+        }
+
+        setClipboard({ data, startCell: { rIdx: rMin, cIdx: cMin } });
+
+        // Also copy to system clipboard
+        const textData = data.map(row => row.join('\t')).join('\n');
+        navigator.clipboard.writeText(textData).catch(() => { });
+    };
+
+    const handlePaste = async () => {
+        if (!activeCell) return;
+
+        try {
+            const text = await navigator.clipboard.readText();
+            const rows = text.split('\n').map(row => row.split('\t'));
+
+            rows.forEach((rowData, rOffset) => {
+                rowData.forEach((value, cOffset) => {
+                    const targetR = activeCell.rIdx + rOffset;
+                    const targetC = activeCell.cIdx + cOffset;
+                    if (targetR < tableRows.length && targetC < tableCols.length) {
+                        setCellValue(targetR, targetC, value);
+                    }
+                });
+            });
+        } catch {
+            // Fallback to internal clipboard
+            if (clipboard) {
+                clipboard.data.forEach((rowData, rOffset) => {
+                    rowData.forEach((value, cOffset) => {
+                        const targetR = activeCell.rIdx + rOffset;
+                        const targetC = activeCell.cIdx + cOffset;
+                        if (targetR < tableRows.length && targetC < tableCols.length) {
+                            setCellValue(targetR, targetC, value);
+                        }
+                    });
+                });
+            }
+        }
+    };
+
+    const handleDelete = () => {
+        if (selectionRanges.length === 0) return;
+
+        selectionRanges.forEach(range => {
+            const rMin = Math.min(range.start.rIdx, range.end.rIdx);
+            const rMax = Math.max(range.start.rIdx, range.end.rIdx);
+            const cMin = Math.min(range.start.cIdx, range.end.cIdx);
+            const cMax = Math.max(range.start.cIdx, range.end.cIdx);
+
+            for (let r = rMin; r <= rMax; r++) {
+                for (let c = cMin; c <= cMax; c++) {
+                    setCellValue(r, c, '');
+                }
+            }
+        });
+    };
+
+    // --- Name Box Navigation ---
+    const handleNameBoxSubmit = () => {
+        const match = nameBoxValue.toUpperCase().match(/^([A-Z]+)(\d+)$/);
+        if (match) {
+            const cIdx = colLetterToIndex(match[1]);
+            const rIdx = parseInt(match[2], 10) - 1;
+            if (rIdx >= 0 && rIdx < tableRows.length && cIdx >= 0 && cIdx < tableCols.length) {
+                const pos = { rIdx, cIdx };
+                setActiveCell(pos);
+                setSelectionRanges([{ start: pos, end: pos }]);
+            }
+        }
+    };
+
     // --- Keyboard Navigation ---
     const handleKeyDown = (e: React.KeyboardEvent, rIdx: number, cIdx: number) => {
+        // Excel-like shortcuts
+        if (e.ctrlKey || e.metaKey) {
+            switch (e.key.toLowerCase()) {
+                case 'c':
+                    e.preventDefault();
+                    handleCopy();
+                    return;
+                case 'v':
+                    e.preventDefault();
+                    handlePaste();
+                    return;
+                case 'x':
+                    e.preventDefault();
+                    handleCopy();
+                    handleDelete();
+                    return;
+                case 'home':
+                    e.preventDefault();
+                    const homePos = { rIdx: 0, cIdx: 0 };
+                    setActiveCell(homePos);
+                    setSelectionRanges([{ start: homePos, end: homePos }]);
+                    return;
+                case 'end':
+                    e.preventDefault();
+                    const endPos = { rIdx: tableRows.length - 1, cIdx: tableCols.length - 1 };
+                    setActiveCell(endPos);
+                    setSelectionRanges([{ start: endPos, end: endPos }]);
+                    return;
+            }
+        }
+
+        // F2 - Toggle edit mode
+        if (e.key === 'F2') {
+            e.preventDefault();
+            setIsEditMode(prev => !prev);
+            return;
+        }
+
+        // Escape - Cancel edit / clear selection
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            setIsEditMode(false);
+            return;
+        }
+
+        // Delete - Clear cell content
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (!isEditMode) {
+                e.preventDefault();
+                handleDelete();
+                return;
+            }
+        }
+
         if (!['Enter', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+
+        // If in edit mode, only Enter exits
+        if (isEditMode && e.key !== 'Enter') return;
+
         e.preventDefault();
 
         let newRIdx = rIdx;
@@ -895,8 +1101,8 @@ export const SmartTable: React.FC<SmartTableProps> = ({
 
         switch (e.key) {
             case 'Enter':
+                setIsEditMode(false);
                 newRIdx = rIdx + 1;
-                newCIdx = 0; // Carriage return
                 break;
             case 'ArrowDown':
                 newRIdx = rIdx + 1;
@@ -905,6 +1111,8 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                 newRIdx = rIdx - 1;
                 break;
             case 'Tab':
+                newCIdx = e.shiftKey ? cIdx - 1 : cIdx + 1;
+                break;
             case 'ArrowRight':
                 newCIdx = cIdx + 1;
                 break;
@@ -914,11 +1122,10 @@ export const SmartTable: React.FC<SmartTableProps> = ({
         }
 
         // Boundary Checks
-        // Boundary Checks
         if (newRIdx >= 0 && newRIdx < tableRows.length && newCIdx >= 0 && newCIdx < tableCols.length) {
             const pos = { rIdx: newRIdx, cIdx: newCIdx };
             setActiveCell(pos);
-            if (e.shiftKey) {
+            if (e.shiftKey && e.key !== 'Tab') {
                 // Extend last range
                 setSelectionRanges(prev => {
                     const current = prev.length > 0 ? [...prev] : [{ start: activeCell || pos, end: pos }];
@@ -964,7 +1171,6 @@ export const SmartTable: React.FC<SmartTableProps> = ({
     const isSelectedTraceable = isTraceable(rawSelectedValue);
 
     const selectedValue = activeCell ? getCellDisplayValue(activeCell.rIdx, activeCell.cIdx) : '';
-    const selectedLabel = activeCell ? `${getColumnLabel(activeCell.cIdx)}${activeCell.rIdx + 1}` : '';
 
 
     if (loading) return <div className="p-4 text-center">Loading...</div>;
@@ -974,225 +1180,292 @@ export const SmartTable: React.FC<SmartTableProps> = ({
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-900 h-full relative">
-            {/* Formula Bar */}
-            <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 border-b border-border-light dark:border-border-dark shrink-0">
-                <div className="w-10 text-center font-bold text-slate-500 text-xs shrink-0 select-none">
-                    {selectedLabel || 'Fx'}
-                </div>
-                <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                <div className="font-serif text-slate-400 font-bold italic select-none">fx</div>
-
-                {/* Enhanced Input Area */}
-                <div className="flex-1 flex items-center relative gap-1">
-                    <input
-                        className={`flex-1 min-w-0 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${isSelectedTraceable ? 'text-blue-600 font-bold' : ''}`}
-                        placeholder="Chọn ô để nhập giá trị hoặc công thức..."
-                        disabled={!activeCell || isSelectedTraceable} // Make traceable read-only for now
-                        value={isSelectedTraceable ? `=${rawSelectedValue.formula}` : selectedValue}
-                        onChange={(e) => activeCell && setCellValue(activeCell.rIdx, activeCell.cIdx, e.target.value)}
-                    />
-
-                    {/* Traceability Action */}
-                    {isSelectedTraceable && rawSelectedValue.source && (
-                        <button
-                            className="absolute right-1 top-0.5 bottom-0.5 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-md text-xs font-bold flex items-center gap-1 hover:bg-blue-200"
-                            onClick={() => {
-                                if (rawSelectedValue.source?.type === 'link') {
-                                    window.location.hash = rawSelectedValue.source.target; // Simple hash nav for now, user can improve to router later
-                                } else {
-                                    alert("Modal source not implemented yet");
+            {/* Formula Bar - Excel Style (only in edit mode) */}
+            {shouldShowFormulaBar && (
+                <div className="flex items-center gap-0 bg-slate-50 dark:bg-slate-800 border-b border-slate-300 dark:border-slate-600 shrink-0 h-8">
+                    {/* Name Box - Clickable like Excel */}
+                    <div className="w-20 border-r border-slate-300 dark:border-slate-600 h-full flex items-center">
+                        <input
+                            className="w-full h-full px-2 text-center font-bold text-slate-700 dark:text-slate-200 text-xs bg-white dark:bg-slate-700 border-none focus:outline-none focus:bg-blue-50 dark:focus:bg-blue-900/30 select-all"
+                            value={nameBoxValue}
+                            onChange={(e) => setNameBoxValue(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleNameBoxSubmit();
                                 }
                             }}
-                            title={`Đi đến nguồn: ${rawSelectedValue.source.label || 'Chi tiết'}`}
-                        >
-                            <span className="material-symbols-outlined text-[14px]">troubleshoot</span>
-                            Truy vết
-                        </button>
-                    )}
+                            onBlur={handleNameBoxSubmit}
+                            placeholder="A1"
+                            title="Nhập tọa độ ô (VD: A1, B5) và nhấn Enter để nhảy đến"
+                        />
+                    </div>
+
+                    {/* Separator */}
+                    <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+
+                    {/* Function Symbol */}
+                    <div className="w-8 h-full flex items-center justify-center border-r border-slate-300 dark:border-slate-600">
+                        <span className="font-serif text-slate-400 font-bold italic text-sm select-none">fx</span>
+                    </div>
+
+                    {/* Formula Input */}
+                    <div className="flex-1 flex items-center relative h-full">
+                        <input
+                            className={`w-full h-full px-3 bg-white dark:bg-slate-700 border-none text-sm focus:outline-none focus:bg-blue-50 dark:focus:bg-blue-900/20 ${isSelectedTraceable ? 'text-blue-600 font-bold' : 'text-slate-800 dark:text-slate-200'}`}
+                            placeholder="Chọn ô để nhập giá trị hoặc công thức..."
+                            disabled={!activeCell || isSelectedTraceable}
+                            value={isSelectedTraceable ? `=${rawSelectedValue.formula}` : selectedValue}
+                            onChange={(e) => activeCell && setCellValue(activeCell.rIdx, activeCell.cIdx, e.target.value)}
+                            onFocus={() => setIsEditMode(true)}
+                        />
+
+                        {/* Traceability Action */}
+                        {isSelectedTraceable && rawSelectedValue.source && (
+                            <button
+                                className="absolute right-2 top-1 bottom-1 px-3 bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 rounded text-xs font-bold flex items-center gap-1 hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+                                onClick={() => {
+                                    if (rawSelectedValue.source?.type === 'link') {
+                                        window.location.hash = rawSelectedValue.source.target;
+                                    } else {
+                                        alert("Modal source not implemented yet");
+                                    }
+                                }}
+                                title={`Đi đến nguồn: ${rawSelectedValue.source.label || 'Chi tiết'}`}
+                            >
+                                <span className="material-symbols-outlined text-[14px]">troubleshoot</span>
+                                Truy vết
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Main Table */}
             <div className="flex-1 overflow-auto relative" onContextMenu={handleContainerContextMenu}>
                 <table className="w-full border-collapse text-sm min-w-max">
-                    <thead className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 shadow-sm">
+                    <thead className={`${stickyHeader ? 'sticky top-0' : ''} z-20 bg-slate-100 dark:bg-slate-800`}>
                         <tr>
-                            <th className="w-10 border-r border-b border-border-light dark:border-border-dark bg-slate-100 dark:bg-slate-700"></th>
-                            {tableCols.map((col, cIdx) => (
-                                <th
-                                    key={col.id}
-                                    className={`first-letter:border-r border-b border-border-light dark:border-border-dark px-2 py-2 font-semibold whitespace-nowrap 
-                                        ${col.type === 'draft' ? 'bg-orange-50 dark:bg-orange-900/20 text-slate-500 w-24 text-center min-w-[80px]' :
-                                            `bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ${col.def?.width || 'w-32'}`}
-                                        relative group text-center cursor-pointer select-none hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors`} // Force text-center for headers
-                                    onContextMenu={(e) => handleContextMenu(e, -1, cIdx)} // Row -1 = Header
-                                    onClick={(e) => handleColumnHeaderClick(cIdx, e)}
-                                >
-                                    <div className="flex items-center justify-center gap-1 w-full"> {/* justify-center */}
-                                        <div className="flex flex-col items-center leading-none w-full"> {/* items-center */}
-                                            <span className="text-[10px] text-slate-400 font-normal text-center w-full block">{getColumnLabel(cIdx)}</span>
-                                            <span>{col.type === 'real' ? col.def?.headerName : ''}</span>
+                            {/* Corner cell - Row numbers header */}
+                            {showRowNumbers && (
+                                <th className="w-10 min-w-[40px] border-r border-b border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-700 sticky left-0 z-30"></th>
+                            )}
+                            {tableCols.map((col, cIdx) => {
+                                // Check if this column is in selection
+                                const isColSelected = selectionRanges.some(range => {
+                                    const cMin = Math.min(range.start.cIdx, range.end.cIdx);
+                                    const cMax = Math.max(range.start.cIdx, range.end.cIdx);
+                                    return cIdx >= cMin && cIdx <= cMax;
+                                });
+                                const isColActive = activeCell?.cIdx === cIdx;
+
+                                // Get width from state or default
+                                const rawWidth = col.def?.width ? parseInt(col.def.width) : 120;
+                                const safeWidth = isNaN(rawWidth) ? 120 : rawWidth;
+                                const colWidth = columnWidths[col.id] || safeWidth;
+
+                                return (
+                                    <th
+                                        key={col.id}
+                                        style={{ width: colWidth, minWidth: colWidth }}
+                                        className={`border-r border-b border-slate-300 dark:border-slate-600 px-1 py-1.5 font-semibold whitespace-nowrap
+                                        ${col.type === 'draft' ? 'bg-orange-100 dark:bg-orange-900/30 text-slate-500' :
+                                                isColActive ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200' :
+                                                    isColSelected ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200' :
+                                                        'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}
+                                        relative group text-center cursor-pointer select-none hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors`}
+                                        onContextMenu={(e) => handleContextMenu(e, -1, cIdx)}
+                                        onClick={(e) => handleColumnHeaderClick(cIdx, e)}
+                                    >
+                                        <div className="flex items-center justify-center gap-1 w-full"> {/* justify-center */}
+                                            <div className="flex flex-col items-center leading-none w-full"> {/* items-center */}
+                                                <span className="text-[10px] text-slate-400 font-normal text-center w-full block">{getColumnLabel(cIdx)}</span>
+                                                <span>{col.type === 'real' ? col.def?.headerName : ''}</span>
+                                            </div>
+                                            {/* Filter/Sort Trigger for Real Cols */}
+                                            {col.type === 'real' && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); activeMenuCol === col.id ? setActiveMenuCol(null) : handleMenuOpen(col.id); }}
+                                                    className={`absolute right-1 top-2 p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 ${activeMenuCol === col.id || filters[col.id] || filterConditions[col.id] ? 'opacity-100 text-blue-600' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`}
+                                                >
+                                                    <span className="material-symbols-outlined text-[16px]">
+                                                        {filters[col.id] || filterConditions[col.id] ? 'filter_alt' : 'arrow_drop_down'}
+                                                    </span>
+                                                </button>
+                                            )}
                                         </div>
-                                        {/* Filter/Sort Trigger for Real Cols */}
-                                        {col.type === 'real' && (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); activeMenuCol === col.id ? setActiveMenuCol(null) : handleMenuOpen(col.id); }}
-                                                className={`absolute right-1 top-2 p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 ${activeMenuCol === col.id || filters[col.id] || filterConditions[col.id] ? 'opacity-100 text-blue-600' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`}
-                                            >
-                                                <span className="material-symbols-outlined text-[16px]">
-                                                    {filters[col.id] || filterConditions[col.id] ? 'filter_alt' : 'arrow_drop_down'}
-                                                </span>
-                                            </button>
-                                        )}
-                                    </div>
-                                    {/* Sort & Filter Menu - Excel Style */}
-                                    {activeMenuCol === col.id && (
-                                        <div ref={menuRef} className="absolute top-full right-0 mt-1 w-64 bg-white dark:bg-slate-800 rounded-md shadow-2xl border border-slate-200 dark:border-slate-700 z-50 text-left font-normal flex flex-col max-h-[400px]">
-                                            <div className="p-2 border-b border-slate-100 dark:border-slate-700 shrink-0">
-                                                <button onClick={() => handleSort(col.id, 'asc')} className="flex items-center w-full px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors group/item">
-                                                    <span className="material-symbols-outlined text-[18px] mr-2 text-slate-400 group-hover/item:text-blue-600">arrow_upward</span>
-                                                    Sắp xếp A-Z
-                                                </button>
-                                                <button onClick={() => handleSort(col.id, 'desc')} className="flex items-center w-full px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors group/item">
-                                                    <span className="material-symbols-outlined text-[18px] mr-2 text-slate-400 group-hover/item:text-blue-600">arrow_downward</span>
-                                                    Sắp xếp Z-A
-                                                </button>
-                                                {sortConfig?.key === col.id && (
-                                                    <button onClick={() => { setSortConfig(null); setActiveMenuCol(null); }} className="flex items-center w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded mt-1">
-                                                        <span className="material-symbols-outlined text-[18px] mr-2">close</span>
-                                                        Bỏ sắp xếp
+                                        {/* Sort & Filter Menu - Excel Style */}
+                                        {activeMenuCol === col.id && (
+                                            <div ref={menuRef} className="absolute top-full right-0 mt-1 w-64 bg-white dark:bg-slate-800 rounded-md shadow-2xl border border-slate-200 dark:border-slate-700 z-50 text-left font-normal flex flex-col max-h-[400px]">
+                                                <div className="p-2 border-b border-slate-100 dark:border-slate-700 shrink-0">
+                                                    <button onClick={() => handleSort(col.id, 'asc')} className="flex items-center w-full px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors group/item">
+                                                        <span className="material-symbols-outlined text-[18px] mr-2 text-slate-400 group-hover/item:text-blue-600">arrow_upward</span>
+                                                        Sắp xếp A-Z
                                                     </button>
-                                                )}
-                                            </div>
-
-                                            {/* Conditional Filter Section */}
-                                            <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
-                                                <div className="text-xs font-bold text-slate-500 uppercase mb-2">Lọc theo điều kiện</div>
-                                                <div className="flex gap-2 mb-2">
-                                                    <select
-                                                        className="w-1/2 text-xs border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-700 focus:ring-1 focus:ring-blue-500"
-                                                        value={tempCondition?.operator || (col.def?.type === 'number' ? 'gt' : 'contains')}
-                                                        onChange={(e) => setTempCondition(prev => ({ operator: e.target.value, value: prev?.value || '' }))}
-                                                    >
-                                                        {col.def?.type === 'number' ? (
-                                                            <>
-                                                                <option value="gt">Lớn hơn (&gt;)</option>
-                                                                <option value="gte">Lớn hơn hoặc bằng (&ge;)</option>
-                                                                <option value="lt">Nhỏ hơn (&lt;)</option>
-                                                                <option value="lte">Nhỏ hơn hoặc bằng (&le;)</option>
-                                                                <option value="eq">Bằng (=)</option>
-                                                                <option value="neq">Khác (!=)</option>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <option value="contains">Chứa</option>
-                                                                <option value="starts">Bắt đầu bằng</option>
-                                                                <option value="ends">Kết thúc bằng</option>
-                                                                <option value="eq">Bằng</option>
-                                                            </>
-                                                        )}
-                                                    </select>
-                                                    <input
-                                                        type={col.def?.type === 'number' ? 'number' : 'text'}
-                                                        className="w-1/2 text-xs border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-700 focus:ring-1 focus:ring-blue-500"
-                                                        placeholder="Giá trị..."
-                                                        value={tempCondition?.value || ''}
-                                                        onChange={(e) => setTempCondition(prev => ({ operator: prev?.operator || (col.def?.type === 'number' ? 'gt' : 'contains'), value: e.target.value }))}
-                                                    />
+                                                    <button onClick={() => handleSort(col.id, 'desc')} className="flex items-center w-full px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors group/item">
+                                                        <span className="material-symbols-outlined text-[18px] mr-2 text-slate-400 group-hover/item:text-blue-600">arrow_downward</span>
+                                                        Sắp xếp Z-A
+                                                    </button>
+                                                    {sortConfig?.key === col.id && (
+                                                        <button onClick={() => { setSortConfig(null); setActiveMenuCol(null); }} className="flex items-center w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded mt-1">
+                                                            <span className="material-symbols-outlined text-[18px] mr-2">close</span>
+                                                            Bỏ sắp xếp
+                                                        </button>
+                                                    )}
                                                 </div>
-                                            </div>
 
-                                            {/* Search Box */}
-                                            <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 shrink-0">
-                                                <div className="relative">
-                                                    <span className="material-symbols-outlined absolute left-2 top-1.5 text-slate-400 text-[18px]">search</span>
-                                                    <input
-                                                        type="text"
-                                                        autoFocus
-                                                        className="w-full pl-8 pr-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                                                        placeholder="Tìm kiếm..."
-                                                        value={filterSearchTerm}
-                                                        onChange={(e) => setFilterSearchTerm(e.target.value)}
-                                                    />
+                                                {/* Conditional Filter Section */}
+                                                <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
+                                                    <div className="text-xs font-bold text-slate-500 uppercase mb-2">Lọc theo điều kiện</div>
+                                                    <div className="flex gap-2 mb-2">
+                                                        <select
+                                                            className="w-1/2 text-xs border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-700 focus:ring-1 focus:ring-blue-500"
+                                                            value={tempCondition?.operator || (col.def?.type === 'number' ? 'gt' : 'contains')}
+                                                            onChange={(e) => setTempCondition(prev => ({ operator: e.target.value, value: prev?.value || '' }))}
+                                                        >
+                                                            {col.def?.type === 'number' ? (
+                                                                <>
+                                                                    <option value="gt">Lớn hơn (&gt;)</option>
+                                                                    <option value="gte">Lớn hơn hoặc bằng (&ge;)</option>
+                                                                    <option value="lt">Nhỏ hơn (&lt;)</option>
+                                                                    <option value="lte">Nhỏ hơn hoặc bằng (&le;)</option>
+                                                                    <option value="eq">Bằng (=)</option>
+                                                                    <option value="neq">Khác (!=)</option>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <option value="contains">Chứa</option>
+                                                                    <option value="starts">Bắt đầu bằng</option>
+                                                                    <option value="ends">Kết thúc bằng</option>
+                                                                    <option value="eq">Bằng</option>
+                                                                </>
+                                                            )}
+                                                        </select>
+                                                        <input
+                                                            type={col.def?.type === 'number' ? 'number' : 'text'}
+                                                            className="w-1/2 text-xs border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-700 focus:ring-1 focus:ring-blue-500"
+                                                            placeholder="Giá trị..."
+                                                            value={tempCondition?.value || ''}
+                                                            onChange={(e) => setTempCondition(prev => ({ operator: prev?.operator || (col.def?.type === 'number' ? 'gt' : 'contains'), value: e.target.value }))}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            {/* Checkbox List */}
-                                            <div className="flex-1 overflow-y-auto p-2 min-h-[150px] custom-scrollbar">
-                                                {(() => {
-                                                    const allValues = getUniqueValues(col.id);
-                                                    const visibleValues = allValues.filter(v => v.toLowerCase().includes(filterSearchTerm.toLowerCase()));
-                                                    const allVisibleSelected = visibleValues.every(v => tempFilterSelection.has(v)) && visibleValues.length > 0;
+                                                {/* Search Box */}
+                                                <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 shrink-0">
+                                                    <div className="relative">
+                                                        <span className="material-symbols-outlined absolute left-2 top-1.5 text-slate-400 text-[18px]">search</span>
+                                                        <input
+                                                            type="text"
+                                                            autoFocus
+                                                            className="w-full pl-8 pr-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                            placeholder="Tìm kiếm..."
+                                                            value={filterSearchTerm}
+                                                            onChange={(e) => setFilterSearchTerm(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
 
-                                                    return (
-                                                        <div className="space-y-1">
-                                                            <div
-                                                                className="flex items-center px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded cursor-pointer select-none"
-                                                                onClick={() => handleSelectAll(allValues, filterSearchTerm)}
-                                                            >
-                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 transition-colors ${allVisibleSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700'}`}>
-                                                                    {allVisibleSelected && <span className="material-symbols-outlined text-[12px] text-white font-bold">check</span>}
-                                                                </div>
-                                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                                                                    (Chọn tất cả)
-                                                                </span>
-                                                            </div>
+                                                {/* Checkbox List */}
+                                                <div className="flex-1 overflow-y-auto p-2 min-h-[150px] custom-scrollbar">
+                                                    {(() => {
+                                                        const allValues = getUniqueValues(col.id);
+                                                        const visibleValues = allValues.filter(v => v.toLowerCase().includes(filterSearchTerm.toLowerCase()));
+                                                        const allVisibleSelected = visibleValues.every(v => tempFilterSelection.has(v)) && visibleValues.length > 0;
 
-                                                            {visibleValues.map(val => (
+                                                        return (
+                                                            <div className="space-y-1">
                                                                 <div
-                                                                    key={val}
-                                                                    className="flex items-center px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded cursor-pointer select-none"
-                                                                    onClick={() => toggleFilterItem(val)}
+                                                                    className="flex items-center px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded cursor-pointer select-none"
+                                                                    onClick={() => handleSelectAll(allValues, filterSearchTerm)}
                                                                 >
-                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 shrink-0 transition-colors ${tempFilterSelection.has(val) ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700'}`}>
-                                                                        {tempFilterSelection.has(val) && <span className="material-symbols-outlined text-[12px] text-white font-bold">check</span>}
+                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 transition-colors ${allVisibleSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700'}`}>
+                                                                        {allVisibleSelected && <span className="material-symbols-outlined text-[12px] text-white font-bold">check</span>}
                                                                     </div>
-                                                                    <span className="text-sm text-slate-700 dark:text-slate-300 truncate" title={val || '(Trống)'}>
-                                                                        {val === '' ? <span className="italic text-slate-400"> (Trống) </span> : val}
+                                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                                                                        (Chọn tất cả)
                                                                     </span>
                                                                 </div>
-                                                            ))}
-                                                            {visibleValues.length === 0 && (
-                                                                <div className="text-center py-4 text-xs text-slate-400 italic">
-                                                                    Không tìm thấy kết quả
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
 
-                                            {/* Action Buttons */}
-                                            <div className="p-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between gap-2 shrink-0">
-                                                <button
-                                                    onClick={() => {
-                                                        handleFilterChange(col.id, []);
-                                                        setFilterConditions(prev => { const { [col.id]: _, ...rest } = prev; return rest; });
-                                                        setActiveMenuCol(null);
-                                                    }}
-                                                    className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
-                                                >
-                                                    Xóa lọc
-                                                </button>
-                                                <div className="flex gap-2">
+                                                                {visibleValues.map(val => (
+                                                                    <div
+                                                                        key={val}
+                                                                        className="flex items-center px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded cursor-pointer select-none"
+                                                                        onClick={() => toggleFilterItem(val)}
+                                                                    >
+                                                                        <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 shrink-0 transition-colors ${tempFilterSelection.has(val) ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700'}`}>
+                                                                            {tempFilterSelection.has(val) && <span className="material-symbols-outlined text-[12px] text-white font-bold">check</span>}
+                                                                        </div>
+                                                                        <span className="text-sm text-slate-700 dark:text-slate-300 truncate" title={val || '(Trống)'}>
+                                                                            {val === '' ? <span className="italic text-slate-400"> (Trống) </span> : val}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                                {visibleValues.length === 0 && (
+                                                                    <div className="text-center py-4 text-xs text-slate-400 italic">
+                                                                        Không tìm thấy kết quả
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+
+                                                {/* Action Buttons */}
+                                                <div className="p-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between gap-2 shrink-0">
                                                     <button
-                                                        onClick={() => setActiveMenuCol(null)}
-                                                        className="px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded"
+                                                        onClick={() => {
+                                                            handleFilterChange(col.id, []);
+                                                            setFilterConditions(prev => { const { [col.id]: _, ...rest } = prev; return rest; });
+                                                            setActiveMenuCol(null);
+                                                        }}
+                                                        className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
                                                     >
-                                                        Hủy
+                                                        Xóa lọc
                                                     </button>
-                                                    <button
-                                                        onClick={() => applyFilter(col.id)}
-                                                        className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded shadow-sm"
-                                                    >
-                                                        Áp dụng
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => setActiveMenuCol(null)}
+                                                            className="px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded"
+                                                        >
+                                                            Hủy
+                                                        </button>
+                                                        <button
+                                                            onClick={() => applyFilter(col.id)}
+                                                            className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded shadow-sm"
+                                                        >
+                                                            Áp dụng
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </th>
-                            ))}
+                                        )}
+
+                                        {/* Column Resize Handle - Excel Style */}
+                                        <div
+                                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 z-10"
+                                            onMouseDown={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                setResizingCol({
+                                                    colId: col.id,
+                                                    startX: e.clientX,
+                                                    startWidth: colWidth
+                                                });
+                                            }}
+                                            onDoubleClick={(e) => {
+                                                // Auto-fit: Reset to default
+                                                e.stopPropagation();
+                                                setColumnWidths(prev => {
+                                                    const { [col.id]: _, ...rest } = prev;
+                                                    return rest;
+                                                });
+                                            }}
+                                            title="Kéo để thay đổi độ rộng, double-click để auto-fit"
+                                        />
+                                    </th>
+                                );
+                            })}
                         </tr>
                     </thead>
                     <tbody className="text-slate-700 dark:text-slate-300">
@@ -1200,28 +1473,54 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                             const rowClass = (row.type === 'real' && row.data && getRowClassName) ? getRowClassName(row.data) : '';
                             const isRowSelected = row.type === 'real' && selectedRow && row.data && (row.data[keyField] === selectedRow[keyField]);
 
+                            // Check if this row is in selection
+                            const isRowInSelection = selectionRanges.some(range => {
+                                const rMin = Math.min(range.start.rIdx, range.end.rIdx);
+                                const rMax = Math.max(range.start.rIdx, range.end.rIdx);
+                                return rIdx >= rMin && rIdx <= rMax;
+                            });
+                            const isRowActive = activeCell?.rIdx === rIdx;
+
                             return (
                                 <tr
                                     key={row.id}
-                                    className={`hover:bg-slate-50 dark:hover:bg-slate-800 group ${rowClass} ${isRowSelected ? '!bg-blue-50 dark:!bg-blue-900/30 ring-1 ring-blue-200 dark:ring-blue-800' : ''}`}
+                                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 group ${rowClass} ${isRowSelected ? '!bg-blue-50 dark:!bg-blue-900/30' : ''}`}
                                 >
-                                    {/* Row Header */}
-                                    <td
-                                        className="border-r border-b border-border-light dark:border-border-dark text-center text-xs text-slate-400 font-medium bg-slate-50 dark:bg-slate-900 sticky left-0 group-hover:font-bold"
-                                        onContextMenu={(e) => handleContextMenu(e, rIdx, -1)}
-                                    >
-                                        {/* If Draft and Valid -> Commit Button. Else Index */}
-                                        {row.type === 'draft' && isDraftRowValid(rIdx) && onRowCommit ? (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleCommitRow(rIdx); }}
-                                                className="w-full h-full flex items-center justify-center text-green-600 hover:bg-green-100 transition-colors"
-                                                title="Lưu dòng này"
-                                            ><span className="material-symbols-outlined text-[16px]">check</span></button>
-                                        ) : (
-                                            /* Using visual index rIdx + 1 */
-                                            rIdx + 1
-                                        )}
-                                    </td>
+                                    {/* Row Header - Excel Style */}
+                                    {showRowNumbers && (
+                                        <td
+                                            className={`border-r border-b border-slate-300 dark:border-slate-600 text-center text-xs font-medium sticky left-0 z-10 select-none w-10 min-w-[40px]
+                                            ${isRowActive ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 font-bold' :
+                                                    isRowInSelection ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 font-bold' :
+                                                        'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}
+                                            hover:bg-slate-300 dark:hover:bg-slate-600 cursor-pointer transition-colors`}
+                                            onContextMenu={(e) => handleContextMenu(e, rIdx, -1)}
+                                            onClick={(e) => {
+                                                if (readOnly) return;
+                                                // Select entire row
+                                                const start = { rIdx, cIdx: 0 };
+                                                const end = { rIdx, cIdx: tableCols.length - 1 };
+                                                setActiveCell(start);
+                                                if (e.ctrlKey || e.metaKey) {
+                                                    setSelectionRanges(prev => [...prev, { start, end }]);
+                                                } else {
+                                                    setSelectionRanges([{ start, end }]);
+                                                }
+                                            }}
+                                        >
+                                            {/* If Draft and Valid -> Commit Button. Else Index */}
+                                            {row.type === 'draft' && isDraftRowValid(rIdx) && onRowCommit ? (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleCommitRow(rIdx); }}
+                                                    className="w-full h-full flex items-center justify-center text-green-600 hover:bg-green-100 transition-colors"
+                                                    title="Lưu dòng này"
+                                                ><span className="material-symbols-outlined text-[16px]">check</span></button>
+                                            ) : (
+                                                /* Using visual index rIdx + 1 */
+                                                rIdx + 1
+                                            )}
+                                        </td>
+                                    )}
                                     {tableCols.map((col, cIdx) => {
                                         const isActive = activeCell?.rIdx === rIdx && activeCell.cIdx === cIdx;
 
@@ -1242,29 +1541,56 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                         const errorMsg = cellErrors[errorKey];
                                         const displayVal = getCellDisplayValue(rIdx, cIdx);
 
-                                        // Styling
-                                        let cellClass = "border-r border-b border-border-light dark:border-border-dark p-0 relative ";
-                                        if (col.type === 'draft') cellClass += "bg-orange-50/30 dark:bg-orange-900/10 ";
-                                        else if (row.type === 'draft') cellClass += "bg-slate-100/50 dark:bg-slate-800/50 italic "; // Draft row in real col
+                                        // Get column width
+                                        const rawWidth = col.def?.width ? parseInt(col.def.width) : 120;
+                                        const safeWidth = isNaN(rawWidth) ? 120 : rawWidth;
+                                        const cellWidth = columnWidths[col.id] || safeWidth;
+
+                                        // Styling - Excel-like grid
+                                        let cellClass = bordered
+                                            ? "border-r border-b border-slate-200 dark:border-slate-700 p-0 relative "
+                                            : "p-0 relative ";
+                                        if (col.type === 'draft') cellClass += "bg-orange-50/50 dark:bg-orange-900/20 ";
+                                        else if (row.type === 'draft') cellClass += "bg-slate-50 dark:bg-slate-800/70 italic "; // Draft row in real col
+                                        else if (striped && rIdx % 2 === 1) cellClass += "bg-slate-50 dark:bg-slate-800/50 ";
+                                        else cellClass += "bg-white dark:bg-slate-900 ";
 
                                         // Alignment Logic: Default to Left. If Number -> Right. override if explicit align set.
                                         let align = col.def?.align;
                                         if (!align && col.def?.type === 'number') align = 'right';
+                                        if (!align && col.def?.type === 'actions') align = 'center';
 
                                         const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
 
-                                        // Selection Styling
-                                        if (isActive) {
-                                            cellClass += " ring-2 ring-green-600 z-10 bg-white dark:bg-slate-900"; // Active cell gets highlight
-                                        } else if (isInRange) {
-                                            cellClass += " bg-blue-50 dark:bg-blue-900/40 mix-blend-multiply"; // Range gets tint
+                                        // Selection Styling - Excel-like colors (only in non-readOnly mode)
+                                        if (!readOnly) {
+                                            if (isActive) {
+                                                // Active cell: thick green border like Excel
+                                                cellClass += " ring-2 ring-inset ring-green-600 dark:ring-green-500 z-10 bg-white dark:bg-slate-900";
+                                            } else if (isInRange) {
+                                                // Selected range: light blue like Excel #CCE5FF
+                                                cellClass += " bg-blue-100 dark:bg-blue-900/50";
+                                            }
                                         }
 
-                                        if (errorMsg) cellClass += " bg-red-50 dark:bg-red-900/20";
+                                        if (errorMsg) cellClass += " !bg-red-50 dark:!bg-red-900/30";
+
+                                        // Custom cell className
+                                        if (col.def?.cellClassName && row.type === 'real') {
+                                            const customClass = typeof col.def.cellClassName === 'function'
+                                                ? col.def.cellClassName(getCellValue(rIdx, cIdx), row.data)
+                                                : col.def.cellClassName;
+                                            cellClass += ` ${customClass}`;
+                                        }
+
+                                        // Determine if cell is editable
+                                        const isActionColumn = col.def?.type === 'actions';
+                                        const isCellEditable = !readOnly && !isActionColumn && (col.def?.editable !== false);
 
                                         return (
                                             <td
                                                 key={col.id}
+                                                style={{ width: cellWidth, minWidth: cellWidth }}
                                                 onMouseDown={(e) => handleCellMouseDown(rIdx, cIdx, e)}
                                                 onMouseEnter={() => handleCellMouseEnter(rIdx, cIdx)}
                                                 onDoubleClick={() => {
@@ -1273,21 +1599,29 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                                         window.location.hash = raw.source.target;
                                                     } else if (row.type === 'real' && onRowDoubleClick) {
                                                         onRowDoubleClick(row.data);
+                                                    } else {
+                                                        // Excel-like: double-click enters edit mode
+                                                        setIsEditMode(true);
                                                     }
                                                 }}
                                                 onContextMenu={(e) => handleContextMenu(e, rIdx, cIdx)}
-                                                className={`${cellClass} ${isTraceable(getRawValue(rIdx, cIdx)) ? 'cursor-alias' : ''}`}
+                                                className={`${cellClass} ${isTraceable(getRawValue(rIdx, cIdx)) ? 'cursor-alias' : 'cursor-cell'}`}
                                                 title={errorMsg || (isTraceable(getRawValue(rIdx, cIdx)) ? 'Double-click để xem nguồn' : undefined)}
                                             >
                                                 {errorMsg && <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-bl triangle-error z-20"></div>}
-                                                {isActive ? (
+                                                {/* Actions column or custom renderer always shows the renderer */}
+                                                {isActionColumn && col.def?.renderCell && row.type === 'real' ? (
+                                                    <div className={`w-full h-full ${compact ? 'px-1 py-0.5' : 'px-2 py-1.5'} text-sm ${alignClass} flex items-center justify-center gap-1`}>
+                                                        {col.def.renderCell(getCellValue(rIdx, cIdx), row.data, rIdx)}
+                                                    </div>
+                                                ) : isActive && isCellEditable ? (
                                                     <input
                                                         ref={(el) => { if (isActive) el?.focus(); }}
                                                         readOnly={
                                                             !!(String(displayVal).startsWith('=') ||
                                                                 (lockedUntil && row.type === 'real' && row.data?.[dateField] <= lockedUntil))
                                                         }
-                                                        className={`w-full h-full px-2 py-1.5 bg-transparent border-none focus:outline-none text-sm ${alignClass} 
+                                                        className={`w-full h-full ${compact ? 'px-1 py-0.5' : 'px-2 py-1.5'} bg-transparent border-none focus:outline-none text-sm ${alignClass}
                                                             ${col.type === 'draft' || row.type === 'draft' ? 'font-mono text-slate-600 dark:text-slate-400' : ''}
                                                             ${col.def?.fontClass || ''}
                                                             ${errorMsg ? 'text-red-700 dark:text-red-300 font-medium' : ''}
@@ -1312,8 +1646,8 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                                         placeholder={col.type === 'real' && col.def?.type === 'date' ? 'DD/MM/YYYY' : ''}
                                                     />
                                                 ) : (
-                                                    <div className={`w-full h-full px-2 py-1.5 text-sm ${alignClass} truncate ${col.def?.fontClass || ''} ${col.type === 'draft' || row.type === 'draft' ? 'font-mono text-slate-600 dark:text-slate-400' : ''} select-none`}>
-                                                        {col.def?.renderCell && row.type === 'real' ? col.def.renderCell(getCellValue(rIdx, cIdx), row.data) : displayVal}
+                                                    <div className={`w-full h-full ${compact ? 'px-1 py-0.5' : 'px-2 py-1.5'} text-sm ${alignClass} truncate ${col.def?.fontClass || ''} ${col.type === 'draft' || row.type === 'draft' ? 'font-mono text-slate-600 dark:text-slate-400' : ''} select-none`}>
+                                                        {col.def?.renderCell && row.type === 'real' ? col.def.renderCell(getCellValue(rIdx, cIdx), row.data, rIdx) : displayVal}
                                                     </div>
                                                 )}
                                             </td>
@@ -1448,20 +1782,33 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                 </div>
             )}
 
-            {/* Status Bar for Selection - Excel Style */}
-            <div className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 px-4 py-1 flex items-center justify-end gap-6 text-xs font-semibold text-slate-600 dark:text-slate-400 select-none h-8 shrink-0">
-                {(() => {
-                    const stats = getSelectionStats();
-                    if (!stats) return <span className="opacity-0">Ready</span>;
-                    return (
-                        <>
-                            {stats.numCount > 0 && <span>Average: {formatNumberDisplay(stats.average, undefined, 2)}</span>}
-                            <span>Count: {stats.count}</span>
-                            {stats.numCount > 0 && <span>Sum: {formatNumberDisplay(stats.sum)}</span>}
-                        </>
-                    );
-                })()}
-            </div>
+            {/* Status Bar - Excel Style */}
+            {showStatusBar && (
+                <div className="bg-slate-100 dark:bg-slate-800 border-t border-slate-300 dark:border-slate-600 px-4 py-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 select-none h-7 shrink-0">
+                    {/* Left side: Mode indicator */}
+                    <div className="flex items-center gap-4">
+                        {readOnly && <span className="text-slate-500 font-medium">Chế độ xem</span>}
+                        {!readOnly && isEditMode && <span className="text-green-600 dark:text-green-400 font-bold">Đang sửa</span>}
+                        {!readOnly && clipboard && <span className="text-blue-600 dark:text-blue-400">Clipboard: {clipboard.data.length}×{clipboard.data[0]?.length || 0}</span>}
+                        {!readOnly && !isEditMode && !clipboard && <span className="text-slate-400">Sẵn sàng</span>}
+                    </div>
+
+                    {/* Right side: Selection stats */}
+                    <div className="flex items-center gap-6 font-semibold">
+                        {(() => {
+                            const stats = getSelectionStats();
+                            if (!stats) return null;
+                            return (
+                                <>
+                                    {stats.numCount > 0 && <span>Trung bình: <span className="text-slate-800 dark:text-slate-200">{formatNumberDisplay(stats.average, undefined, 2)}</span></span>}
+                                    <span>Số ô: <span className="text-slate-800 dark:text-slate-200">{stats.count}</span></span>
+                                    {stats.numCount > 0 && <span>Tổng: <span className="text-slate-800 dark:text-slate-200">{formatNumberDisplay(stats.sum)}</span></span>}
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

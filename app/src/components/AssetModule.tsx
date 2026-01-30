@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { SmartTable, type ColumnDef } from './SmartTable';
-import { assetService, hcsnService } from '../api';
+import { assetService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { formatMonthVN, toInputDateValue, toInputMonthValue } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
-import { useSimplePrint } from '../hooks/usePrintHandler';
+import { PrintPreviewModal, type VoucherView } from './PrintTemplates';
+import { triggerBrowserPrint } from '../hooks/usePrintHandler';
+import { ExcelImportModal } from './ExcelImportModal';
+import { ASSET_TEMPLATE } from '../utils/excelTemplates';
 
 // --- TYPES ---
 interface AssetModuleProps {
@@ -33,11 +36,40 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     const [selectedRow, setSelectedRow] = useState<any>(null);
 
     // Modals Control
-    const [modalMode, setModalMode] = useState<'create_fixed' | 'create_infra' | 'create_invest' | 'depreciation' | 'decrease' | 'maintenance' | 'condition' | 'transfer' | 'revaluation' | 'create_inventory' | 'inventory_detail' | 'view_card' | null>(null);
+    const [modalMode, setModalMode] = useState<'create_fixed' | 'create_infra' | 'create_invest' | 'invest_income' | 'depreciation' | 'decrease' | 'maintenance' | 'condition' | 'transfer' | 'revaluation' | 'create_inventory' | 'inventory_detail' | 'view_card' | null>(null);
     const [editingItem, setEditingItem] = useState<any>(null); // Track item being edited
+
+    // Print Preview State
+    const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [printView, setPrintView] = useState<VoucherView>('ASSET_CARD');
+    const [printRecord, setPrintRecord] = useState<any>(null);
+    const lastPrintSignalRef = React.useRef(0); // Track last handled print signal
+
+    // Import states
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
 
     const formatNumber = (num: number) => new Intl.NumberFormat('vi-VN').format(num);
+
+    const isInfraReportView = subView === 'infra_report';
+    const isAssetSummaryReportView = subView === 'asset_report_summary';
+    const isAssetSourceReportView = subView === 'asset_report_source';
+    const isReportView = isInfraReportView || isAssetSummaryReportView || isAssetSourceReportView;
+    const isInvestIncomeView = subView === 'invest_income';
+    const isInfraModuleView = subView.startsWith('infra') && !isInfraReportView;
+    const isInvestModuleView = subView.startsWith('invest');
+
+    const sumBy = (items: any[], field: string) =>
+        items.reduce((acc, item) => acc + (Number(item?.[field]) || 0), 0);
+
+    const sumNetValue = (items: any[], netField: string, originalField: string, accumulatedField: string) =>
+        items.reduce((acc, item) => {
+            const net = item?.[netField];
+            const netValue = net ?? ((Number(item?.[originalField]) || 0) - (Number(item?.[accumulatedField]) || 0));
+            return acc + (Number(netValue) || 0);
+        }, 0);
 
     // --- COLUMNS DEFINITIONS ---
     const fixedAssetColumns: ColumnDef[] = [
@@ -90,14 +122,105 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
         { field: 'notes', headerName: 'Ghi chú', width: 'min-w-[200px]' },
     ];
 
+    const infraReportColumns: ColumnDef[] = [
+        { field: 'category', headerName: 'Loại hạ tầng', width: 'min-w-[200px]', fontClass: 'font-bold' },
+        { field: 'count', headerName: 'Số lượng', width: 'w-24', align: 'center', type: 'number' },
+        { field: 'total_original_value', headerName: 'Tổng nguyên giá', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono font-bold text-blue-600">{formatNumber(v)}</span> },
+        { field: 'total_depreciation', headerName: 'Hao mòn lũy kế', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono text-red-500">{formatNumber(v)}</span> },
+        { field: 'total_net_value', headerName: 'Giá trị còn lại', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono font-bold">{formatNumber(v)}</span> },
+    ];
+
+    const assetSummaryColumns: ColumnDef[] = [
+        { field: 'asset_type', headerName: 'Nhóm tài sản', width: 'min-w-[220px]', fontClass: 'font-bold' },
+        { field: 'count', headerName: 'Số lượng', width: 'w-24', align: 'center', type: 'number' },
+        { field: 'original_value', headerName: 'Nguyên giá', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono font-bold text-blue-600">{formatNumber(v)}</span> },
+        { field: 'accumulated_depreciation', headerName: 'Hao mòn/Phân bổ', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono text-red-500">{formatNumber(v)}</span> },
+        { field: 'net_value', headerName: 'Giá trị còn lại', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono font-bold">{formatNumber(v)}</span> },
+        { field: 'income_received', headerName: 'Thu nhập lũy kế', width: 'w-36', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono text-green-600">{formatNumber(v)}</span> },
+    ];
+
+    const assetSourceColumns: ColumnDef[] = [
+        { field: 'fund_source_name', headerName: 'Nguồn vốn', width: 'min-w-[220px]', fontClass: 'font-bold' },
+        { field: 'fixed_count', headerName: 'TSCĐ (SL)', width: 'w-24', align: 'center', type: 'number' },
+        { field: 'fixed_value', headerName: 'TSCĐ (Giá trị)', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono font-bold text-blue-600">{formatNumber(v)}</span> },
+        { field: 'infra_count', headerName: 'Hạ tầng (SL)', width: 'w-24', align: 'center', type: 'number' },
+        { field: 'infra_value', headerName: 'Hạ tầng (Giá trị)', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono font-bold text-blue-600">{formatNumber(v)}</span> },
+        { field: 'invest_count', headerName: 'Đầu tư (SL)', width: 'w-24', align: 'center', type: 'number' },
+        { field: 'invest_value', headerName: 'Đầu tư (Giá trị)', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono text-green-600">{formatNumber(v)}</span> },
+        { field: 'total_value', headerName: 'Tổng giá trị', width: 'w-40', align: 'right', type: 'number', renderCell: (v: number) => <span className="font-mono font-bold">{formatNumber(v)}</span> },
+    ];
+
     // --- LOGIC ---
     useEffect(() => {
         fetchData();
         fetchFundSources();
     }, []);
 
-    // Print handler
-    useSimplePrint(printSignal, 'Tài sản', { allowBrowserPrint: true });
+    // Print handler - show print preview for selected asset
+    useEffect(() => {
+        // Only respond to NEW print signals, not when other dependencies change
+        if (printSignal > 0 && printSignal !== lastPrintSignalRef.current) {
+            lastPrintSignalRef.current = printSignal;
+
+            // For fixed assets list, show ASSET_CARD template
+            if ((subView === 'asset_fixed_list' || subView.startsWith('asset_fixed')) && selectedRow) {
+                // Transform data for ASSET_CARD template
+                const record = {
+                    // Basic info
+                    code: selectedRow.code || selectedRow.asset_code || '',
+                    name: selectedRow.name || selectedRow.asset_name || '',
+                    // Dates
+                    start_date: selectedRow.start_date || selectedRow.purchase_date || selectedRow.acquisition_date,
+                    purchase_date: selectedRow.purchase_date || selectedRow.acquisition_date,
+                    decrease_date: selectedRow.decrease_date || selectedRow.disposal_date,
+                    // Specifications
+                    specification: selectedRow.specification || selectedRow.specs || '',
+                    serial_no: selectedRow.serial_no || selectedRow.serial_number || '',
+                    country: selectedRow.country || selectedRow.origin_country || 'VN',
+                    manufacture_year: selectedRow.manufacture_year || selectedRow.year_made,
+                    start_year: selectedRow.start_year || new Date(selectedRow.start_date || selectedRow.purchase_date || new Date()).getFullYear(),
+                    // Department
+                    dept: selectedRow.dept || selectedRow.department || selectedRow.using_department || '',
+                    department: selectedRow.department || selectedRow.dept || selectedRow.using_department || '',
+                    // Capacity
+                    capacity: selectedRow.capacity || '',
+                    area: selectedRow.area || '',
+                    // Values
+                    original_value: selectedRow.original_value || selectedRow.acquisition_cost || 0,
+                    accumulated_depreciation: selectedRow.accumulated_depreciation || 0,
+                    net_value: selectedRow.net_value || (selectedRow.original_value - (selectedRow.accumulated_depreciation || 0)),
+                    // Source & depreciation
+                    fund_source_name: selectedRow.fund_source_name || selectedRow.source || 'Vốn chủ sở hữu',
+                    source: selectedRow.fund_source_name || selectedRow.source || 'Vốn chủ sở hữu',
+                    useful_life: selectedRow.useful_life || selectedRow.useful_years || 5,
+                    voucher_no: selectedRow.voucher_no || selectedRow.doc_no || '',
+                    doc_no: selectedRow.doc_no || selectedRow.voucher_no || '',
+                    // Depreciation log (if available)
+                    depreciation_log: selectedRow.depreciation_log || [],
+                };
+                setPrintRecord(record);
+                setPrintView('ASSET_CARD');
+                setShowPrintPreview(true);
+            } else if (selectedRow) {
+                // For other views with selected item, show handover template
+                const record = {
+                    ...selectedRow,
+                    // Ensure required fields
+                    code: selectedRow.code || selectedRow.asset_code || '',
+                    name: selectedRow.name || selectedRow.asset_name || '',
+                    original_value: selectedRow.original_value || selectedRow.acquisition_cost || 0,
+                    country: selectedRow.country || 'VN',
+                    start_year: selectedRow.start_year || new Date().getFullYear(),
+                };
+                setPrintRecord(record);
+                setPrintView('ASSET_HANDOVER');
+                setShowPrintPreview(true);
+            } else {
+                // No selection - use browser print for list view
+                triggerBrowserPrint();
+            }
+        }
+    }, [printSignal, subView, selectedRow]);
 
     // Handle SubView Changes -> Modal Triggers
     useEffect(() => {
@@ -115,6 +238,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
             case 'infra_condition': setModalMode('condition'); break;
 
             case 'invest_list': setModalMode(null); break; // Default to list
+            case 'invest_income': setModalMode('invest_income'); break;
 
             default: setModalMode(null); break;
         }
@@ -144,16 +268,276 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     };
 
     const fetchFundSources = async () => {
-        try {
-            const res = await hcsnService.getFundSources();
-            const d = res.data;
-            setFundSources(Array.isArray(d) ? d : (d?.data || []));
-        } catch (err) {
-            console.error(err);
-        }
+        // Nguồn vốn DN: Vốn chủ sở hữu, Vốn vay, Lợi nhuận giữ lại...
+        setFundSources([
+            { id: 'VCSH', code: 'VCSH', name: 'Vốn chủ sở hữu' },
+            { id: 'VAY', code: 'VAY', name: 'Vốn vay dài hạn' },
+            { id: 'LNGL', code: 'LNGL', name: 'Lợi nhuận giữ lại' },
+            { id: 'KHAC', code: 'KHAC', name: 'Nguồn khác' }
+        ]);
     }
 
+    // Excel import handler
+    const handleImportFromExcel = useCallback(async (rows: any[]) => {
+        if (rows.length === 0) return;
+
+        setImporting(true);
+        setImportProgress({ current: 0, total: rows.length });
+        setShowImportModal(false);
+
+        let successCount = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            setImportProgress({ current: i + 1, total: rows.length });
+
+            try {
+                await assetService.createFixedAsset({
+                    code: rows[i].code || rows[i]['Mã TSCĐ (*)'],
+                    name: rows[i].name || rows[i]['Tên tài sản (*)'],
+                    category: rows[i].category || rows[i]['Loại TSCĐ'] || 'TANGIBLE',
+                    original_value: parseFloat(rows[i].original_value || rows[i]['Nguyên giá (*)'] || 0),
+                    useful_life: parseInt(rows[i].useful_life || rows[i]['Số năm SD'] || 5),
+                    fund_source_id: rows[i].fund_source_id || rows[i]['Mã nguồn vốn'],
+                    department: rows[i].department || rows[i]['Bộ phận sử dụng'],
+                    purchase_date: rows[i].purchase_date || rows[i]['Ngày ghi tăng (*)'] || toInputDateValue(),
+                    specification: rows[i].specification || rows[i]['Quy cách'],
+                    serial_no: rows[i].serial_no || rows[i]['Số serial'],
+                    country: rows[i].country || rows[i]['Nước SX'] || 'VN',
+                    manufacture_year: rows[i].manufacture_year || rows[i]['Năm SX']
+                });
+                successCount++;
+            } catch (err: any) {
+                const code = rows[i].code || rows[i]['Mã TSCĐ (*)'] || `Dòng ${i + 1}`;
+                errors.push(`${code}: ${err.response?.data?.error || err.message}`);
+            }
+        }
+
+        setImporting(false);
+
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} tài sản cố định!`);
+        } else {
+            alert(`Nhập ${successCount}/${rows.length} tài sản.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        fetchData();
+    }, []);
+
+    const fundSourceMap = useMemo(() => {
+        const map = new Map<string, any>();
+        fundSources.forEach((fs: any) => {
+            if (fs?.id) map.set(fs.id, fs);
+        });
+        return map;
+    }, [fundSources]);
+
+    const infraReportRows = useMemo(() => {
+        const rowsByCategory = new Map<string, any>();
+        infraAssets.forEach((asset: any) => {
+            const categoryLabel = asset?.category || 'Khác';
+            const key = categoryLabel || 'Khác';
+            const row = rowsByCategory.get(key) || {
+                id: key,
+                category: categoryLabel || 'Khác',
+                count: 0,
+                total_original_value: 0,
+                total_depreciation: 0,
+                total_net_value: 0
+            };
+            row.count += 1;
+            row.total_original_value += Number(asset?.original_value) || 0;
+            row.total_depreciation += Number(asset?.accumulated_depreciation) || 0;
+            const netValue = asset?.net_value ?? ((Number(asset?.original_value) || 0) - (Number(asset?.accumulated_depreciation) || 0));
+            row.total_net_value += Number(netValue) || 0;
+            rowsByCategory.set(key, row);
+        });
+
+        const rows = Array.from(rowsByCategory.values()).sort((a, b) =>
+            String(a.category || '').localeCompare(String(b.category || ''), 'vi')
+        );
+
+        if (!rows.length) return rows;
+
+        const total = rows.reduce(
+            (acc, row) => ({
+                count: acc.count + row.count,
+                total_original_value: acc.total_original_value + row.total_original_value,
+                total_depreciation: acc.total_depreciation + row.total_depreciation,
+                total_net_value: acc.total_net_value + row.total_net_value
+            }),
+            { count: 0, total_original_value: 0, total_depreciation: 0, total_net_value: 0 }
+        );
+
+        rows.push({
+            id: 'TOTAL',
+            category: 'Tổng cộng',
+            ...total,
+            is_total: true
+        });
+
+        return rows;
+    }, [infraAssets]);
+
+    const assetSummaryRows = useMemo(() => {
+        const fixedRow = {
+            id: 'fixed',
+            asset_type: 'TSCĐ',
+            count: assets.length,
+            original_value: sumBy(assets, 'original_value'),
+            accumulated_depreciation: sumBy(assets, 'accumulated_depreciation'),
+            net_value: sumNetValue(assets, 'net_value', 'original_value', 'accumulated_depreciation'),
+            income_received: 0
+        };
+
+        const infraRow = {
+            id: 'infra',
+            asset_type: 'Hạ tầng',
+            count: infraAssets.length,
+            original_value: sumBy(infraAssets, 'original_value'),
+            accumulated_depreciation: sumBy(infraAssets, 'accumulated_depreciation'),
+            net_value: sumNetValue(infraAssets, 'net_value', 'original_value', 'accumulated_depreciation'),
+            income_received: 0
+        };
+
+        const investNetValue = investments.some((inv: any) => inv?.current_value !== undefined && inv?.current_value !== null)
+            ? sumBy(investments, 'current_value')
+            : sumBy(investments, 'investment_amount');
+
+        const investmentRow = {
+            id: 'invest',
+            asset_type: 'Đầu tư dài hạn',
+            count: investments.length,
+            original_value: sumBy(investments, 'investment_amount'),
+            accumulated_depreciation: 0,
+            net_value: investNetValue,
+            income_received: sumBy(investments, 'income_received')
+        };
+
+        const ccdcRow = {
+            id: 'ccdc',
+            asset_type: 'CCDC',
+            count: ccdc.length,
+            original_value: sumBy(ccdc, 'cost'),
+            accumulated_depreciation: sumBy(ccdc, 'allocated'),
+            net_value: sumBy(ccdc, 'remaining'),
+            income_received: 0
+        };
+
+        const rows = [fixedRow, infraRow, investmentRow, ccdcRow];
+
+        const total = rows.reduce(
+            (acc, row) => ({
+                count: acc.count + row.count,
+                original_value: acc.original_value + row.original_value,
+                accumulated_depreciation: acc.accumulated_depreciation + row.accumulated_depreciation,
+                net_value: acc.net_value + row.net_value,
+                income_received: acc.income_received + row.income_received
+            }),
+            { count: 0, original_value: 0, accumulated_depreciation: 0, net_value: 0, income_received: 0 }
+        );
+
+        return [
+            ...rows,
+            {
+                id: 'TOTAL',
+                asset_type: 'Tổng cộng',
+                ...total,
+                is_total: true
+            }
+        ];
+    }, [assets, infraAssets, investments, ccdc, sumBy, sumNetValue]);
+
+    const assetSourceRows = useMemo(() => {
+        const rowsBySource = new Map<string, any>();
+        const unassignedId = 'UNASSIGNED';
+
+        const resolveSourceName = (id?: string, fallbackName?: string) => {
+            if (fallbackName) return fallbackName;
+            if (!id) return 'Chưa gán nguồn';
+            return fundSourceMap.get(id)?.name || 'Chưa gán nguồn';
+        };
+
+        const ensureRow = (id: string, name: string) => {
+            if (!rowsBySource.has(id)) {
+                rowsBySource.set(id, {
+                    id,
+                    fund_source_id: id,
+                    fund_source_name: name,
+                    fixed_count: 0,
+                    fixed_value: 0,
+                    infra_count: 0,
+                    infra_value: 0,
+                    invest_count: 0,
+                    invest_value: 0,
+                    total_value: 0
+                });
+            }
+            return rowsBySource.get(id);
+        };
+
+        assets.forEach((asset: any) => {
+            const id = asset?.fund_source_id || unassignedId;
+            const name = resolveSourceName(asset?.fund_source_id, asset?.fund_source_name);
+            const row = ensureRow(id, name);
+            row.fixed_count += 1;
+            row.fixed_value += Number(asset?.original_value) || 0;
+        });
+
+        infraAssets.forEach((asset: any) => {
+            const id = asset?.fund_source_id || unassignedId;
+            const name = resolveSourceName(asset?.fund_source_id, asset?.fund_source_name);
+            const row = ensureRow(id, name);
+            row.infra_count += 1;
+            row.infra_value += Number(asset?.original_value) || 0;
+        });
+
+        investments.forEach((investment: any) => {
+            const id = investment?.fund_source_id || unassignedId;
+            const name = resolveSourceName(investment?.fund_source_id, investment?.fund_source_name);
+            const row = ensureRow(id, name);
+            row.invest_count += 1;
+            const value = investment?.current_value ?? investment?.investment_amount ?? 0;
+            row.invest_value += Number(value) || 0;
+        });
+
+        const rows = Array.from(rowsBySource.values())
+            .filter((row) => row.fixed_count || row.infra_count || row.invest_count)
+            .map((row) => ({
+                ...row,
+                total_value: row.fixed_value + row.infra_value + row.invest_value
+            }))
+            .sort((a, b) => String(a.fund_source_name || '').localeCompare(String(b.fund_source_name || ''), 'vi'));
+
+        if (!rows.length) return rows;
+
+        const total = rows.reduce(
+            (acc, row) => ({
+                fixed_count: acc.fixed_count + row.fixed_count,
+                fixed_value: acc.fixed_value + row.fixed_value,
+                infra_count: acc.infra_count + row.infra_count,
+                infra_value: acc.infra_value + row.infra_value,
+                invest_count: acc.invest_count + row.invest_count,
+                invest_value: acc.invest_value + row.invest_value,
+                total_value: acc.total_value + row.total_value
+            }),
+            { fixed_count: 0, fixed_value: 0, infra_count: 0, infra_value: 0, invest_count: 0, invest_value: 0, total_value: 0 }
+        );
+
+        rows.push({
+            id: 'TOTAL',
+            fund_source_name: 'Tổng cộng',
+            ...total,
+            is_total: true
+        });
+
+        return rows;
+    }, [assets, infraAssets, investments, fundSourceMap]);
+
     const getCurrentList = () => {
+        if (isInfraReportView) return infraReportRows;
+        if (isAssetSummaryReportView) return assetSummaryRows;
+        if (isAssetSourceReportView) return assetSourceRows;
         if (subView.startsWith('infra')) return infraAssets;
         if (subView.startsWith('invest')) return investments;
         if (subView === 'ccdc') return ccdc; // Support legacy CCDC view
@@ -162,6 +546,9 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     };
 
     const getCurrentColumns = () => {
+        if (isInfraReportView) return infraReportColumns;
+        if (isAssetSummaryReportView) return assetSummaryColumns;
+        if (isAssetSourceReportView) return assetSourceColumns;
         if (subView.startsWith('infra')) return infraColumns;
         if (subView.startsWith('invest')) return investColumns;
         if (subView === 'ccdc') return ccdcColumns;
@@ -170,6 +557,10 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     };
 
     const getTitleAndIcon = () => {
+        if (isAssetSummaryReportView) return { title: 'Tổng hợp Tài sản', icon: 'pie_chart' };
+        if (isAssetSourceReportView) return { title: 'Tài sản theo Nguồn vốn', icon: 'account_tree' };
+        if (isInfraReportView) return { title: 'Báo cáo Hạ tầng', icon: 'summarize' };
+        if (isInvestIncomeView) return { title: 'Thu nhập Đầu tư', icon: 'payments' };
         if (subView.startsWith('infra')) return { title: 'Quản lý Tài sản Kết cấu Hạ tầng', icon: 'location_city' };
         if (subView.startsWith('invest')) return { title: 'Quản lý Đầu tư Dài hạn', icon: 'account_balance' };
         if (subView === 'ccdc') return { title: 'Quản lý Công cụ dụng cụ', icon: 'home_repair_service' };
@@ -186,22 +577,24 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
             // Context-based Actions
             if (subView.startsWith('asset_fixed')) {
                 actions.push({ label: 'Ghi tăng', icon: 'add_business', onClick: () => setModalMode('create_fixed'), primary: true });
+                actions.push({ label: 'Nhập từ Excel', icon: 'upload_file', onClick: () => setShowImportModal(true) });
                 actions.push({ label: 'Tính khấu hao', icon: 'calculate', onClick: () => setModalMode('depreciation') });
                 actions.push({ label: 'Ghi giảm', icon: 'remove_circle', onClick: () => setModalMode('decrease') });
-            } else if (subView.startsWith('infra')) {
+            } else if (isInfraModuleView) {
                 actions.push({ label: 'Ghi nhận mới', icon: 'add_location', onClick: () => setModalMode('create_infra'), primary: true });
                 actions.push({ label: 'Bảo trì', icon: 'build', onClick: () => setModalMode('maintenance') });
                 actions.push({ label: 'Đánh giá', icon: 'health_and_safety', onClick: () => setModalMode('condition') });
-            } else if (subView.startsWith('invest')) {
-                actions.push({ label: 'Đầu tư mới', icon: 'payments', onClick: () => setModalMode('create_invest'), primary: true });
+            } else if (isInvestModuleView) {
+                actions.push({ label: 'Ghi nhận Thu nhập', icon: 'paid', onClick: () => setModalMode('invest_income'), primary: isInvestIncomeView });
+                actions.push({ label: 'Đầu tư mới', icon: 'payments', onClick: () => setModalMode('create_invest'), primary: !isInvestIncomeView });
             } else if (subView === 'asset_inventory') {
                 actions.push({ label: 'Tạo phiếu kiểm kê', icon: 'post_add', onClick: () => setModalMode('create_inventory'), primary: true });
             }
 
             actions.push({ label: 'Làm mới', icon: 'refresh', onClick: fetchData });
-            actions.push({ label: 'In danh sách', icon: 'print', onClick: () => window.print() });
+            actions.push({ label: 'In danh sách', icon: 'print', onClick: () => triggerBrowserPrint() });
 
-            if (selectedRow) {
+            if (selectedRow && !isReportView) {
                 // Edit Logic
                 if (subView === 'asset_fixed_list' || subView.startsWith('asset_fixed')) {
                     actions.push({
@@ -227,7 +620,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
                 title,
                 icon,
                 actions,
-                onDelete: handleDeleteSelected
+                onDelete: selectedRow && !isReportView ? handleDeleteSelected : undefined
             });
         }
     }, [subView, onSetHeader, selectedRow]);
@@ -266,6 +659,9 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
         }
     };
 
+    const tableData = getCurrentList();
+    const tableColumns = getCurrentColumns();
+
     // --- RENDER ---
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
@@ -292,17 +688,19 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
                 {loading ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10">
                         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                        <p className="text-slate-500 font-bold animate-pulse">Đang tải dữ liệu HCSN...</p>
+                        <p className="text-slate-500 font-bold animate-pulse">Đang tải dữ liệu...</p>
                     </div>
                 ) : (
                     <SmartTable
-                        data={getCurrentList()}
-                        columns={getCurrentColumns()}
+                        data={tableData}
+                        columns={tableColumns}
                         keyField="id"
-                        onSelectionChange={setSelectedRow}
-                        onRowClick={(row) => setSelectedRow(row)}
-                        selectedRow={selectedRow}
+                        onSelectionChange={isReportView ? undefined : setSelectedRow}
+                        onRowClick={isReportView ? undefined : (row) => setSelectedRow(row)}
+                        selectedRow={isReportView ? undefined : selectedRow}
                         minRows={15}
+                        showTotalRow={!isReportView}
+                        getRowClassName={isReportView ? (row: any) => row.is_total ? 'bg-blue-50/50 dark:bg-blue-900/10 font-bold' : '' : undefined}
                     />
                 )}
             </div>
@@ -316,6 +714,14 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
             )}
             {modalMode === 'create_invest' && (
                 <InvestmentModal onClose={() => { setModalMode(null); setEditingItem(null); }} onRefresh={fetchData} fundSources={fundSources} initialData={editingItem} />
+            )}
+            {modalMode === 'invest_income' && (
+                <InvestmentIncomeModal
+                    onClose={() => setModalMode(null)}
+                    onRefresh={fetchData}
+                    investments={investments}
+                    initialInvestmentId={isInvestModuleView ? selectedRow?.id : undefined}
+                />
             )}
             {modalMode === 'depreciation' && (
                 <DepreciationModal onClose={() => setModalMode(null)} onRefresh={fetchData} assets={assets} />
@@ -344,6 +750,62 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
             {modalMode === 'view_card' && selectedRow && (
                 <AssetCardModal asset={selectedRow} onClose={() => setModalMode(null)} />
             )}
+
+            {/* Print Preview Modal */}
+            {showPrintPreview && printRecord && (
+                <PrintPreviewModal
+                    record={printRecord}
+                    view={printView}
+                    onClose={() => {
+                        setShowPrintPreview(false);
+                        setPrintRecord(null);
+                    }}
+                    companyInfo={{ name: 'ĐƠN VỊ SỬ DỤNG', address: 'Địa chỉ đơn vị' }}
+                />
+            )}
+
+            {/* Excel Import Modal */}
+            {showImportModal && (
+                <ExcelImportModal
+                    onClose={() => setShowImportModal(false)}
+                    onImport={handleImportFromExcel}
+                    title="Nhập tài sản cố định từ Excel"
+                    enhancedTemplate={ASSET_TEMPLATE}
+                    columns={[
+                        { key: 'code', label: 'Mã TSCĐ', required: true },
+                        { key: 'name', label: 'Tên tài sản', required: true },
+                        { key: 'category', label: 'Loại TSCĐ' },
+                        { key: 'original_value', label: 'Nguyên giá', required: true },
+                        { key: 'useful_life', label: 'Số năm SD' },
+                        { key: 'fund_source_id', label: 'Mã nguồn vốn' },
+                        { key: 'department', label: 'Bộ phận sử dụng' },
+                        { key: 'purchase_date', label: 'Ngày ghi tăng', required: true },
+                        { key: 'specification', label: 'Quy cách' },
+                        { key: 'serial_no', label: 'Số serial' }
+                    ]}
+                />
+            )}
+
+            {/* Import Progress Overlay */}
+            {importing && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                        <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            Đang nhập tài sản cố định...
+                        </p>
+                        <p className="text-2xl font-mono text-purple-600 mt-2">
+                            {importProgress.current} / {importProgress.total}
+                        </p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                            <div
+                                className="bg-purple-600 h-2 rounded-full transition-all"
+                                style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -369,7 +831,7 @@ const FixedAssetModal = ({ onClose, onRefresh, fundSources, initialData }: any) 
     };
 
     return (
-        <FormModal title={initialData ? "Sửa Hồ sơ TSCĐ" : "Ghi tăng Tài sản Cố định (TT 24/2024)"} onClose={onClose}>
+        <FormModal title={initialData ? "Sửa Hồ sơ TSCĐ" : "Ghi tăng Tài sản Cố định"} onClose={onClose}>
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-4">
                     <div>
@@ -405,9 +867,9 @@ const FixedAssetModal = ({ onClose, onRefresh, fundSources, initialData }: any) 
                         </div>
                     </div>
                     <div>
-                        <label className="form-label">Nguồn kinh phí (Bắt buộc)</label>
+                        <label className="form-label">Nguồn vốn hình thành (Bắt buộc)</label>
                         <select className="form-input border-purple-300 bg-purple-50" value={data.fund_source_id} onChange={e => setData({ ...data, fund_source_id: e.target.value })}>
-                            <option value="">-- Chọn nguồn vốn hình thành --</option>
+                            <option value="">-- Chọn nguồn vốn --</option>
                             {fundSources.map((fs: any) => (
                                 <option key={fs.id} value={fs.id}>{fs.code} - {fs.name}</option>
                             ))}
@@ -442,7 +904,7 @@ const InfrastructureModal = ({ onClose, onRefresh, fundSources, initialData }: a
     };
 
     return (
-        <FormModal title={initialData ? "Sửa Hồ sơ Hạ tầng" : "Ghi nhận Tài sản Hạ tầng (TT 24/2024)"} onClose={onClose}>
+        <FormModal title={initialData ? "Sửa Hồ sơ Hạ tầng" : "Ghi nhận Tài sản Hạ tầng"} onClose={onClose}>
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-4">
                     <div><label className="form-label">Mã Hạ tầng</label><input className="form-input" value={data.code} onChange={e => setData({ ...data, code: e.target.value })} /></div>
@@ -525,6 +987,78 @@ const InvestmentModal = ({ onClose, onRefresh, fundSources, initialData }: any) 
             <div className="mt-6 flex justify-end gap-2">
                 <button onClick={onClose} className="form-button-secondary">Hủy</button>
                 <button onClick={handleSave} className="form-button-primary">Lưu Đầu tư</button>
+            </div>
+        </FormModal>
+    );
+};
+
+const InvestmentIncomeModal = ({ onClose, onRefresh, investments, initialInvestmentId }: any) => {
+    const [data, setData] = useState({
+        investment_id: initialInvestmentId || '',
+        income_amount: 0,
+        income_date: toInputDateValue(),
+        note: ''
+    });
+
+    useEffect(() => {
+        if (initialInvestmentId) {
+            setData((prev: any) => ({ ...prev, investment_id: initialInvestmentId }));
+        }
+    }, [initialInvestmentId]);
+
+    const selectedInvestment = investments.find((inv: any) => inv.id === data.investment_id);
+    const formatCurrency = (value: number) => new Intl.NumberFormat('vi-VN').format(value || 0);
+
+    const handleSave = async () => {
+        if (!data.investment_id) return alert("Chọn khoản đầu tư!");
+        if (!data.income_amount || data.income_amount <= 0) return alert("Nhập số tiền thu nhập!");
+        try {
+            await assetService.recordInvestmentIncome(data);
+            alert("Đã ghi nhận thu nhập đầu tư!");
+            onRefresh(); onClose();
+        } catch (e) {
+            alert("Lỗi khi ghi nhận thu nhập");
+            console.error(e);
+        }
+    };
+
+    return (
+        <FormModal title="Ghi nhận Thu nhập Đầu tư" onClose={onClose}>
+            <div className="space-y-4">
+                <div>
+                    <label className="form-label">Khoản đầu tư</label>
+                    <select className="form-input" value={data.investment_id} onChange={e => setData({ ...data, investment_id: e.target.value })}>
+                        <option value="">-- Chọn --</option>
+                        {investments.map((inv: any) => (
+                            <option key={inv.id} value={inv.id}>{inv.code} - {inv.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {selectedInvestment && (
+                    <div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
+                        <div>Giá trị đầu tư: <span className="font-mono font-bold text-blue-600">{formatCurrency(selectedInvestment.investment_amount || 0)}</span></div>
+                        <div>Thu nhập lũy kế: <span className="font-mono font-bold text-green-600">{formatCurrency(selectedInvestment.income_received || 0)}</span></div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="form-label">Số tiền thu nhập</label>
+                        <input type="number" className="form-input font-bold text-green-600" value={data.income_amount} onChange={e => setData({ ...data, income_amount: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                        <label className="form-label">Ngày ghi nhận</label>
+                        <DateInput className="form-input" value={data.income_date} onChange={v => setData({ ...data, income_date: v })} />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="form-label">Ghi chú</label>
+                    <input className="form-input" value={data.note} onChange={e => setData({ ...data, note: e.target.value })} placeholder="Ví dụ: Cổ tức, Lãi vay..." />
+                </div>
+
+                <button onClick={handleSave} className="form-button-primary w-full mt-4">Ghi nhận</button>
             </div>
         </FormModal>
     );

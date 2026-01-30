@@ -1,6 +1,6 @@
 /**
  * PostingModal Component
- * SyntexHCSN - Modal xác nhận ghi sổ chứng từ
+ * SyntexLegger - Modal xác nhận ghi sổ chứng từ
  */
 
 import React, { useState } from 'react';

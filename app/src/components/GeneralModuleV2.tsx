@@ -1,9 +1,9 @@
 /**
  * GeneralModuleV2 - Refactored Version
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import OpeningBalance from './OpeningBalance';
 import { type RibbonAction } from './Ribbon';
 
@@ -14,15 +14,17 @@ import { Revaluation } from './RevaluationModule';
 import { PeriodLock } from './GeneralModule/PeriodLock';
 import { Reconciliation } from './GeneralModule/Reconciliation';
 import { PostingModal } from './GeneralModule/PostingModal';
-import { StagingArea } from './GeneralModule/StagingArea';
+import { StagingArea, type GroupedVoucher } from './GeneralModule/StagingArea';
 import { ChartOfAccounts } from './GeneralModule/ChartOfAccounts';
 import { GeneralVoucherList } from './GeneralModule/GeneralVoucherList';
 import { GeneralVoucherForm } from './GeneralModule/GeneralVoucherForm';
 import { CostItemTable, CostItemFormModal } from './GeneralModule/CostItemTable';
-import FundSourceModule from './FundSourceModule';
+// FundSourceModule removed - không dùng cho Doanh nghiệp
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { useSimplePrint } from '../hooks/usePrintHandler';
+import { voucherService } from '../api';
+import type { VoucherLine } from './GeneralModule/types/voucher.types';
 
 
 interface GeneralModuleV2Props {
@@ -55,6 +57,9 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
     const [editingVoucherId, setEditingVoucherId] = useState<string | undefined>(undefined);
     const [selectedRow] = useState<any>(null);
     const [refreshSignal, setRefreshSignal] = useState(0);
+    const [importedLines, setImportedLines] = useState<VoucherLine[] | null>(null);
+    const [batchImporting, setBatchImporting] = useState(false);
+    const [batchImportProgress, setBatchImportProgress] = useState({ current: 0, total: 0, errors: [] as string[] });
 
     // Business Logic State
     const [lockedUntil] = useState<string | undefined>(undefined);
@@ -66,6 +71,63 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
     const prevImportSignalRef = useRef(importSignal);
 
     const handleRefresh = () => setRefreshSignal(prev => prev + 1);
+
+    // Batch import handler - creates multiple vouchers
+    const handleBatchImport = useCallback(async (vouchers: GroupedVoucher[]) => {
+        if (vouchers.length === 0) return;
+
+        setBatchImporting(true);
+        setBatchImportProgress({ current: 0, total: vouchers.length, errors: [] });
+
+        const errors: string[] = [];
+        let successCount = 0;
+
+        for (let i = 0; i < vouchers.length; i++) {
+            const v = vouchers[i];
+            setBatchImportProgress(prev => ({ ...prev, current: i + 1 }));
+
+            try {
+                // Prepare voucher data for API
+                const voucherData = {
+                    doc_no: v.doc_no || `IMP-${Date.now()}-${i}`,
+                    doc_date: v.doc_date || new Date().toISOString().split('T')[0],
+                    post_date: v.doc_date || new Date().toISOString().split('T')[0],
+                    description: v.description || 'Chứng từ nhập từ Excel',
+                    type: 'IMPORT',
+                    total_amount: v.total_amount,
+                    items: v.lines.map(line => ({
+                        description: line.description,
+                        debit_acc: line.debitAcc,
+                        credit_acc: line.creditAcc,
+                        amount: line.amount,
+                        partner_code: line.partnerCode,
+                        dim1: line.dim1,
+                        item_code: line.itemCode,
+                        sub_item_code: line.subItemCode
+                    }))
+                };
+
+                await voucherService.save(voucherData);
+                successCount++;
+            } catch (err: any) {
+                const errorMsg = `CT ${v.doc_no}: ${err.response?.data?.error || err.message}`;
+                errors.push(errorMsg);
+            }
+        }
+
+        setBatchImporting(false);
+        setBatchImportProgress(prev => ({ ...prev, errors }));
+
+        // Show result
+        if (errors.length === 0) {
+            alert(`Nhập thành công ${successCount} chứng từ!`);
+        } else {
+            alert(`Nhập ${successCount}/${vouchers.length} chứng từ.\n\nLỗi:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...và ${errors.length - 5} lỗi khác` : ''}`);
+        }
+
+        handleRefresh();
+        setShowStagingArea(false);
+    }, []);
 
     // Print handler
     useSimplePrint(printSignal || 0, 'Tổng hợp', { allowBrowserPrint: true });
@@ -92,7 +154,7 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
 
     // Set Header Logic
     useEffect(() => {
-        if (subView.startsWith('fund_')) return; // Delegate to FundSourceModule
+        // FundSourceModule removed - không dùng cho Doanh nghiệp
         if (onSetHeader) {
             let title = 'Tổng hợp';
             let icon = 'account_balance_wallet';
@@ -181,7 +243,7 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
             )}
 
             {/* Main Content Area (Sub Views) */}
-            <div className={`flex-1 overflow-auto bg-slate-50 dark:bg-slate-900 relative ${isOverview ? 'hidden' : ''}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden relative ${isOverview ? 'hidden' : ''}`}>
 
                 {/* Vouchers List View */}
                 {subView === 'voucher_list' && (
@@ -225,8 +287,7 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
                 {subView === 'locking' && <PeriodLock onClose={onCloseModal} onRefresh={handleRefresh} />}
                 {subView === 'check' && <Reconciliation onClose={onCloseModal} />}
 
-                {/* Budget Management (Merged from HCSN Module) */}
-                {subView.startsWith('fund_') && <FundSourceModule subView={subView.replace('fund_', '')} onSetHeader={onSetHeader} />}
+                {/* FundSourceModule removed - không dùng cho Doanh nghiệp */}
 
                 {/* Master Data Views */}
                 {subView === 'cost_item' && <CostItemTable type={costType} refreshSignal={refreshSignal} />}
@@ -240,12 +301,37 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
             {showStagingArea && (
                 <StagingArea
                     onClose={() => setShowStagingArea(false)}
+                    mode="auto"
                     onImport={(lines) => {
-                        console.log('Imported lines:', lines);
+                        // Single mode: Store imported lines and open voucher form
+                        setImportedLines(lines);
                         setShowStagingArea(false);
-                        handleRefresh();
+                        setEditingVoucherId(undefined); // New voucher
+                        setShowVoucherModal(true);
                     }}
+                    onBatchImport={handleBatchImport}
                 />
+            )}
+
+            {/* Batch Import Progress Overlay */}
+            {batchImporting && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-2xl text-center max-w-md">
+                        <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            Đang nhập chứng từ...
+                        </p>
+                        <p className="text-2xl font-mono text-purple-600 mt-2">
+                            {batchImportProgress.current} / {batchImportProgress.total}
+                        </p>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-4">
+                            <div
+                                className="bg-purple-600 h-2 rounded-full transition-all"
+                                style={{ width: `${(batchImportProgress.current / batchImportProgress.total) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {showPostingModal && selectedRow && (
@@ -268,13 +354,16 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-[95vw] h-[90vh] max-w-7xl overflow-hidden flex flex-col">
                         <GeneralVoucherForm
                             id={editingVoucherId}
+                            initialLines={importedLines || undefined}
                             onClose={() => {
                                 setShowVoucherModal(false);
                                 setEditingVoucherId(undefined);
+                                setImportedLines(null);
                             }}
                             onSuccess={() => {
                                 setShowVoucherModal(false);
                                 setEditingVoucherId(undefined);
+                                setImportedLines(null);
                                 handleRefresh();
                             }}
                         />

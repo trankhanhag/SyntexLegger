@@ -1,12 +1,13 @@
 /**
  * Partners Component
- * SyntexHCSN - Quản lý Đối tác với chức năng nhập Excel
+ * SyntexLegger - Quản lý Đối tác với chức năng nhập Excel
  */
 
 import React, { useRef } from 'react';
 import { SmartTable, type ColumnDef } from '../SmartTable';
 import { masterDataService } from '../../api';
 import { ExcelImportModal, type ColumnDef as ImportColumnDef } from '../ExcelImportModal';
+import { PARTNER_TEMPLATE } from '../../utils/excelTemplates';
 
 interface PartnersProps {
     onSelectionChange?: (v: any) => void;
@@ -278,6 +279,7 @@ export const Partners: React.FC<PartnersProps> = ({
                     validate={validatePartner}
                     templateFileName="danh_muc_doi_tac"
                     description="Nhập danh sách đối tác từ file Excel. Các đối tác đã tồn tại sẽ được cập nhật."
+                    enhancedTemplate={PARTNER_TEMPLATE}
                 />
             )}
         </div>

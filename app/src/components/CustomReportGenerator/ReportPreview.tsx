@@ -9,6 +9,7 @@ import type { SavedTemplate } from './index';
 import { SmartTable, type ColumnDef } from '../SmartTable';
 import { formatNumber } from '../../utils/format';
 import { toInputDateValue } from '../../utils/dateUtils';
+import { triggerBrowserPrint } from '../../hooks/usePrintHandler';
 
 interface ReportPreviewProps {
     template?: SavedTemplate | null;
@@ -116,7 +117,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
     };
 
     const handlePrint = () => {
-        window.print();
+        triggerBrowserPrint();
     };
 
     // Build SmartTable columns

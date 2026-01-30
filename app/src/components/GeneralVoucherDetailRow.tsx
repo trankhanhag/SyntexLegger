@@ -34,6 +34,7 @@ interface GeneralVoucherDetailRowProps {
     issue: any;
     effectiveShowAdvanced: boolean;
     visibleDimTypes: number[];
+    mandatoryDimIds?: Set<number>;
     isLocked: boolean;
 }
 
@@ -55,6 +56,7 @@ export const GeneralVoucherDetailRow = React.memo(({
     issue,
     effectiveShowAdvanced,
     visibleDimTypes,
+    mandatoryDimIds = new Set(),
     isLocked
 }: GeneralVoucherDetailRowProps) => {
 
@@ -343,21 +345,32 @@ export const GeneralVoucherDetailRow = React.memo(({
                     </td>
 
                     {/* DIMS */}
-                    {visibleDimTypes.map(type => (
-                        <td key={`dim-${idx}-${type}`} className="px-2 py-1">
-                            <select
-                                value={line[`dim${type}`] || ''}
-                                onChange={(e) => onChange(idx, `dim${type}`, e.target.value)}
-                                disabled={isLocked}
-                                className={`w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-1 ${missingDims.includes(type) ? 'bg-red-50 text-red-600' : ''}`}
-                            >
-                                <option value="">--</option>
-                                {(dimOptions[type] || []).map((d: any) => (
-                                    <option key={d.id || d.code} value={d.code}>{d.code} {d.name ? `- ${d.name}` : ''}</option>
-                                ))}
-                            </select>
-                        </td>
-                    ))}
+                    {visibleDimTypes.map(type => {
+                        const isMandatory = mandatoryDimIds.has(type);
+                        const dimValue = line[`dim${type}`] || '';
+                        const isMissingMandatory = isMandatory && !dimValue;
+                        return (
+                            <td key={`dim-${idx}-${type}`} className="px-2 py-1">
+                                <select
+                                    value={dimValue}
+                                    onChange={(e) => onChange(idx, `dim${type}`, e.target.value)}
+                                    disabled={isLocked}
+                                    className={`w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-1 ${
+                                        isMissingMandatory
+                                            ? 'bg-red-50 dark:bg-red-900/20 text-red-600 ring-1 ring-red-300'
+                                            : missingDims.includes(type)
+                                                ? 'bg-red-50 text-red-600'
+                                                : ''
+                                    }`}
+                                >
+                                    <option value="">{isMandatory ? '-- * --' : '--'}</option>
+                                    {(dimOptions[type] || []).map((d: any) => (
+                                        <option key={d.id || d.code} value={d.code}>{d.code} {d.name ? `- ${d.name}` : ''}</option>
+                                    ))}
+                                </select>
+                            </td>
+                        );
+                    })}
                 </>
             )}
 

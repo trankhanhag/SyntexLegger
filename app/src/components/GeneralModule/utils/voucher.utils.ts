@@ -1,6 +1,6 @@
 /**
  * Voucher Utility Functions
- * SyntexHCSN - Helper functions for voucher operations
+ * SyntexLegger - Helper functions for voucher operations
  *
  * NOTE: Number/Currency formatting is re-exported from central utils/format.ts
  * for consistency across the application.
@@ -146,7 +146,7 @@ export function getVoucherTypeColor(type: string): string {
  */
 export function isValidAccountCode(code: string): boolean {
     if (!code || typeof code !== 'string') return false;
-    // Tài khoản HCSN thường có 3-4 ký tự số
+    // Tài khoản DN thường có 3-4 ký tự số
     return /^[0-9]{3,4}[A-Z0-9]?$/.test(code);
 }
 

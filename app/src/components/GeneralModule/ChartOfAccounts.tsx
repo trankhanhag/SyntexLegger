@@ -1,12 +1,13 @@
 /**
  * ChartOfAccounts Component
- * SyntexHCSN - Hệ thống Tài khoản với chức năng nhập Excel
+ * SyntexLegger - Hệ thống Tài khoản với chức năng nhập Excel
  */
 
 import React, { useRef } from 'react';
 import { SmartTable, type ColumnDef } from '../SmartTable';
 import { masterDataService } from '../../api';
 import { ExcelImportModal, type ColumnDef as ImportColumnDef } from '../ExcelImportModal';
+import { ACCOUNT_TEMPLATE } from '../../utils/excelTemplates';
 
 interface ChartOfAccountsProps {
     onSelectionChange?: (v: any) => void;
@@ -192,6 +193,7 @@ export const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({
                     validate={validateAccount}
                     templateFileName="he_thong_tai_khoan"
                     description="Nhập danh sách tài khoản từ file Excel. Các tài khoản đã tồn tại sẽ được cập nhật."
+                    enhancedTemplate={ACCOUNT_TEMPLATE}
                 />
             )}
         </div>

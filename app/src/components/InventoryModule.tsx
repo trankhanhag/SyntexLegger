@@ -3,13 +3,15 @@ import { SmartTable, type ColumnDef } from './SmartTable';
 import { type RibbonAction } from './Ribbon';
 import { FormModal } from './FormModal';
 import { PrintPreviewModal } from './PrintTemplates';
-import { settingsService } from '../api';
+import { ExcelImportModal, type ColumnDef as ImportColumnDef } from './ExcelImportModal';
+import { settingsService, inventoryService, API_URL } from '../api';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
+import { MATERIAL_TEMPLATE } from '../utils/excelTemplates';
 
 /**
- * Inventory Module for HCSN
- * Quản lý Kho vật tư theo TT 24/2024/TT-BTC
+ * Inventory Module
+ * Quản lý Kho vật tư theo TT 99/2025/TT-BTC
  */
 
 interface InventoryModuleProps {
@@ -146,9 +148,9 @@ const EditableItemTable: React.FC<EditableItemTableProps> = ({ items, setItems, 
                                             value={item.expense_account_code}
                                             onChange={e => handleChange(idx, 'expense_account_code', e.target.value)}
                                         >
-                                            <option value="611">611 - Hoạt động</option>
-                                            <option value="612">612 - Viện trợ</option>
-                                            <option value="613">613 - Mua sắm</option>
+                                            <option value="611">611 - Mua hàng</option>
+                                            <option value="627">627 - Chi phí SXC</option>
+                                            <option value="632">632 - Giá vốn hàng bán</option>
                                         </select>
                                     )}
                                 </td>
@@ -189,8 +191,8 @@ const MaterialFormModal = ({ material, onClose, onSave }: any) => {
     const handleSubmit = async () => {
         try {
             const url = material
-                ? `http://localhost:3000/api/hcsn/materials/${material.id}`
-                : 'http://localhost:3000/api/hcsn/materials';
+                ? `${API_URL}/hcsn/materials/${material.id}`
+                : `${API_URL}/hcsn/materials`;
             const method = material ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -303,7 +305,7 @@ const ReceiptFormModal = ({ onClose, onSave, initialData }: any) => {
     const [materials, setMaterials] = useState<any[]>([]);
 
     useEffect(() => {
-        fetch('http://localhost:3000/api/hcsn/materials', {
+        fetch(`${API_URL}/hcsn/materials`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => res.json())
@@ -312,7 +314,7 @@ const ReceiptFormModal = ({ onClose, onSave, initialData }: any) => {
 
         // If editing, fetch details to get items
         if (initialData?.id && (!initialData.items || initialData.items.length === 0)) {
-            fetch(`http://localhost:3000/api/hcsn/material-receipts/${initialData.id}`, {
+            fetch(`${API_URL}/hcsn/material-receipts/${initialData.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
@@ -328,8 +330,8 @@ const ReceiptFormModal = ({ onClose, onSave, initialData }: any) => {
     const handleSubmit = async (status: 'DRAFT' | 'POSTED') => {
         try {
             const url = initialData?.id
-                ? `http://localhost:3000/api/hcsn/material-receipts/${initialData.id}`
-                : 'http://localhost:3000/api/hcsn/material-receipts';
+                ? `${API_URL}/hcsn/material-receipts/${initialData.id}`
+                : `${API_URL}/hcsn/material-receipts`;
             const method = initialData?.id ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -375,16 +377,16 @@ const ReceiptFormModal = ({ onClose, onSave, initialData }: any) => {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-bold mb-1">Nguồn kinh phí</label>
+                        <label className="block text-sm font-bold mb-1">Bộ phận sử dụng</label>
                         <select
                             className="w-full px-3 py-2 border rounded"
                             value={formData.fund_source_id}
                             onChange={e => setFormData({ ...formData, fund_source_id: e.target.value })}
                         >
 
-                            <option value="fs_ns">Ngân sách Nhà nước</option>
-                            <option value="fs_phi">Nguồn thu phí, lệ phí</option>
-                            <option value="fs_vien_tro">Nguồn viện trợ</option>
+                            <option value="dept_sx">Bộ phận Sản xuất</option>
+                            <option value="dept_bh">Bộ phận Bán hàng</option>
+                            <option value="dept_vp">Văn phòng / Quản lý</option>
                         </select>
                     </div>
                     <div>
@@ -453,7 +455,7 @@ const IssueFormModal = ({ onClose, onSave, initialData }: any) => {
     const [materials, setMaterials] = useState<any[]>([]);
 
     useEffect(() => {
-        fetch('http://localhost:3000/api/hcsn/materials', {
+        fetch(`${API_URL}/hcsn/materials`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => res.json())
@@ -461,7 +463,7 @@ const IssueFormModal = ({ onClose, onSave, initialData }: any) => {
             .catch(err => console.error(err));
 
         if (initialData?.id && (!initialData.items || initialData.items.length === 0)) {
-            fetch(`http://localhost:3000/api/hcsn/material-issues/${initialData.id}`, {
+            fetch(`${API_URL}/hcsn/material-issues/${initialData.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
@@ -477,8 +479,8 @@ const IssueFormModal = ({ onClose, onSave, initialData }: any) => {
     const handleSubmit = async (status: 'DRAFT' | 'POSTED') => {
         try {
             const url = initialData?.id
-                ? `http://localhost:3000/api/hcsn/material-issues/${initialData.id}`
-                : 'http://localhost:3000/api/hcsn/material-issues';
+                ? `${API_URL}/hcsn/material-issues/${initialData.id}`
+                : `${API_URL}/hcsn/material-issues`;
             const method = initialData?.id ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -593,7 +595,7 @@ const TransferFormModal = ({ onClose, onSave, initialData }: any) => {
     const [materials, setMaterials] = useState<any[]>([]);
 
     useEffect(() => {
-        fetch('http://localhost:3000/api/hcsn/materials', {
+        fetch(`${API_URL}/hcsn/materials`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => res.json())
@@ -601,7 +603,7 @@ const TransferFormModal = ({ onClose, onSave, initialData }: any) => {
             .catch(err => console.error(err));
 
         if (initialData?.id && (!initialData.items || initialData.items.length === 0)) {
-            fetch(`http://localhost:3000/api/hcsn/material-transfers/${initialData.id}`, {
+            fetch(`${API_URL}/hcsn/material-transfers/${initialData.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
@@ -626,8 +628,8 @@ const TransferFormModal = ({ onClose, onSave, initialData }: any) => {
 
         try {
             const url = initialData?.id
-                ? `http://localhost:3000/api/hcsn/material-transfers/${initialData.id}`
-                : 'http://localhost:3000/api/hcsn/material-transfers';
+                ? `${API_URL}/hcsn/material-transfers/${initialData.id}`
+                : `${API_URL}/hcsn/material-transfers`;
             const method = initialData?.id ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -726,7 +728,7 @@ const InventoryCardModal = ({ material, onClose }: any) => {
 
     useEffect(() => {
         if (material) {
-            fetch(`http://localhost:3000/api/hcsn/inventory/cards/${material.material_id || material.id}`, {
+            fetch(`${API_URL}/hcsn/inventory/cards/${material.material_id || material.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
@@ -741,7 +743,7 @@ const InventoryCardModal = ({ material, onClose }: any) => {
                 <table className="w-full text-sm border-collapse border">
                     <thead className="bg-slate-100">
                         <tr>
-                            <th className="border p-2">Nguồn kinh phí</th>
+                            <th className="border p-2">Bộ phận</th>
                             <th className="border p-2">Kho</th>
                             <th className="border p-2 text-right">Tồn đầu</th>
                             <th className="border p-2 text-right">Nhập</th>
@@ -787,6 +789,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [showMaterialModal, setShowMaterialModal] = useState(false);
+    const [showMaterialImport, setShowMaterialImport] = useState(false);
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [showIssueModal, setShowIssueModal] = useState(false);
     const [showTransferModal, setShowTransferModal] = useState(false);
@@ -808,9 +811,49 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
     const [selectedCardMaterial, setSelectedCardMaterial] = useState<any>(null);
     const [selectedRow, setSelectedRow] = useState<any>(null);
 
+    // Print record state - holds detailed record with items for printing
+    const [printRecord, setPrintRecord] = useState<any>(null);
+    const lastPrintSignalRef = React.useRef(0); // Track last handled print signal
+
+    // Fetch detail with items for printing
+    const fetchDetailForPrint = async (record: any) => {
+        if (!record?.id) return null;
+
+        try {
+            let url = '';
+            if (view === 'receipts' || view === 'receipt') {
+                url = `${API_URL}/hcsn/material-receipts/${record.id}`;
+            } else if (view === 'issues' || view === 'issue') {
+                url = `${API_URL}/hcsn/material-issues/${record.id}`;
+            } else if (view === 'transfers' || view === 'transfer') {
+                url = `${API_URL}/hcsn/material-transfers/${record.id}`;
+            }
+
+            if (!url) return record; // Return original if no detail endpoint
+
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+
+            if (!res.ok) {
+                console.warn('Failed to fetch detail for print, using list data');
+                return record;
+            }
+
+            const detail = await res.json();
+            return detail;
+        } catch (err) {
+            console.error('Error fetching detail for print:', err);
+            return record;
+        }
+    };
+
     // Handle print signal from Ribbon
     useEffect(() => {
-        if (printSignal > 0) {
+        // Only respond to NEW print signals, not when other dependencies change
+        if (printSignal > 0 && printSignal !== lastPrintSignalRef.current) {
+            lastPrintSignalRef.current = printSignal;
+
             // Only allow printing for voucher views (receipts, issues, transfers)
             const printableViews = ['receipts', 'receipt', 'issues', 'issue', 'transfers', 'transfer'];
             if (!printableViews.includes(view)) {
@@ -823,7 +866,11 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                 return;
             }
 
-            setShowPrintPreview(true);
+            // Fetch full detail with items before printing
+            fetchDetailForPrint(selectedRow).then(detail => {
+                setPrintRecord(detail);
+                setShowPrintPreview(true);
+            });
         }
     }, [printSignal, view, selectedRow]);
 
@@ -836,16 +883,16 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
         try {
             let url = '';
             if (view === 'materials') {
-                url = 'http://localhost:3000/api/hcsn/materials';
+                url = `${API_URL}/hcsn/materials`;
             } else if (view === 'receipts' || view === 'receipt') {
-                url = 'http://localhost:3000/api/hcsn/material-receipts';
+                url = `${API_URL}/hcsn/material-receipts`;
             } else if (view === 'issues' || view === 'issue') {
-                url = 'http://localhost:3000/api/hcsn/material-issues';
+                url = `${API_URL}/hcsn/material-issues`;
             } else if (view === 'transfers' || view === 'transfer') {
-                url = 'http://localhost:3000/api/hcsn/material-transfers';
+                url = `${API_URL}/hcsn/material-transfers`;
             } else if (view === 'summary') {
                 const year = new Date().getFullYear();
-                url = `http://localhost:3000/api/hcsn/inventory/summary?fiscal_year=${year}`;
+                url = `${API_URL}/hcsn/inventory/summary?fiscal_year=${year}`;
             }
 
             if (!url) {
@@ -874,6 +921,32 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
         fetchData();
     }, [view]);
 
+    // Handle Material Excel Import
+    const handleMaterialImport = async (importedData: any[]) => {
+        try {
+            const res = await inventoryService.importMaterials(importedData);
+            if (res.data.success) {
+                alert(`Nhập vật tư thành công!\n- Thêm mới: ${res.data.inserted || 0}\n- Cập nhật: ${res.data.updated || 0}`);
+                fetchData(); // Refresh data
+            } else {
+                throw new Error(res.data.error || 'Import failed');
+            }
+        } catch (err: any) {
+            console.error('Import materials failed:', err);
+            throw new Error(err.response?.data?.error || err.message || 'Lỗi khi nhập vật tư');
+        }
+    };
+
+    // Validate Material Import Row
+    const validateMaterialImport = (row: any, allRows: any[]): string | null => {
+        // Check for duplicate codes within import file
+        const duplicates = allRows.filter(r => r.code === row.code);
+        if (duplicates.length > 1) {
+            return `Mã vật tư "${row.code}" bị trùng trong file`;
+        }
+        return null;
+    };
+
     useEffect(() => {
         if (onSetHeader) {
             const getTitle = () => {
@@ -901,6 +974,11 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                     },
                     primary: true
                 });
+                actions.push({
+                    label: 'Nhập Excel',
+                    icon: 'upload_file',
+                    onClick: () => setShowMaterialImport(true)
+                });
             } else if (view === 'receipts') {
                 actions.push({
                     label: 'Nhập kho mới',
@@ -917,7 +995,12 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                     actions.push({
                         label: 'In phiếu',
                         icon: 'print',
-                        onClick: () => setShowPrintPreview(true)
+                        onClick: () => {
+                            fetchDetailForPrint(selectedRow).then(detail => {
+                                setPrintRecord(detail);
+                                setShowPrintPreview(true);
+                            });
+                        }
                     });
                 }
             } else if (view === 'issues') {
@@ -936,7 +1019,12 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                     actions.push({
                         label: 'In phiếu',
                         icon: 'print',
-                        onClick: () => setShowPrintPreview(true)
+                        onClick: () => {
+                            fetchDetailForPrint(selectedRow).then(detail => {
+                                setPrintRecord(detail);
+                                setShowPrintPreview(true);
+                            });
+                        }
                     });
                 }
             } else if (view === 'transfers') {
@@ -1000,7 +1088,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
     const receiptCols: ColumnDef[] = [
         { field: 'receipt_no', headerName: 'Số phiếu', width: 'w-36', align: 'center' },
         { field: 'receipt_date', headerName: 'Ngày nhập', width: 'w-32', type: 'date' },
-        { field: 'fund_source_name', headerName: 'Nguồn kinh phí', width: 'w-48' },
+        { field: 'fund_source_name', headerName: 'Bộ phận', width: 'w-48' },
         { field: 'supplier', headerName: 'Nhà cung cấp', width: 'flex-1' },
         { field: 'warehouse', headerName: 'Kho', width: 'w-32' },
         { field: 'total_amount', headerName: 'Tổng tiền', width: 'w-40', align: 'right', renderCell: (v) => <span className="font-mono font-bold">{formatNumber(v)}</span> }
@@ -1026,7 +1114,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
     const summaryCols: ColumnDef[] = [
         { field: 'material_code', headerName: 'Mã VT', width: 'w-32' },
         { field: 'material_name', headerName: 'Tên vật tư', width: 'flex-1' },
-        { field: 'fund_source_name', headerName: 'Nguồn KP', width: 'w-40' },
+        { field: 'fund_source_name', headerName: 'Bộ phận', width: 'w-40' },
         { field: 'opening_qty', headerName: 'Tồn đầu', width: 'w-28', align: 'right', renderCell: (v) => formatNumber(v) },
         { field: 'receipts_qty', headerName: 'Nhập', width: 'w-28', align: 'right', renderCell: (v) => <span className="text-blue-600">+{formatNumber(v)}</span> },
         { field: 'issues_qty', headerName: 'Xuất', width: 'w-28', align: 'right', renderCell: (v) => <span className="text-red-600">-{formatNumber(v)}</span> },
@@ -1130,14 +1218,101 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                 />
             )}
 
-            {showPrintPreview && selectedRow && (
+            {showPrintPreview && printRecord && (
                 <PrintPreviewModal
-                    record={selectedRow}
+                    record={printRecord}
                     view={view === 'receipts' ? 'RECEIPT' : view === 'issues' ? 'ISSUE' : 'TRANSFER'}
-                    onClose={() => setShowPrintPreview(false)}
+                    onClose={() => {
+                        setShowPrintPreview(false);
+                        setPrintRecord(null);
+                    }}
                     companyInfo={companyInfo}
+                />
+            )}
+
+            {/* Material Excel Import Modal */}
+            {showMaterialImport && (
+                <ExcelImportModal
+                    title="Nhập Danh mục Vật tư từ Excel"
+                    columns={MATERIAL_IMPORT_COLUMNS}
+                    onClose={() => setShowMaterialImport(false)}
+                    onImport={handleMaterialImport}
+                    validate={validateMaterialImport}
+                    templateFileName="danh_muc_vat_tu"
+                    description="Nhập danh sách vật tư từ file Excel. Các vật tư đã tồn tại sẽ được cập nhật."
+                    enhancedTemplate={MATERIAL_TEMPLATE}
                 />
             )}
         </div>
     );
 };
+
+// Import columns definition for Materials
+const MATERIAL_IMPORT_COLUMNS: ImportColumnDef[] = [
+    {
+        key: 'code',
+        label: 'Mã vật tư',
+        required: true,
+        aliases: ['ma', 'ma vat tu', 'material_code', 'code'],
+        width: '15',
+    },
+    {
+        key: 'name',
+        label: 'Tên vật tư',
+        required: true,
+        aliases: ['ten', 'ten vat tu', 'material_name', 'name'],
+        width: '30',
+    },
+    {
+        key: 'category',
+        label: 'Loại',
+        required: false,
+        aliases: ['loai', 'phan loai', 'nhom', 'type', 'category'],
+        width: '15',
+    },
+    {
+        key: 'unit',
+        label: 'ĐVT',
+        required: false,
+        aliases: ['don vi', 'dvt', 'don vi tinh', 'unit'],
+        width: '10',
+    },
+    {
+        key: 'unit_price',
+        label: 'Đơn giá',
+        required: false,
+        type: 'number',
+        aliases: ['don gia', 'gia', 'price', 'unit_price'],
+        width: '15',
+    },
+    {
+        key: 'account_code',
+        label: 'TK kế toán',
+        required: false,
+        aliases: ['tai khoan', 'tk', 'account', 'tk ke toan'],
+        width: '10',
+    },
+    {
+        key: 'min_stock',
+        label: 'Tồn tối thiểu',
+        required: false,
+        type: 'number',
+        aliases: ['ton toi thieu', 'min', 'min_stock'],
+        width: '12',
+    },
+    {
+        key: 'max_stock',
+        label: 'Tồn tối đa',
+        required: false,
+        type: 'number',
+        aliases: ['ton toi da', 'max', 'max_stock'],
+        width: '12',
+    },
+    {
+        key: 'notes',
+        label: 'Ghi chú',
+        required: false,
+        aliases: ['ghi chu', 'mo ta', 'description', 'notes'],
+        width: '25',
+    },
+];

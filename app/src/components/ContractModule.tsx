@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { SmartTable, type ColumnDef } from './SmartTable';
-import { contractService, hcsnService } from '../api';
+import { contractService, masterDataService } from '../api';
 import { type RibbonAction } from './Ribbon';
 import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
 import { toInputDateValue } from '../utils/dateUtils';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
-import { useSimplePrint } from '../hooks/usePrintHandler';
+import { useSimplePrint, triggerBrowserPrint } from '../hooks/usePrintHandler';
 
 interface ContractModuleProps {
     subView?: string;
@@ -51,7 +51,7 @@ export const ContractModule: React.FC<ContractModuleProps> = ({ subView = 'sales
                 {
                     label: 'In danh sách',
                     icon: 'print',
-                    onClick: () => window.print()
+                    onClick: () => triggerBrowserPrint()
                 }
             ];
             onSetHeader({ title: info.title, icon: info.icon, actions, onDelete: handleDeleteSelected });
@@ -240,8 +240,6 @@ const Modal = ({ title, onClose, widthClass = "max-w-4xl", children }: { title: 
 const ContractFormModal = ({ onClose, type, onSave }: { onClose: () => void, type: 'sales' | 'purchase', onSave: () => void }) => {
     const [loading, setLoading] = useState(false);
     const [partners, setPartners] = useState<any[]>([]);
-    const [fundSources, setFundSources] = useState<any[]>([]);
-    const [budgetEstimates, setBudgetEstimates] = useState<any[]>([]);
     const [formData, setFormData] = useState({
         code: '',
         name: '',
@@ -251,10 +249,8 @@ const ContractFormModal = ({ onClose, type, onSave }: { onClose: () => void, typ
         value: 0,
         type: type,
         status: 'Đang thực hiện',
-        // HCSN fields
+        // Contract fields
         contract_type: type === 'sales' ? 'SERVICE' : 'PROCUREMENT',
-        fund_source_id: '',
-        budget_estimate_id: '',
         approval_no: '',
         approval_date: '',
         payment_method: 'TRANSFER',
@@ -264,18 +260,8 @@ const ContractFormModal = ({ onClose, type, onSave }: { onClose: () => void, typ
     });
 
     useEffect(() => {
-        // Fetch partners, fund sources, and budget estimates
-        import('../api').then(({ masterDataService }) => {
-            masterDataService.getPartners().then(res => setPartners(res.data || [])).catch(err => console.error('Error loading partners:', err));
-        });
-        hcsnService.getFundSources().then(res => {
-            const d = res.data;
-            setFundSources(Array.isArray(d) ? d : (d?.data || []));
-        }).catch(err => console.error('Error loading fund sources:', err));
-        hcsnService.getBudgetEstimates().then(res => {
-            const d = res.data;
-            setBudgetEstimates(Array.isArray(d) ? d : (d?.data || []));
-        }).catch(err => console.error('Error loading budget estimates:', err));
+        // Fetch partners
+        masterDataService.getPartners().then(res => setPartners(res.data || [])).catch(err => console.error('Error loading partners:', err));
     }, []);
 
     const handleSave = async () => {
@@ -296,7 +282,7 @@ const ContractFormModal = ({ onClose, type, onSave }: { onClose: () => void, typ
     };
 
     return (
-        <Modal title={`Lập Hợp đồng ${type === 'sales' ? 'Bán ra' : 'Mua vào'} mới (HCSN)`} onClose={onClose} widthClass="max-w-5xl">
+        <Modal title={`Lập Hợp đồng ${type === 'sales' ? 'Bán ra' : 'Mua vào'} mới`} onClose={onClose} widthClass="max-w-5xl">
             <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -337,33 +323,15 @@ const ContractFormModal = ({ onClose, type, onSave }: { onClose: () => void, typ
                         </div>
                     </div>
                     <div className="space-y-4">
-                        {/* HCSN Fields */}
+                        {/* Contract Fields */}
                         <div>
-                            <label className="form-label">Loại hợp đồng HCSN</label>
+                            <label className="form-label">Loại hợp đồng</label>
                             <select className="form-select" value={formData.contract_type} onChange={e => setFormData({ ...formData, contract_type: e.target.value })}>
                                 <option value="PROCUREMENT">Mua sắm</option>
                                 <option value="SERVICE">Dịch vụ</option>
                                 <option value="CONSTRUCTION">Xây dựng</option>
                                 <option value="CONSULTING">Tư vấn</option>
                                 <option value="OTHER">Khác</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="form-label">Nguồn kinh phí</label>
-                            <select className="form-select" value={formData.fund_source_id} onChange={e => setFormData({ ...formData, fund_source_id: e.target.value })}>
-                                <option value="">-- Chọn nguồn kinh phí --</option>
-                                {fundSources.map(fs => (
-                                    <option key={fs.id} value={fs.id}>{fs.code} - {fs.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="form-label">Dự toán ngân sách</label>
-                            <select className="form-select" value={formData.budget_estimate_id} onChange={e => setFormData({ ...formData, budget_estimate_id: e.target.value })}>
-                                <option value="">-- Chọn dự toán --</option>
-                                {budgetEstimates.map(be => (
-                                    <option key={be.id} value={be.id}>{be.category_code} - {be.category_name}</option>
-                                ))}
                             </select>
                         </div>
                         <div>

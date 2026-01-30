@@ -1,6 +1,6 @@
 /**
  * GeneralModule Hooks
- * SyntexHCSN - Export all custom hooks
+ * SyntexLegger - Export all custom hooks
  */
 
 export { useVouchers, type UseVouchersReturn, type MasterData } from './useVouchers';

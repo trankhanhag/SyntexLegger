@@ -1,6 +1,6 @@
 /**
  * Voucher Types & Interfaces
- * SyntexHCSN - Frontend
+ * SyntexLegger - Frontend
  */
 
 export interface VoucherLine {

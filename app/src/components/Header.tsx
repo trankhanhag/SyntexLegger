@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 
+interface HeaderProps {
+    onSearch?: () => void;
+}
 
-export const Header: React.FC = () => {
+export const Header: React.FC<HeaderProps> = ({ onSearch }) => {
     const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
     const fileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -118,7 +121,7 @@ export const Header: React.FC = () => {
     };
 
     const handleAbout = () => {
-        alert("SyntexHCSN - SaaS MVP\nPhiên bản: 1.0.0\nPhát triển bởi: Team AI");
+        alert("SyntexLegger - Phần mềm Kế toán Doanh nghiệp\nPhiên bản: 1.0.0\nTheo TT 99/2025/TT-BTC");
         setIsHelpMenuOpen(false);
     };
 
@@ -137,16 +140,16 @@ export const Header: React.FC = () => {
                     <div className="size-8 bg-blue-600 rounded flex items-center justify-center text-white">
                         <span className="material-symbols-outlined text-[20px]">table_view</span>
                     </div>
-                    <h2 className="text-xl font-bold leading-tight tracking-[-0.015em]">SyntexHCSN</h2>
-                    <div className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full text-[10px] font-black tracking-tighter uppercase border border-blue-200 dark:border-blue-800 ml-1">
-                        PHÂN HỆ HCSN
+                    <h2 className="text-xl font-bold leading-tight tracking-[-0.015em]">SyntexLegger</h2>
+                    <div className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full text-[10px] font-black tracking-tighter uppercase border border-green-200 dark:border-green-800 ml-1">
+                        DOANH NGHIỆP
                     </div>
                 </div>
                 <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                 <div className="flex gap-4 relative items-center">
                     <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 mr-2">
-                        <span className="material-symbols-outlined text-[16px] text-blue-600">verified_user</span>
-                        <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">TT 24/2024/TT-BTC</span>
+                        <span className="material-symbols-outlined text-[16px] text-green-600">verified_user</span>
+                        <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">TT 99/2025/TT-BTC</span>
                     </div>
                     <div ref={fileMenuRef} className="relative">
                         <button
@@ -298,11 +301,17 @@ export const Header: React.FC = () => {
                 </div>
             </div>
             <div className="flex items-center gap-4">
-                <label className="flex items-center relative min-w-40 h-8">
-
+                <button
+                    onClick={onSearch}
+                    className="flex items-center relative min-w-48 h-8 rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer group"
+                    title="Tìm kiếm chức năng (Ctrl+K)"
+                >
                     <span className="absolute left-2.5 text-slate-400 material-symbols-outlined text-[18px]">search</span>
-                    <input className="form-input flex w-full rounded-md text-slate-900 dark:text-white focus:outline-0 focus:ring-1 ring-primary/50 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 h-full placeholder:text-slate-400 pl-9 pr-3 text-sm font-normal" placeholder="Tìm kiếm..." />
-                </label>
+                    <span className="pl-9 pr-3 text-sm text-slate-400 group-hover:text-slate-500">Tìm kiếm...</span>
+                    <kbd className="hidden sm:flex items-center gap-0.5 absolute right-2 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-slate-200/70 dark:bg-slate-700 rounded">
+                        <span className="text-[9px]">⌘</span>K
+                    </kbd>
+                </button>
                 <div className="flex items-center gap-2">
                     {/* Dark Mode Toggle Button */}
                     <button

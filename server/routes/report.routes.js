@@ -1,15 +1,131 @@
 /**
  * Reporting Routes
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
-const hcsnReports = require('../hcsn_reports_apis');
+const dnReports = require('../dn_reports_apis');
+// Legacy HCSN reports (kept for reference)
+// const hcsnReports = require('../hcsn_reports_apis');
 
 const { verifyToken } = require('../middleware');
 
 module.exports = (db) => {
     const router = express.Router();
+
+    // ========================================
+    // TAX REPORTS
+    // ========================================
+
+    /**
+     * GET /api/reports/tax-declaration
+     * Tờ khai thuế (GTGT, TNCN, TNDN)
+     */
+    router.get('/reports/tax-declaration', verifyToken, (req, res) => {
+        const { type, from, to } = req.query;
+        const fromDate = from || new Date().toISOString().slice(0, 8) + '01';
+        const toDate = to || new Date().toISOString().slice(0, 10);
+
+        // Basic aggregation queries based on Account Codes
+        // Note: This is an approximation. Real tax reports need Invoice details.
+
+        if (type === 'vat') {
+            // VAT Calculation (01/GTGT)
+            // Input VAT: 133 (or 3113 in HCSN mapping if applicable, usually 133/333 in commercial view)
+            // Output VAT: 3331
+            const sql = `
+                SELECT 
+                    SUM(CASE WHEN account_code LIKE '133%' THEN debit_amount ELSE 0 END) as input_vat,
+                    SUM(CASE WHEN account_code LIKE '3331%' THEN credit_amount ELSE 0 END) as output_vat,
+                    SUM(CASE WHEN account_code LIKE '511%' OR account_code LIKE '531%' THEN credit_amount ELSE 0 END) as revenue
+                FROM general_ledger
+                WHERE trx_date >= ? AND trx_date <= ?
+            `;
+
+            db.get(sql, [fromDate, toDate], (err, row) => {
+                if (err) return res.status(400).json({ error: err.message });
+
+                const inputVAT = row?.input_vat || 0;
+                const outputVAT = row?.output_vat || 0;
+                const revenue = row?.revenue || 0;
+
+                res.json({
+                    // Input
+                    v23: revenue * 0.8, // Rough estimate of purchase value based on input VAT? No, just placeholder.
+                    v24: inputVAT,
+                    v25: inputVAT, // Assume all deductible
+
+                    // Output (All assumed 10% for simplicity if tax exists, ensuring balanced math)
+                    v32a: 0,
+                    v33: revenue + outputVAT,
+                    v34: revenue,
+                    v35: outputVAT,
+
+                    // Detailed breakdown (Put all in 10% [32] for now)
+                    v26: 0, v27: 0, v28: 0, v29: 0, v30: 0,
+                    v31: revenue,
+                    v32: outputVAT,
+
+                    // Adjustments
+                    v37: 0, v38: 0, v39: 0, v40a: 0, v42: 0
+                });
+            });
+
+        } else if (type === 'pit') {
+            // PIT Calculation (05/KK-TNCN)
+            // Tax: 3335
+            const sql = `
+                SELECT 
+                    SUM(CASE WHEN account_code LIKE '3335%' THEN credit_amount ELSE 0 END) as pit_tax
+                FROM general_ledger
+                WHERE trx_date >= ? AND trx_date <= ?
+            `;
+
+            db.get(sql, [fromDate, toDate], (err, row) => {
+                if (err) return res.status(400).json({ error: err.message });
+                const pit = row?.pit_tax || 0;
+
+                res.json({
+                    v21: 10, // Mock employee count
+                    v24: pit * 10, // Mock income (10% rate reverse calc)
+                    v30: pit
+                });
+            });
+
+        } else if (type === 'cit') {
+            // CIT Calculation (03/TNDN)
+            // Tax: 3334
+            const sql = `
+                SELECT 
+                    SUM(CASE WHEN account_code LIKE '3334%' THEN credit_amount ELSE 0 END) as cit_tax,
+                    SUM(CASE WHEN account_code LIKE '511%' OR account_code LIKE '531%' THEN credit_amount ELSE 0 END) as revenue,
+                    SUM(CASE WHEN account_code LIKE '6%' OR account_code LIKE '8%' THEN debit_amount ELSE 0 END) as expenses
+                FROM general_ledger
+                WHERE trx_date >= ? AND trx_date <= ?
+            `;
+
+            db.get(sql, [fromDate, toDate], (err, row) => {
+                if (err) return res.status(400).json({ error: err.message });
+                const revenue = row?.revenue || 0;
+                const expenses = row?.expenses || 0;
+                const profit = revenue - expenses;
+                const cit = row?.cit_tax || 0;
+
+                res.json({
+                    a1: revenue,
+                    b1: profit,
+                    b13: 0,
+                    b14: 0,
+                    c2: 0,
+                    c7: cit, // Standard rate tax
+                    c10: cit,
+                    g2: cit // Paid same as calculated for now
+                });
+            });
+        } else {
+            res.json({});
+        }
+    });
 
     // ========================================
     // STANDARD ACCOUNTING REPORTS
@@ -476,6 +592,8 @@ module.exports = (db) => {
         const { from, to, account_code } = req.query;
         let sql = `
             SELECT
+                vi.id as id,
+                v.id as voucher_id,
                 v.doc_date,
                 v.doc_no,
                 v.description as voucher_desc,
@@ -511,34 +629,207 @@ module.exports = (db) => {
     });
 
     // ========================================
-    // HCSN REPORTS (TT 24/2024/TT-BTC)
-    // Using handlers from hcsn_reports_apis.js
+    // BALANCE VERIFICATION REPORT
+    // Kiểm tra cân đối Nợ = Có theo kỳ
     // ========================================
 
-    // 1. Báo cáo Tình hình tài chính (B01-BCTC)
-    router.get('/reports/hcsn/b01-balance-sheet', verifyToken, hcsnReports.getBalanceSheetHCSN(db));
-    router.get('/reports/balance-sheet-hcsn', verifyToken, hcsnReports.getBalanceSheetHCSN(db));
+    /**
+     * GET /api/reports/balance-verification
+     * Check that total debits = total credits for a period
+     * Excludes off-balance sheet accounts (accounts starting with "0")
+     */
+    router.get('/reports/balance-verification', verifyToken, (req, res) => {
+        const { fromDate, toDate, period } = req.query;
 
-    // 2. Báo cáo Kết quả hoạt động (B02-BCTC)
-    router.get('/reports/hcsn/b02-activity-result', verifyToken, hcsnReports.getActivityResult(db));
-    router.get('/reports/activity-result', verifyToken, hcsnReports.getActivityResult(db));
+        // Build date conditions
+        let dateConditions = '';
+        const params = [];
 
-    // 3. Quyết toán (B03-BCQT)
-    router.get('/reports/hcsn/b03-settlement-rec', verifyToken, hcsnReports.getBudgetSettlementRegular(db));
-    router.get('/reports/budget-settlement-regular', verifyToken, hcsnReports.getBudgetSettlementRegular(db));
+        if (period) {
+            // Format: YYYY-MM
+            const [year, month] = period.split('-').map(Number);
+            const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+            const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // Last day of month
+            dateConditions = ' AND trx_date BETWEEN ? AND ?';
+            params.push(startDate, endDate);
+        } else if (fromDate && toDate) {
+            dateConditions = ' AND trx_date BETWEEN ? AND ?';
+            params.push(fromDate, toDate);
+        }
 
-    router.get('/reports/hcsn/b03-settlement-unrec', verifyToken, hcsnReports.getBudgetSettlementNonRegular(db));
-    router.get('/reports/budget-settlement-nonregular', verifyToken, hcsnReports.getBudgetSettlementNonRegular(db));
+        // Query 1: Overall balance check (excluding off-balance sheet accounts starting with "0")
+        const overallSql = `
+            SELECT
+                SUM(debit_amount) as total_debit,
+                SUM(credit_amount) as total_credit,
+                SUM(debit_amount) - SUM(credit_amount) as difference,
+                COUNT(*) as entry_count
+            FROM general_ledger
+            WHERE account_code NOT LIKE '0%' ${dateConditions}
+        `;
 
-    router.get('/reports/hcsn/b03-settlement-capex', verifyToken, hcsnReports.getBudgetSettlementCapex(db));
-    router.get('/reports/budget-settlement-capex', verifyToken, hcsnReports.getBudgetSettlementCapex(db));
+        // Query 2: Balance by voucher (to find unbalanced vouchers)
+        const byVoucherSql = `
+            SELECT
+                doc_no,
+                MIN(trx_date) as doc_date,
+                SUM(debit_amount) as total_debit,
+                SUM(credit_amount) as total_credit,
+                ABS(SUM(debit_amount) - SUM(credit_amount)) as difference
+            FROM general_ledger
+            WHERE account_code NOT LIKE '0%' ${dateConditions}
+            GROUP BY doc_no
+            HAVING ABS(SUM(debit_amount) - SUM(credit_amount)) > 0.01
+            ORDER BY difference DESC
+        `;
 
-    // 4. Báo cáo khác
-    router.get('/reports/hcsn/fund-sources', verifyToken, hcsnReports.getFundSourceReport(db));
-    router.get('/reports/hcsn/infrastructure', verifyToken, hcsnReports.getInfrastructureReport(db));
+        // Query 3: Off-balance sheet summary
+        const offBalanceSql = `
+            SELECT
+                account_code,
+                SUM(debit_amount) as total_debit,
+                SUM(credit_amount) as total_credit,
+                COUNT(*) as entry_count
+            FROM general_ledger
+            WHERE account_code LIKE '0%' ${dateConditions}
+            GROUP BY account_code
+            ORDER BY account_code
+        `;
 
-    router.get('/reports/hcsn/budget-performance', verifyToken, hcsnReports.getBudgetPerformance(db));
-    router.get('/reports/budget-performance', verifyToken, hcsnReports.getBudgetPerformance(db));
+        db.get(overallSql, params, (err, overall) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            db.all(byVoucherSql, params, (err, unbalancedVouchers) => {
+                if (err) return res.status(500).json({ error: err.message });
+
+                db.all(offBalanceSql, params, (err, offBalanceSheet) => {
+                    if (err) return res.status(500).json({ error: err.message });
+
+                    const tolerance = 0.01;
+                    const isBalanced = Math.abs(overall?.difference || 0) <= tolerance;
+
+                    res.json({
+                        period: period || `${fromDate || 'all'} - ${toDate || 'all'}`,
+                        summary: {
+                            is_balanced: isBalanced,
+                            total_debit: overall?.total_debit || 0,
+                            total_credit: overall?.total_credit || 0,
+                            difference: overall?.difference || 0,
+                            entry_count: overall?.entry_count || 0,
+                            status: isBalanced ? 'CÂN ĐỐI' : 'KHÔNG CÂN ĐỐI',
+                            message: isBalanced
+                                ? 'Tổng phát sinh Nợ = Tổng phát sinh Có (TK trong bảng)'
+                                : `Chênh lệch: ${Math.abs(overall?.difference || 0).toLocaleString('vi-VN')} VNĐ`
+                        },
+                        unbalanced_vouchers: unbalancedVouchers || [],
+                        off_balance_sheet: {
+                            note: 'Tài khoản ngoài bảng (TK bắt đầu bằng 0) - Ghi đơn, không áp dụng nguyên tắc Nợ = Có',
+                            accounts: offBalanceSheet || []
+                        }
+                    });
+                });
+            });
+        });
+    });
+
+    /**
+     * GET /api/reports/voucher-balance/:docNo
+     * Check balance for a specific voucher
+     */
+    router.get('/reports/voucher-balance/:docNo', verifyToken, (req, res) => {
+        const { docNo } = req.params;
+
+        const sql = `
+            SELECT
+                doc_no,
+                trx_date,
+                description,
+                account_code,
+                reciprocal_acc,
+                debit_amount,
+                credit_amount
+            FROM general_ledger
+            WHERE doc_no = ?
+            ORDER BY id
+        `;
+
+        const summarySql = `
+            SELECT
+                SUM(CASE WHEN account_code NOT LIKE '0%' THEN debit_amount ELSE 0 END) as total_debit,
+                SUM(CASE WHEN account_code NOT LIKE '0%' THEN credit_amount ELSE 0 END) as total_credit,
+                SUM(CASE WHEN account_code LIKE '0%' THEN debit_amount ELSE 0 END) as off_balance_debit,
+                SUM(CASE WHEN account_code LIKE '0%' THEN credit_amount ELSE 0 END) as off_balance_credit
+            FROM general_ledger
+            WHERE doc_no = ?
+        `;
+
+        db.all(sql, [docNo], (err, entries) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            db.get(summarySql, [docNo], (err, summary) => {
+                if (err) return res.status(500).json({ error: err.message });
+
+                const tolerance = 0.01;
+                const difference = (summary?.total_debit || 0) - (summary?.total_credit || 0);
+                const isBalanced = Math.abs(difference) <= tolerance;
+
+                res.json({
+                    doc_no: docNo,
+                    is_balanced: isBalanced,
+                    on_balance_sheet: {
+                        total_debit: summary?.total_debit || 0,
+                        total_credit: summary?.total_credit || 0,
+                        difference: difference,
+                        status: isBalanced ? 'CÂN ĐỐI' : 'KHÔNG CÂN ĐỐI'
+                    },
+                    off_balance_sheet: {
+                        total_debit: summary?.off_balance_debit || 0,
+                        total_credit: summary?.off_balance_credit || 0,
+                        note: 'TK ngoài bảng - Ghi đơn'
+                    },
+                    entries: entries || []
+                });
+            });
+        });
+    });
+
+    // ========================================
+    // DN REPORTS (TT 99/2025/TT-BTC)
+    // Using handlers from dn_reports_apis.js
+    // ========================================
+
+    // 1. Bảng Cân đối Kế toán (B01-DN)
+    router.get('/reports/balance-sheet-dn', verifyToken, dnReports.getBalanceSheetDN(db));
+    router.get('/reports/dn/b01-balance-sheet', verifyToken, dnReports.getBalanceSheetDN(db));
+
+    // 2. Báo cáo Kết quả Kinh doanh (B02-DN)
+    router.get('/reports/profit-loss', verifyToken, dnReports.getProfitLossStatement(db));
+    router.get('/reports/dn/b02-profit-loss', verifyToken, dnReports.getProfitLossStatement(db));
+
+    // 3. Báo cáo Lưu chuyển Tiền tệ (B03-DN)
+    router.get('/reports/cash-flow-dn', verifyToken, dnReports.getCashFlowStatement(db));
+    router.get('/reports/dn/b03-cash-flow', verifyToken, dnReports.getCashFlowStatement(db));
+
+    // 4. Thuyết minh Báo cáo Tài chính (B09-DN)
+    router.get('/reports/notes-fs', verifyToken, dnReports.getNotesToFinancialStatements(db));
+    router.get('/reports/dn/b09-notes-financial', verifyToken, dnReports.getNotesToFinancialStatements(db));
+
+    // 5. Phân tích Chi phí
+    router.get('/reports/cost-analysis', verifyToken, dnReports.getCostAnalysis(db));
+
+    // Phân tích Lợi nhuận
+    router.get('/reports/profitability-analysis', verifyToken, dnReports.getProfitabilityAnalysis(db));
+
+    // Báo cáo Thực hiện Kế hoạch/Ngân sách
+    router.get('/reports/budget-performance', verifyToken, dnReports.getBudgetPerformance(db));
+
+    // ========================================
+    // Legacy HCSN REPORTS (TT 24/2024/TT-BTC)
+    // REMOVED - Không còn sử dụng cho Doanh nghiệp
+    // ========================================
+    // router.get('/reports/balance-sheet-hcsn', verifyToken, hcsnReports.getBalanceSheetHCSN(db));
+    // router.get('/reports/activity-result', verifyToken, hcsnReports.getActivityResult(db));
+    // router.get('/reports/budget-settlement-*', verifyToken, ...);
 
     return router;
 };

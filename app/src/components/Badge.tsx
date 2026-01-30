@@ -1,6 +1,6 @@
 /**
  * Badge Component
- * SyntexHCSN - Reusable Badge/Tag Component
+ * SyntexLegger - Reusable Badge/Tag Component
  *
  * USAGE:
  * <Badge variant="success">Đã ghi sổ</Badge>

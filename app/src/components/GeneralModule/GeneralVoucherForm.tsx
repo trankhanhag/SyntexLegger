@@ -1,19 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useVoucherForm } from './hooks/useVoucherForm';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useVoucherForm, type DimensionConfig } from './hooks/useVoucherForm';
 import { GeneralVoucherDetailRow } from '../GeneralVoucherDetailRow'; // Main Detail Row Component
-import { voucherService, masterDataService, dimensionService, hcsnService } from '../../api';
+import { voucherService, masterDataService, dimensionService } from '../../api';
+import { StagingArea } from './StagingArea';
+import type { VoucherLine } from './types/voucher.types';
 
 interface GeneralVoucherFormProps {
     id?: string;
     onClose?: () => void;
     onSuccess?: () => void;
+    initialLines?: VoucherLine[];
 }
 
 export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
     id,
     onClose,
-    onSuccess
+    onSuccess,
+    initialLines
 }) => {
+    const [dimensionConfigs, setDimensionConfigs] = useState<DimensionConfig[]>([]);
+
     const {
         voucher,
         setVoucher,
@@ -23,8 +29,10 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
         saveVoucher,
         saving,
         resetForm,
-        getEmptyLine
-    } = useVoucherForm();
+        getEmptyLine,
+        errors,
+        balanceCheck
+    } = useVoucherForm({ dimensionConfigs });
 
     const [loadingData, setLoadingData] = useState(false);
     const [masterData, setMasterData] = useState({
@@ -34,7 +42,7 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
         dimensions: {} as Record<number, any[]>
     });
     const [fundSources, setFundSources] = useState<any[]>([]);
-    const [budgetEstimates, setBudgetEstimates] = useState<any[]>([]);
+    const [showStagingArea, setShowStagingArea] = useState(false);
 
     const formState = voucher;
     const loading = saving || loadingData;
@@ -80,6 +88,30 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
         updateLine(idx, targetField, value);
     };
 
+    // Handle import from Excel via StagingArea
+    const handleExcelImport = useCallback((importedLines: VoucherLine[]) => {
+        if (importedLines.length === 0) return;
+
+        // Filter out empty initial lines before adding imported ones
+        const existingNonEmpty = (voucher.lines || []).filter(
+            (line: any) => line.debitAcc || line.creditAcc || line.amount > 0 || line.description
+        );
+
+        // Merge existing non-empty lines with imported lines
+        const newLines = [...existingNonEmpty, ...importedLines];
+
+        // Calculate new total
+        const newTotal = newLines.reduce((sum, line) => sum + (line.amount || 0), 0);
+
+        setVoucher({
+            ...voucher,
+            lines: newLines.length > 0 ? newLines : [getEmptyLine()],
+            total_amount: newTotal
+        });
+
+        setShowStagingArea(false);
+    }, [voucher, setVoucher, getEmptyLine]);
+
     const validationIssues = useMemo(() => {
         const issues: Record<number, any> = {};
         (formState.lines || []).forEach((line: any, idx: number) => {
@@ -93,6 +125,24 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
         });
         return issues;
     }, [formState.lines]);
+
+    // Compute visible dimension types from config (only active ones)
+    const visibleDimTypes = useMemo(() => {
+        if (dimensionConfigs.length === 0) return [1, 2, 3, 4, 5]; // Default fallback
+        return dimensionConfigs
+            .filter(cfg => cfg.isActive === 1)
+            .map(cfg => cfg.id)
+            .sort((a, b) => a - b);
+    }, [dimensionConfigs]);
+
+    // Get mandatory dimension IDs for visual indication
+    const mandatoryDimIds = useMemo(() => {
+        return new Set(
+            dimensionConfigs
+                .filter(cfg => cfg.isActive === 1 && cfg.isMandatory === 1)
+                .map(cfg => cfg.id)
+        );
+    }, [dimensionConfigs]);
 
     useEffect(() => {
         let isActive = true;
@@ -138,6 +188,22 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
         };
     }, [id, resetForm, getEmptyLine]);
 
+    // Handle initial lines from parent (e.g., when imported from Excel via module-level StagingArea)
+    useEffect(() => {
+        if (initialLines && initialLines.length > 0 && !id) {
+            // Calculate total from imported lines
+            const newTotal = initialLines.reduce((sum, line) => sum + (line.amount || 0), 0);
+
+            // Set voucher with imported lines
+            setVoucher({
+                ...voucher,
+                lines: initialLines,
+                total_amount: newTotal,
+                description: voucher.description || 'Chứng từ nhập từ Excel'
+            });
+        }
+    }, [initialLines, id]); // Only run when initialLines changes or on mount
+
     useEffect(() => {
         let isActive = true;
 
@@ -160,7 +226,7 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                 dimensionService.getDimensions(4),
                 dimensionService.getDimensions(5),
                 masterDataService.getFundSources(),
-                hcsnService.getBudgetEstimates()
+                dimensionService.getConfigs()
             ]);
 
             if (!isActive) return;
@@ -176,7 +242,7 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                 5: getArray(results[7])
             };
             const fundSourcesRaw = getArray(results[8]);
-            const budgetEstimatesRaw = getArray(results[9]);
+            const dimConfigsRaw = getArray(results[9]);
 
             const products = productsRaw.map((p: any) => ({
                 ...p,
@@ -193,11 +259,6 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                 name: f.name
             }));
 
-            const budgetEstimates = budgetEstimatesRaw.map((be: any) => ({
-                ...be,
-                category_code: be.category_code || be.item_code || be.item_name || ''
-            }));
-
             setMasterData({
                 accounts,
                 partners,
@@ -205,7 +266,7 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                 dimensions
             });
             setFundSources(fundSourcesNormalized);
-            setBudgetEstimates(budgetEstimates);
+            setDimensionConfigs(dimConfigsRaw);
         };
 
         loadMasterData();
@@ -242,10 +303,56 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* === BALANCE STATUS INDICATOR === */}
+                    <div
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${balanceCheck.status === 'balanced'
+                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                : balanceCheck.status === 'incomplete'
+                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                    : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 animate-pulse'
+                            }`}
+                        title={balanceCheck.message}
+                    >
+                        <span className="material-symbols-outlined text-base">
+                            {balanceCheck.status === 'balanced' ? 'check_circle' : balanceCheck.status === 'incomplete' ? 'warning' : 'error'}
+                        </span>
+                        <div className="flex flex-col leading-tight">
+                            <span className="font-mono">
+                                Nợ: {balanceCheck.totalDebit.toLocaleString('vi-VN')}
+                            </span>
+                            <span className="font-mono">
+                                Có: {balanceCheck.totalCredit.toLocaleString('vi-VN')}
+                            </span>
+                        </div>
+                        {balanceCheck.status !== 'balanced' && (
+                            <span className="text-[10px] uppercase tracking-wide">
+                                {balanceCheck.status === 'incomplete' ? 'Thiếu TK' : 'Lệch'}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Show error count badge */}
+                    {Object.keys(errors).length > 0 && (
+                        <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-bold rounded-full">
+                            {Object.keys(errors).length} lỗi
+                        </span>
+                    )}
+                    <button
+                        onClick={() => setShowStagingArea(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-sm transition-all"
+                        title="Nhập dữ liệu từ Excel"
+                    >
+                        <span className="material-symbols-outlined">upload_file</span>
+                        <span>Nhập Excel</span>
+                    </button>
                     <button
                         onClick={handleSave}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium shadow-sm transition-all"
+                        disabled={loading || !balanceCheck.isBalanced}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-sm transition-all ${!balanceCheck.isBalanced
+                                ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            } disabled:opacity-50`}
+                        title={!balanceCheck.isBalanced ? 'Không thể lưu: Chứng từ chưa cân đối' : 'Lưu chứng từ'}
                     >
                         {loading ? (
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -256,6 +363,26 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Validation Errors Display */}
+            {Object.keys(errors).length > 0 && (
+                <div className="mx-4 mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <div className="flex items-start gap-2">
+                        <span className="material-symbols-outlined text-red-500 text-lg">error</span>
+                        <div className="flex-1">
+                            <p className="text-sm font-bold text-red-700 dark:text-red-300 mb-1">Vui lòng kiểm tra lại thông tin:</p>
+                            <ul className="text-xs text-red-600 dark:text-red-400 space-y-0.5 list-disc list-inside">
+                                {Object.values(errors).slice(0, 5).map((err, i) => (
+                                    <li key={i}>{err}</li>
+                                ))}
+                                {Object.keys(errors).length > 5 && (
+                                    <li className="text-red-500">...và {Object.keys(errors).length - 5} lỗi khác</li>
+                                )}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Header Form */}
             <div className="p-4 grid grid-cols-1 lg:grid-cols-4 gap-4 bg-white dark:bg-slate-800 shadow-sm mb-1">
@@ -377,7 +504,7 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                                     // Master Data Props
                                     products={masterData.products}
                                     fundSources={fundSources}
-                                    budgetEstimates={budgetEstimates}
+                                    budgetEstimates={[]}
                                     accounts={masterData.accounts}
                                     partners={masterData.partners}
                                     projects={[]}
@@ -387,27 +514,83 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                                     balancesCache={{}}
                                     issue={validationIssues[idx] || {}}
                                     effectiveShowAdvanced={true}
-                                    visibleDimTypes={[1, 2, 3, 4, 5]} // Should come from config
+                                    visibleDimTypes={visibleDimTypes}
+                                    mandatoryDimIds={mandatoryDimIds}
                                     isLocked={false}
                                 />
                             ))}
                         </tbody>
                         <tfoot className="bg-slate-50 dark:bg-slate-700/30 font-bold sticky bottom-0">
+                            {/* Balance Summary Row */}
+                            <tr className="border-t-2 border-slate-300 dark:border-slate-600">
+                                <td colSpan={7} className="px-2 py-2 text-right text-xs text-slate-500 uppercase">
+                                    Tổng cộng (TK trong bảng):
+                                </td>
+                                <td className="px-2 py-2 text-center">
+                                    <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
+                                        {balanceCheck.totalDebit.toLocaleString('vi-VN')}
+                                    </span>
+                                </td>
+                                <td className="px-2 py-2 text-center">
+                                    <span className="font-mono text-sm text-purple-600 dark:text-purple-400">
+                                        {balanceCheck.totalCredit.toLocaleString('vi-VN')}
+                                    </span>
+                                </td>
+                                <td className="px-2 py-2 text-right">
+                                    <span className={`font-mono text-sm px-2 py-0.5 rounded ${balanceCheck.isBalanced
+                                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                        }`}>
+                                        {balanceCheck.isBalanced ? 'CÂN ĐỐI ✓' : `Lệch: ${balanceCheck.difference.toLocaleString('vi-VN')}`}
+                                    </span>
+                                </td>
+                                <td colSpan={2}></td>
+                            </tr>
+                            {/* Off-balance sheet info */}
+                            {balanceCheck.offBalanceSheetLines > 0 && (
+                                <tr className="text-xs text-slate-500">
+                                    <td colSpan={12} className="px-2 py-1">
+                                        <span className="material-symbols-outlined text-xs align-middle mr-1">info</span>
+                                        {balanceCheck.offBalanceSheetLines} bút toán ngoài bảng (TK bắt đầu bằng 0) - Ghi đơn, không áp dụng nguyên tắc cân đối
+                                    </td>
+                                </tr>
+                            )}
+                            {/* Action buttons */}
                             <tr>
                                 <td colSpan={12} className="px-2 py-2">
-                                    <button
-                                        onClick={addLine}
-                                        className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">add</span>
-                                        Thêm dòng
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={addLine}
+                                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">add</span>
+                                            Thêm dòng
+                                        </button>
+                                        <button
+                                            onClick={() => setShowStagingArea(true)}
+                                            className="flex items-center gap-1 text-green-600 hover:text-green-700 text-xs font-semibold px-2 py-1 rounded hover:bg-green-50 transition-colors"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">upload_file</span>
+                                            Nhập từ Excel
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
+
+            {/* StagingArea Modal for Excel Import */}
+            {showStagingArea && (
+                <StagingArea
+                    onClose={() => setShowStagingArea(false)}
+                    onImport={handleExcelImport}
+                    accounts={masterData.accounts}
+                    partners={masterData.partners}
+                    mode="single"
+                />
+            )}
         </div>
     );
 };

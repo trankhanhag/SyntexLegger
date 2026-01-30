@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { createPortal } from 'react-dom';
+
+export type PrintPaperSize = 'A4' | 'A4-landscape' | 'A5' | 'A5-landscape';
 
 interface PrintPreviewShellProps {
     title?: string;
@@ -10,7 +12,26 @@ interface PrintPreviewShellProps {
     footerActions?: React.ReactNode;
     showFooter?: boolean;
     children: React.ReactNode;
+    /** Paper size for print - will inject correct @page CSS */
+    paperSize?: PrintPaperSize;
 }
+
+/**
+ * Get the CSS @page rule for a given paper size
+ */
+const getPageSizeCSS = (size: PrintPaperSize): string => {
+    switch (size) {
+        case 'A4-landscape':
+            return '@page { size: A4 landscape; margin: 0; }';
+        case 'A5':
+            return '@page { size: A5 portrait; margin: 0; }';
+        case 'A5-landscape':
+            return '@page { size: A5 landscape; margin: 0; }';
+        case 'A4':
+        default:
+            return '@page { size: A4 portrait; margin: 0; }';
+    }
+};
 
 export const PrintPreviewShell: React.FC<PrintPreviewShellProps> = ({
     title = 'Xem trước bản in',
@@ -20,9 +41,43 @@ export const PrintPreviewShell: React.FC<PrintPreviewShellProps> = ({
     footerHint,
     footerActions,
     showFooter = true,
-    children
+    children,
+    paperSize = 'A4'
 }) => {
-    const handlePrint = onPrint || (() => window.print());
+    /**
+     * Inject dynamic @page CSS before printing to ensure correct page orientation
+     * This is necessary because named @page rules are not consistently supported
+     */
+    const handlePrint = useCallback(() => {
+        // Create and inject dynamic style for @page
+        const styleId = 'dynamic-print-page-size';
+        let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+
+        // Set the @page rule based on selected paper size
+        styleEl.textContent = `@media print { ${getPageSizeCSS(paperSize)} }`;
+
+        // Execute print
+        if (onPrint) {
+            onPrint();
+        } else {
+            window.print();
+        }
+
+        // Clean up after print (with delay to ensure print dialog uses the style)
+        setTimeout(() => {
+            if (styleEl && styleEl.parentNode) {
+                // Don't remove - keep for subsequent prints in same session
+                // styleEl.parentNode.removeChild(styleEl);
+            }
+        }, 1000);
+    }, [paperSize, onPrint]);
+
     const actions = footerActions || (
         <>
             <button

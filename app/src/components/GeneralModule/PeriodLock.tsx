@@ -1,6 +1,6 @@
 /**
  * PeriodLock Component
- * SyntexHCSN - Khóa sổ kỳ kế toán
+ * SyntexLegger - Khóa sổ kỳ kế toán
  */
 
 import React from 'react';

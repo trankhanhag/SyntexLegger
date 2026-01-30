@@ -1,6 +1,7 @@
 import React from 'react';
 import { auditService } from '../api';
 import { FormModal } from './FormModal';
+import { triggerBrowserPrint } from '../hooks/usePrintHandler';
 
 // Simple Modal Wrapper reproduced here to avoid dependency cycle or heavy imports
 const Modal = ({ title, onClose, children }: { title: string, onClose: () => void, children: React.ReactNode }) => (
@@ -189,7 +190,7 @@ export const TaxHealthReport = ({ onClose, isModal = false, onNavigate }: { onCl
                     </div>
                     <div className="flex gap-3">
                         <button onClick={onClose} className="px-6 py-2 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-all">Đóng</button>
-                        <button onClick={() => window.print()} className="form-button-primary flex items-center gap-2">
+                        <button onClick={() => triggerBrowserPrint()} className="form-button-primary flex items-center gap-2">
                             <span className="material-symbols-outlined">description</span> Xuất báo cáo PDF
                         </button>
                     </div>
