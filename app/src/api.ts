@@ -389,13 +389,18 @@ export const purchaseService = {
 export const inventoryService = {
     getReceipts: () => api.get('/inventory/receipts'),
     getIssues: () => api.get('/inventory/issues'),
-    // Materials (Vật tư) - Route vẫn dùng /hcsn/ cho backend compatibility
-    // TODO: Rename backend route từ /hcsn/materials → /inventory/materials
-    getMaterials: (params?: any) => api.get('/hcsn/materials', { params }),
-    createMaterial: (data: any) => api.post('/hcsn/materials', data),
-    updateMaterial: (id: string, data: any) => api.put(`/hcsn/materials/${id}`, data),
-    deleteMaterial: (id: string) => api.delete(`/hcsn/materials/${id}`),
-    importMaterials: (materials: any[]) => api.post('/hcsn/materials/import', { materials }),
+    // Materials (Vật tư)
+    getMaterials: (params?: any) => api.get('/inventory/materials', { params }),
+    createMaterial: (data: any) => api.post('/inventory/materials', data),
+    updateMaterial: (id: string, data: any) => api.put(`/inventory/materials/${id}`, data),
+    deleteMaterial: (id: string) => api.delete(`/inventory/materials/${id}`),
+    importMaterials: (materials: any[]) => api.post('/inventory/materials/import', { materials }),
+    // Transfers
+    getTransfers: () => api.get('/inventory/transfers'),
+    createTransfer: (data: any) => api.post('/inventory/transfers', data),
+    // Summary & Cards
+    getSummary: (params?: any) => api.get('/inventory/summary', { params }),
+    getCards: (params?: any) => api.get('/inventory/cards', { params }),
 };
 
 export const contractService = {
@@ -460,8 +465,8 @@ export const reminderService = {
     getIncompleteDetail: () => api.get('/reminders/incomplete')
 };
 
-// DEPRECATED: hcsnService - Giữ lại cho backward compatibility với InventoryModule
-// TODO: Migrate InventoryModule to use new /inventory/ routes
+// DEPRECATED: hcsnService - Legacy service cho backward compatibility
+// InventoryModule đã migrate sang inventoryService
 export const hcsnService = {
     getFundSources: () => api.get('/master/departments'),
     getBudgetEstimates: (params?: any) => api.get('/budget-control/budget-estimates', { params }),

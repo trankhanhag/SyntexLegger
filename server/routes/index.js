@@ -27,6 +27,7 @@ const closingRoutes = require('./closing.routes');
 const customReportRoutes = require('./custom-report.routes');
 const einvoiceRoutes = require('./einvoice.routes');
 const bankRoutes = require('./bank.routes');
+const inventoryRoutes = require('./inventory.routes');
 
 /**
  * Register all routes with Express app
@@ -105,7 +106,10 @@ const registerRoutes = (app, db) => {
     // Bank Routes
     app.use('/api/bank', bankRoutes(db));
 
-    console.log('[ROUTES] Registered: auth, system, master, dashboard, allocation, asset, hr, report, commercial, voucher, audit, checklist, xml-export, opening-balance, budget-control, closing, custom-report, einvoice, bank');
+    // Inventory Routes (Materials, Receipts, Issues, Transfers)
+    app.use('/api', inventoryRoutes(db));
+
+    console.log('[ROUTES] Registered: auth, system, master, dashboard, allocation, asset, hr, report, commercial, voucher, audit, checklist, xml-export, opening-balance, budget-control, closing, custom-report, einvoice, bank, inventory');
 };
 
 module.exports = {

@@ -210,8 +210,40 @@ function createReceipt(db) {
                 return res.status(500).json({ error: err.message });
             }
 
-            // TODO: Auto-create voucher in general_ledger if needed
-            // TODO: Update budget_estimates.spent_amount if budget_estimate_id provided
+            const ledgerId = uuidv4();
+            const debitAcc = payment_method === 'BANK' ? '112' : '111'; // Tiền gửi NH hoặc Tiền mặt
+            const creditAcc = account_code || '511'; // Doanh thu
+
+            // Auto-create ledger entry
+            const ledgerSql = `INSERT INTO general_ledger
+                (id, trx_date, posted_at, doc_no, description, account_code, reciprocal_acc,
+                 debit_amount, credit_amount, partner_code, origin_staging_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`;
+
+            db.run(ledgerSql, [
+                ledgerId, receipt_date, now, receipt_no,
+                `Thu: ${payer_name} - ${category_name || category_code}`,
+                debitAcc, creditAcc, amount, payer_id_card || null, id
+            ], (ledgerErr) => {
+                if (ledgerErr) {
+                    console.error('Auto-create ledger error:', ledgerErr);
+                }
+            });
+
+            // Update budget_estimates if budget_estimate_id provided (for revenue tracking)
+            if (budget_estimate_id) {
+                const budgetSql = `UPDATE budget_estimates
+                    SET spent_amount = spent_amount + ?,
+                        remaining_amount = allocated_amount - (spent_amount + ?),
+                        updated_at = ?
+                    WHERE id = ?`;
+
+                db.run(budgetSql, [amount, amount, now, budget_estimate_id], (budgetErr) => {
+                    if (budgetErr) {
+                        console.error('Update budget estimate error:', budgetErr);
+                    }
+                });
+            }
 
             res.status(201).json({ id, receipt_no, message: 'Receipt created successfully' });
         });
