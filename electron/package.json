@@ -1,0 +1,20 @@
+{
+  "name": "syntexlegger-electron",
+  "version": "1.0.0",
+  "description": "Electron wrapper for SyntexLegger",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "electron dist/main.js",
+    "dev": "npm run build && npm start"
+  },
+  "dependencies": {
+    "node-machine-id": "^1.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "electron": "^29.0.0",
+    "typescript": "^5.3.3"
+  }
+}

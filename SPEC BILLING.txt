@@ -1,0 +1,227 @@
+SPEC TÍNH PHÍ 
+
+Mô hình: Free Until Meaningful + Subscription theo mức trưởng thành
+
+1. Mục tiêu thiết kế (Design Goals)
+
+Giảm ma sát onboarding = 0
+
+DN mới dùng hoàn toàn miễn phí
+
+Không yêu cầu thẻ, không trial đếm ngày
+
+Tính phí khi DN thực sự hoạt động
+
+Không thu tiền khi DN còn “chết lâm sàng”
+
+Thu tiền khi đã có:
+
+phát sinh
+
+doanh thu
+
+nhu cầu quản trị
+
+Không phá trải nghiệm kế toán
+
+Không khóa nghiệp vụ đột ngột
+
+Không tính tiền theo hành động
+
+2. Khái niệm & thuật ngữ
+2.1 Company Lifecycle State (CLS)
+
+Mỗi doanh nghiệp luôn ở 1 trạng thái duy nhất:
+
+INIT → FREE_ACTIVE → PRE_BILLING → PAID_ACTIVE → SUSPENDED
+
+State	Ý nghĩa
+INIT	Tạo DN nhưng chưa phát sinh
+FREE_ACTIVE	Đang dùng miễn phí
+PRE_BILLING	Đã vượt ngưỡng, trong thời gian đệm
+PAID_ACTIVE	Đang trả phí
+SUSPENDED	Quá hạn thanh toán
+3. Các chỉ số dùng để kích hoạt tính phí (Billing Triggers)
+3.1 Các chỉ số chính (Primary Metrics)
+Code	Chỉ số	Đơn vị
+M1	Tổng số bút toán	count / năm
+M2	Doanh thu ghi nhận	VND / năm
+M3	Số hóa đơn điện tử	count
+M4	Số tháng có phát sinh	month
+M5	Số user	count
+M6	Phần hành nâng cao	boolean
+3.2 Ngưỡng mặc định (Configurable)
+FREE_LIMITS:
+  journal_entries_per_year: 1000
+  revenue_per_year: 2_000_000_000
+  invoices_total: 100
+  active_months: 4
+  users: 1
+  advanced_modules_enabled: false
+
+
+⚠️ Các giá trị phải cấu hình được, không hard-code.
+
+4. Quy tắc chuyển trạng thái (State Transition Rules)
+4.1 INIT → FREE_ACTIVE
+
+Điều kiện
+
+Tạo ít nhất 1 bút toán
+
+Hoặc nhập số dư đầu kỳ
+
+4.2 FREE_ACTIVE → PRE_BILLING
+
+Kích hoạt khi ≥ 1 điều kiện đúng:
+
+M1 > journal_entries_per_year
+OR M2 > revenue_per_year
+OR M3 > invoices_total
+OR M4 > active_months
+OR M5 > users
+OR M6 == true
+
+
+Hành vi hệ thống
+
+Không khóa nghiệp vụ
+
+Gắn billing_warning = true
+
+Ghi pre_billing_start_at = now()
+
+4.3 PRE_BILLING → PAID_ACTIVE
+
+Điều kiện
+
+Người dùng chọn gói
+
+Thanh toán thành công
+
+4.4 PRE_BILLING → SUSPENDED
+
+Điều kiện
+
+Quá thời gian đệm (grace period)
+
+Không thanh toán
+
+GRACE_PERIOD_DAYS: 30
+
+4.5 SUSPENDED → PAID_ACTIVE
+
+Thanh toán thành công
+
+Không mất dữ liệu
+
+5. Hành vi UI / UX theo trạng thái
+5.1 FREE_ACTIVE
+
+Không hiển thị giá
+
+Không banner quảng cáo
+
+Không countdown
+
+5.2 PRE_BILLING
+
+Hiển thị rất nhẹ:
+
+🟡 Doanh nghiệp đã vượt mức miễn phí.
+Vui lòng chọn gói phù hợp trước ngày DD/MM/YYYY.
+
+
+Không popup cưỡng bức
+
+Không chặn lưu bút toán
+
+Cho xem:
+
+số liệu đang vượt
+
+gói phù hợp đề xuất
+
+5.3 SUSPENDED
+
+Cho xem dữ liệu
+
+Cho xuất dữ liệu
+
+Không cho tạo mới:
+
+bút toán
+
+hóa đơn
+
+báo cáo kỳ mới
+
+⚠️ Không được khóa toàn bộ hệ thống.
+
+6. Nguyên tắc tính phí (Pricing Principles)
+6.1 Không bao giờ tính phí theo:
+
+Số bút toán lẻ
+
+Lần sửa / xóa
+
+Import / AI agent chạy
+
+6.2 Tính phí theo:
+
+Thời gian (tháng/năm)
+
+Gói quy mô
+
+Phần hành mở
+
+7. Gợi ý mapping gói (tham khảo)
+Gói	CLS	Đặc điểm
+Free	FREE_ACTIVE	DN mới
+Growth	PAID_ACTIVE	DN ổn định
+Pro	PAID_ACTIVE	Xây lắp / SX
+Enterprise	PAID_ACTIVE	Custom
+8. Edge Cases (bắt buộc xử lý)
+8.1 DN ngừng hoạt động
+
+Không phát sinh → không reset trạng thái
+
+CLS giữ nguyên
+
+8.2 DN vượt ngưỡng rồi quay lại
+
+Không rollback CLS
+
+Đã PRE_BILLING thì không quay về FREE
+
+8.3 Import dữ liệu lớn ban đầu
+
+Có flag:
+
+is_initial_migration: true
+
+
+Không tính vào M1 trong X ngày đầu
+
+9. Logging & Audit (bắt buộc)
+
+Mỗi lần thay đổi CLS phải log:
+
+{
+  "company_id": "...",
+  "from_state": "FREE_ACTIVE",
+  "to_state": "PRE_BILLING",
+  "trigger": "journal_entries",
+  "value": 1024,
+  "timestamp": "..."
+}
+
+10. Nguyên tắc vàng (developer MUST NOT break)
+
+Không khóa nghiệp vụ kế toán đang làm
+
+Không surprise billing
+
+Không đếm tiền theo thao tác
+
+Billing là trạng thái, không phải nút bấm
