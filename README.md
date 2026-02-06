@@ -30,15 +30,26 @@ Hệ thống áp dụng **TT 99/2025/TT-BTC** (Chế độ kế toán doanh nghi
 
 ## Kiến trúc
 
-### Server (Express.js + SQLite/PostgreSQL)
+### Server (Express.js + SQLite)
 ```
 server/
+├── index.js         # Main entry point (JavaScript runtime)
+├── database.js      # SQLite database initialization
+├── app.js           # Express application setup
 ├── routes/          # API endpoints
 ├── services/        # Business logic
-├── migrations/      # Database schema
-├── seeds/           # Default data (TT99 accounts)
-└── legacy/          # Deprecated HCSN (TT24) code
+├── src/             # TypeScript modules (future migration)
+│   ├── db/          # Knex migrations & schemas
+│   ├── repositories/# Data access layer
+│   └── utils/       # Utilities and helpers
+├── __tests__/       # Jest tests (JS + TS)
+└── seeds/           # Sample data (TT99 accounts)
 ```
+
+**Runtime**: Hybrid JavaScript + TypeScript
+- **Primary**: JavaScript (index.js) - Production-ready
+- **TypeScript**: Type-safe modules, gradual migration path
+- **Tests**: Support both .js and .ts test files
 
 ### Client (React + Vite)
 ```
@@ -69,10 +80,19 @@ app/
 ```bash
 cd server
 npm install
-npm run migrate
-npm run seed
-npm start
+
+# Môi trường Development (với sample data)
+npm run dev
+
+# Môi trường Production (không có sample data)
+DISABLE_SAMPLE_DATA=true npm start
 ```
+
+**Lưu ý về Seed Data**:
+- Mặc định (dev): Tự động seed sample data khi DB rỗng
+- Production: Đặt `DISABLE_SAMPLE_DATA=true` để tắt sample data
+- Admin user: Chỉ seed lần đầu (không reset password khi restart)
+- Default admin: username=`admin`, password=`admin` (có thể đổi qua env vars)
 
 ### Khởi chạy Client
 ```bash
@@ -84,21 +104,35 @@ npm run dev
 ## Biến môi trường
 
 ### Server (.env)
-```
+```bash
+# Server Configuration
 PORT=3000
+NODE_ENV=development
+
+# Database
 DB_TYPE=sqlite
-DB_PATH=./database.sqlite
-JWT_SECRET=your-secret-key
+DB_PATH=./db_v2.sqlite
+
+# Authentication
+JWT_SECRET=your-secret-key-change-in-production
+DEFAULT_ADMIN_USER=admin
+DEFAULT_ADMIN_PASSWORD=admin
+
+# Sample Data (Development only)
+DISABLE_SAMPLE_DATA=false
+
+# License Management
+LICENSE_SERVER_URL=http://localhost:4000
 ```
 
 ### Client (.env)
-```
+```bash
 VITE_API_URL=http://localhost:3000/api
 ```
 
 ## Giấy phép
 
-Proprietary - Xem file LICENSE
+MIT License - Xem file [LICENSE](LICENSE)
 
 ## Tài liệu thêm
 

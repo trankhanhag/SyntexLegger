@@ -6,7 +6,8 @@ const DEFAULT_ADMIN_USER = process.env.DEFAULT_ADMIN_USER || 'admin';
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || 'admin';
 
 // Flag to disable sample data insertion (set to true for production)
-const DISABLE_SAMPLE_DATA = process.env.DISABLE_SAMPLE_DATA === 'true' || true;
+// Default to false for dev, can be overridden with env var
+const DISABLE_SAMPLE_DATA = process.env.DISABLE_SAMPLE_DATA === 'true';
 
 // ========================================
 // HỆ THỐNG TÀI KHOẢN DOANH NGHIỆP
@@ -227,17 +228,19 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             // Ensure columns exist for existing databases
             db.all("PRAGMA table_info(users)", (err, columns) => {
                 const addColumns = () => {
-                    const adminPass = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
-                    // Delete existing admin user first to ensure password is updated
-                    db.run('DELETE FROM users WHERE username = ?', [DEFAULT_ADMIN_USER], (delErr) => {
-                        db.run('INSERT INTO users (username, password, fullname, role, status, company_id) VALUES (?,?,?,?,?,?)',
-                            [DEFAULT_ADMIN_USER, adminPass, "Administrator", "admin", "Active", "1"], (err) => {
-                                if (err) {
-                                    console.error('Failed to seed admin user:', err);
-                                } else {
-                                    // Admin user seeded
-                                }
-                            });
+                    // Only seed admin if not exists (prevent password reset)
+                    db.get('SELECT id FROM users WHERE username = ?', [DEFAULT_ADMIN_USER], (err, row) => {
+                        if (!err && !row) {
+                            const adminPass = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
+                            db.run('INSERT INTO users (username, password, fullname, role, status, company_id) VALUES (?,?,?,?,?,?)',
+                                [DEFAULT_ADMIN_USER, adminPass, "Administrator", "admin", "Active", "1"], (err) => {
+                                    if (err) {
+                                        console.error('Failed to seed admin user:', err);
+                                    } else {
+                                        console.log('Admin user seeded successfully');
+                                    }
+                                });
+                        }
                     });
                 };
 
