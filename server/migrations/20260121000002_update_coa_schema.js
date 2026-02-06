@@ -1,6 +1,6 @@
 /**
  * Update Chart of Accounts Schema
- * Add missing columns for TT24 compliance
+ * Add missing columns for TT99 compliance
  */
 
 /**

@@ -1,8 +1,8 @@
 /**
  * Initial Database Schema Migration
- * SyntexHCSN - Thông tư 24/2024/TT-BTC
+ * SyntexLegger - Thông tư 99/2025/TT-BTC (Doanh nghiệp)
  * 
- * Creates all core tables for HCSN accounting system
+ * Creates all core tables for accounting system
  */
 
 /**
@@ -37,7 +37,7 @@ exports.up = async function (knex) {
             table.integer('level').defaultTo(1);
             table.string('category', 100);
             table.string('type', 50); // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
-            table.string('tt24_class', 50); // Loại 1-9 theo TT24
+            table.string('tt99_class', 50); // Loại 1-9 theo TT99
             table.boolean('is_parent').defaultTo(false);
             table.boolean('is_active').defaultTo(true);
             table.integer('is_off_balance').defaultTo(0);

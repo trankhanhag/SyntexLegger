@@ -1,6 +1,6 @@
 /**
  * Report Generator Service
- * SyntexHCSN - Generates reports from templates by querying database
+ * SyntexLegger - Generates reports from templates by querying database
  *
  * This service:
  * 1. Takes a template with field mappings
@@ -33,7 +33,7 @@ const ALLOWED_TABLES = [
 
 // Whitelist of allowed columns per table
 const ALLOWED_COLUMNS = {
-    chart_of_accounts: ['account_code', 'account_name', 'parent_account', 'level', 'category', 'type', 'tt24_class', 'is_parent', 'is_active', 'is_off_balance'],
+    chart_of_accounts: ['account_code', 'account_name', 'parent_account', 'level', 'category', 'type', 'tt99_class', 'is_parent', 'is_active', 'is_off_balance'],
     vouchers: ['id', 'doc_no', 'doc_date', 'post_date', 'description', 'type', 'total_amount', 'status', 'org_doc_no', 'org_doc_date', 'company_id', 'created_by', 'created_at'],
     voucher_items: ['id', 'voucher_id', 'line_no', 'description', 'debit_account', 'credit_account', 'amount', 'partner_code', 'project_code', 'contract_code', 'debt_note', 'dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'product_code', 'quantity', 'unit_price', 'currency', 'fx_rate', 'fx_amount'],
     partners: ['partner_code', 'partner_name', 'tax_code', 'address', 'phone', 'email', 'bank_account', 'bank_name', 'type', 'company_id', 'is_active'],

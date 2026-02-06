@@ -1,9 +1,9 @@
 /**
  * Vietnamese Accounting Terms Dictionary
- * SyntexHCSN - Mapping Vietnamese terms to database schema
+ * SyntexLegger - Mapping Vietnamese terms to database schema
  *
  * Used by template-parser.service.js for local field recognition
- * Based on: Thông tư 24/2024/TT-BTC và các quy định kế toán HCSN
+ * Based on: Thông tư 99/2025/TT-BTC và các quy định kế toán doanh nghiệp
  */
 
 /**
@@ -341,14 +341,14 @@ const VIETNAMESE_TERMS = {
     },
 
     // ============================================
-    // NGUỒN KINH PHÍ (Fund Sources - TT24)
+    // NGUỒN KINH PHÍ (Fund Sources - Enterprise)
     // ============================================
     'mã nguồn': {
         table: TABLES.FUND_SOURCES,
         column: 'fund_code',
         type: 'text',
         aliases: ['nguồn kinh phí', 'mã nguồn kp', 'nguồn', 'fund code', 'mã nkp'],
-        description: 'Mã nguồn kinh phí theo TT24'
+        description: 'Mã nguồn kinh phí'
     },
     'tên nguồn': {
         table: TABLES.FUND_SOURCES,
