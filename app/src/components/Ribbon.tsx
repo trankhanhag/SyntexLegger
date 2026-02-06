@@ -108,6 +108,12 @@ export const Ribbon: React.FC<RibbonProps> = ({ activeTab, onTabChange, onPrint,
                 <button onClick={() => onTabChange('cash')} className={getTabClass('cash')}>
                     <p className="text-sm font-medium leading-normal">Ngân quỹ</p>
                 </button>
+                <button onClick={() => onTabChange('purchase')} className={getTabClass('purchase')}>
+                    <p className="text-sm font-medium leading-normal">Mua hàng</p>
+                </button>
+                <button onClick={() => onTabChange('sales')} className={getTabClass('sales')}>
+                    <p className="text-sm font-medium leading-normal">Bán hàng</p>
+                </button>
                 <button onClick={() => onTabChange('tax')} className={getTabClass('tax')}>
                     <p className="text-sm font-medium leading-normal">Thuế</p>
                 </button>

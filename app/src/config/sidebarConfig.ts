@@ -19,7 +19,6 @@ export interface SectionConfig {
 
 // Section icons and colors for better visual grouping
 export const SECTION_CONFIG: Record<string, SectionConfig> = {
-    'KẾ HOẠCH & NGÂN SÁCH': { icon: 'account_balance', color: 'blue' },
     'CHỨNG TỪ TỔNG HỢP': { icon: 'receipt_long', color: 'amber' },
     'QUY TRÌNH CUỐI KỲ': { icon: 'published_with_changes', color: 'purple' },
     'DANH MỤC & THIẾT LẬP': { icon: 'settings', color: 'slate' },
@@ -53,6 +52,11 @@ export const SECTION_CONFIG: Record<string, SectionConfig> = {
     'THEO DÕI': { icon: 'analytics', color: 'teal' },
     'QUẢN TRỊ': { icon: 'admin_panel_settings', color: 'blue' },
     'KIỂM SOÁT': { icon: 'security', color: 'red' },
+    'ĐƠN HÀNG': { icon: 'assignment', color: 'blue' },
+    'HÓA ĐƠN': { icon: 'receipt', color: 'green' },
+    'TRẢ HÀNG & THANH TOÁN': { icon: 'payments', color: 'amber' },
+    'TRẢ HÀNG & THU TIỀN': { icon: 'credit_card', color: 'teal' },
+    'CHỨNG TỪ': { icon: 'receipt_long', color: 'blue' },
 };
 
 // Tab titles mapping - Kế toán Doanh nghiệp
@@ -61,6 +65,8 @@ export const TAB_TITLES: Record<string, string> = {
     general: 'Kế toán Tổng hợp',
     report: 'Báo cáo Tài chính',
     cash: 'Quản lý Ngân quỹ',
+    purchase: 'Mua hàng',
+    sales: 'Bán hàng',
     revenue: 'Doanh thu',
     expense: 'Chi phí',
     inventory: 'Quản lý Kho',
@@ -80,6 +86,8 @@ export const TAB_ICONS: Record<string, string> = {
     general: 'account_balance',
     report: 'summarize',
     cash: 'account_balance_wallet',
+    purchase: 'shopping_cart',
+    sales: 'storefront',
     revenue: 'trending_up',
     expense: 'shopping_cart',
     inventory: 'warehouse',
@@ -100,13 +108,6 @@ export const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'incomplete_docs', icon: 'error_outline', label: 'Chứng từ lỗi', keywords: ['error', 'lỗi'] },
     ],
     'general': [
-        // === KẾ HOẠCH & NGÂN SÁCH NỘI BỘ ===
-        { id: 'fund_budget', icon: 'edit_note', label: 'Lập kế hoạch', section: 'KẾ HOẠCH & NGÂN SÁCH', keywords: ['kế hoạch', 'dự toán', 'budget'] },
-        { id: 'fund_allocation', icon: 'call_split', label: 'Phân bổ ngân sách', section: 'KẾ HOẠCH & NGÂN SÁCH', keywords: ['phân bổ', 'allocation'] },
-        { id: 'fund_adjustment', icon: 'tune', label: 'Điều chỉnh ngân sách', section: 'KẾ HOẠCH & NGÂN SÁCH', keywords: ['điều chỉnh', 'adjustment'] },
-        { id: 'fund_transfer', icon: 'swap_horiz', label: 'Điều chuyển ngân sách', section: 'KẾ HOẠCH & NGÂN SÁCH', keywords: ['điều chuyển', 'transfer'] },
-        { id: 'fund_control', icon: 'security', label: 'Kiểm soát ngân sách', section: 'KẾ HOẠCH & NGÂN SÁCH', keywords: ['kiểm soát', 'control'] },
-
         // === CHỨNG TỪ TỔNG HỢP ===
         { id: 'voucher_list', icon: 'format_list_bulleted', label: 'Danh sách chứng từ', section: 'CHỨNG TỪ TỔNG HỢP', keywords: ['chứng từ', 'voucher'] },
 
@@ -145,6 +146,7 @@ export const MENU_MAP: Record<string, MenuItem[]> = {
         // === SỔ CHI TIẾT ===
         { id: 'inventory_summary', icon: 'inventory', label: 'Tổng hợp Vật tư, Công cụ', section: 'SỔ CHI TIẾT', keywords: ['vật tư', 'công cụ'] },
         { id: 'inventory_ledger', icon: 'inventory_2', label: 'Sổ chi tiết Vật tư', section: 'SỔ CHI TIẾT', keywords: ['chi tiết', 'vật tư'] },
+        { id: 'debt_ledger', icon: 'account_balance_wallet', label: 'Sổ chi tiết Công nợ', section: 'SỔ CHI TIẾT', keywords: ['công nợ', 'debt', 'phải thu', 'phải trả'] },
 
         // === BÁO CÁO KHÁC ===
         { id: 'transaction_details', icon: 'list_alt', label: 'Chi tiết Bút toán', section: 'KHÁC', keywords: ['bút toán', 'transaction'] },
@@ -162,6 +164,33 @@ export const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'cash_bank_sync', icon: 'sync_alt', label: 'Đối soát Ngân hàng', section: 'NGÂN HÀNG', keywords: ['đối soát', 'reconcile'] },
         { id: 'cash_bank_config', icon: 'settings_input_component', label: 'Kết nối Ngân hàng', section: 'NGÂN HÀNG', keywords: ['kết nối', 'config'] },
         { id: 'cash_inventory', icon: 'currency_exchange', label: 'Kiểm kê quỹ', section: 'KIỂM KÊ', keywords: ['kiểm kê', 'inventory'] },
+    ],
+    'purchase': [
+        // === ĐƠN HÀNG & HÓA ĐƠN ===
+        { id: 'purchase_request', icon: 'edit_note', label: 'Đề xuất Mua hàng', section: 'ĐƠN HÀNG', keywords: ['đề xuất', 'request'] },
+        { id: 'purchase_order', icon: 'assignment', label: 'Đơn đặt hàng', section: 'ĐƠN HÀNG', keywords: ['đơn hàng', 'order', 'PO'] },
+        { id: 'purchase_invoice', icon: 'receipt', label: 'Hóa đơn Mua hàng', section: 'HÓA ĐƠN', keywords: ['hóa đơn', 'invoice'] },
+        { id: 'purchase_service', icon: 'receipt_long', label: 'Hóa đơn Dịch vụ', section: 'HÓA ĐƠN', keywords: ['dịch vụ', 'service'] },
+        // === TRẢ HÀNG & THANH TOÁN ===
+        { id: 'purchase_return', icon: 'keyboard_return', label: 'Trả hàng NCC', section: 'TRẢ HÀNG & THANH TOÁN', keywords: ['trả hàng', 'return'] },
+        { id: 'purchase_payment', icon: 'payments', label: 'Thanh toán NCC', section: 'TRẢ HÀNG & THANH TOÁN', keywords: ['thanh toán', 'payment'] },
+        // === DANH MỤC & BÁO CÁO ===
+        { id: 'vendor_list', icon: 'groups', label: 'Nhà cung cấp', section: 'DANH MỤC & BÁO CÁO', keywords: ['nhà cung cấp', 'vendor', 'NCC'] },
+        { id: 'purchase_report', icon: 'bar_chart', label: 'Báo cáo Mua hàng', section: 'DANH MỤC & BÁO CÁO', keywords: ['báo cáo', 'report'] },
+    ],
+    'sales': [
+        // === ĐƠN HÀNG ===
+        { id: 'sales_order', icon: 'shopping_cart', label: 'Đơn hàng bán', section: 'ĐƠN HÀNG', keywords: ['đơn hàng', 'order', 'SO'] },
+        { id: 'sales_delivery', icon: 'local_shipping', label: 'Giao hàng', section: 'ĐƠN HÀNG', keywords: ['giao hàng', 'delivery'] },
+        // === HÓA ĐƠN ===
+        { id: 'sales_invoice', icon: 'receipt', label: 'Hóa đơn Bán hàng', section: 'HÓA ĐƠN', keywords: ['hóa đơn', 'invoice', 'GTGT'] },
+        { id: 'sales_service', icon: 'receipt_long', label: 'Hóa đơn Dịch vụ', section: 'HÓA ĐƠN', keywords: ['dịch vụ', 'service'] },
+        // === TRẢ HÀNG & THU TIỀN ===
+        { id: 'sales_return', icon: 'undo', label: 'Trả hàng', section: 'TRẢ HÀNG & THU TIỀN', keywords: ['trả hàng', 'return'] },
+        { id: 'sales_payment', icon: 'payments', label: 'Thu tiền KH', section: 'TRẢ HÀNG & THU TIỀN', keywords: ['thu tiền', 'payment'] },
+        // === DANH MỤC & BÁO CÁO ===
+        { id: 'customer_list', icon: 'group', label: 'Khách hàng', section: 'DANH MỤC & BÁO CÁO', keywords: ['khách hàng', 'customer', 'KH'] },
+        { id: 'sales_report', icon: 'bar_chart', label: 'Báo cáo Bán hàng', section: 'DANH MỤC & BÁO CÁO', keywords: ['báo cáo', 'report'] },
     ],
     'revenue': [
         { id: 'revenue_invoice', icon: 'receipt', label: 'Hóa đơn Bán hàng', section: 'CHỨNG TỪ', keywords: ['hóa đơn', 'bán hàng', 'invoice'] },
@@ -185,10 +214,9 @@ export const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'inventory_receipt', icon: 'inventory_2', label: 'Nhập kho', section: 'NHẬP XUẤT KHO', keywords: ['nhập kho', 'receipt'] },
         { id: 'inventory_issue', icon: 'output', label: 'Xuất kho', section: 'NHẬP XUẤT KHO', keywords: ['xuất kho', 'issue'] },
         { id: 'inventory_transfer', icon: 'sync_alt', label: 'Điều chuyển kho', section: 'NHẬP XUẤT KHO', keywords: ['điều chuyển', 'transfer'] },
-        { id: 'inventory_check', icon: 'fact_check', label: 'Kiểm kê kho', section: 'NHẬP XUẤT KHO', keywords: ['kiểm kê', 'check'] },
         { id: 'inventory_items', icon: 'category', label: 'Danh mục Vật tư', section: 'DANH MỤC & BÁO CÁO', keywords: ['vật tư', 'items'] },
         { id: 'inventory_status', icon: 'inventory', label: 'Tổng hợp Tồn kho', section: 'DANH MỤC & BÁO CÁO', keywords: ['tồn kho', 'status'] },
-        { id: 'inventory_ledger', icon: 'list_alt', label: 'Thẻ kho', section: 'DANH MỤC & BÁO CÁO', keywords: ['thẻ kho', 'ledger'] },
+        { id: 'inventory_card', icon: 'list_alt', label: 'Thẻ kho', section: 'DANH MỤC & BÁO CÁO', keywords: ['thẻ kho', 'card'] },
     ],
     'tax': [
         { id: 'tax_vat', icon: 'assignment_turned_in', label: 'Tờ khai GTGT', section: 'BÁO CÁO THUẾ', keywords: ['GTGT', 'VAT'] },
@@ -214,7 +242,7 @@ export const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'asset_revaluation', icon: 'assessment', label: 'Đánh giá lại TSCĐ', section: 'TÀI SẢN CỐ ĐỊNH', keywords: ['đánh giá lại', 'revaluation'] },
         { id: 'asset_transfer', icon: 'swap_horiz', label: 'Điều chuyển TSCĐ', section: 'TÀI SẢN CỐ ĐỊNH', keywords: ['điều chuyển', 'transfer'] },
         { id: 'asset_inventory', icon: 'fact_check', label: 'Kiểm kê TSCĐ', section: 'TÀI SẢN CỐ ĐỊNH', keywords: ['kiểm kê', 'inventory'] },
-        { id: 'ccdc', icon: 'handyman', label: 'Công cụ Dụng cụ', section: 'CCDC', keywords: ['CCDC', 'công cụ'] },
+        { id: 'asset_ccdc', icon: 'handyman', label: 'Công cụ Dụng cụ', section: 'CCDC', keywords: ['CCDC', 'công cụ'] },
         { id: 'infra_list', icon: 'location_city', label: 'Danh sách Hạ tầng', section: 'TÀI SẢN HẠ TẦNG', keywords: ['hạ tầng', 'infra'] },
         { id: 'infra_register', icon: 'add_location', label: 'Ghi nhận Hạ tầng mới', section: 'TÀI SẢN HẠ TẦNG', keywords: ['ghi nhận', 'register'] },
         { id: 'infra_maintenance', icon: 'build', label: 'Bảo trì & Sửa chữa', section: 'TÀI SẢN HẠ TẦNG', keywords: ['bảo trì', 'maintenance'] },
@@ -264,7 +292,6 @@ export const MENU_MAP: Record<string, MenuItem[]> = {
         { id: 'sys_perms', icon: 'security', label: 'Phân quyền', section: 'QUẢN TRỊ', keywords: ['phân quyền', 'permission'] },
         { id: 'sys_backup', icon: 'backup', label: 'Sao lưu dữ liệu', section: 'QUẢN TRỊ', keywords: ['sao lưu', 'backup'] },
         { id: 'sys_audit_trail', icon: 'history_edu', label: 'Nhật ký Kiểm toán', section: 'KIỂM SOÁT', keywords: ['kiểm toán', 'audit'] },
-        { id: 'sys_budget_control', icon: 'account_balance', label: 'Kiểm soát Ngân sách', section: 'KIỂM SOÁT', keywords: ['kiểm soát', 'budget'] },
         { id: 'sys_logs', icon: 'history', label: 'Nhật ký truy cập', section: 'KIỂM SOÁT', keywords: ['nhật ký', 'logs'] },
     ],
 };

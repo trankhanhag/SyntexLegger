@@ -1,11 +1,12 @@
 /**
  * Custom Report Generator Routes
- * SyntexHCSN - API endpoints for custom report creation from Excel templates
+ * SyntexLegger - API endpoints for custom report creation from Excel templates
  */
 
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
+const logger = require('../src/utils/logger');
 
 const templateParser = require('../services/template-parser.service');
 const aiEnhancer = require('../services/ai-enhancer.service');
@@ -82,7 +83,7 @@ router.post('/analyze-template', upload.single('file'), async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Template analysis error:', error);
+        logger.error('Template analysis error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -132,7 +133,7 @@ router.post('/ai-enhance', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('AI Enhancement error:', error);
+        logger.error('AI Enhancement error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -182,7 +183,7 @@ router.post('/templates', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Save template error:', error);
+        logger.error('Save template error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -204,7 +205,7 @@ router.get('/templates', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get templates error:', error);
+        logger.error('Get templates error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -226,7 +227,7 @@ router.get('/templates/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get template error:', error);
+        logger.error('Get template error:', error);
         res.status(404).json({ error: error.message });
     }
 });
@@ -249,7 +250,7 @@ router.delete('/templates/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Delete template error:', error);
+        logger.error('Delete template error:', error);
         res.status(400).json({ error: error.message });
     }
 });
@@ -304,7 +305,7 @@ router.post('/generate/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Generate report error:', error);
+        logger.error('Generate report error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -347,7 +348,7 @@ router.post('/preview', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Preview error:', error);
+        logger.error('Preview error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -378,7 +379,7 @@ router.get('/schema-info', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get schema info error:', error);
+        logger.error('Get schema info error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -408,7 +409,7 @@ router.get('/generation-logs', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get logs error:', error);
+        logger.error('Get logs error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -451,7 +452,7 @@ router.post('/update-mappings/:id', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Update mappings error:', error);
+        logger.error('Update mappings error:', error);
         res.status(500).json({ error: error.message });
     }
 });

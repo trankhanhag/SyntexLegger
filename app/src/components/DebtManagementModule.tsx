@@ -10,6 +10,7 @@ import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { useSimplePrint, triggerBrowserPrint } from '../hooks/usePrintHandler';
 import { ExcelImportModal } from './ExcelImportModal';
 import { DEBT_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 interface DebtManagementModuleProps {
     subView?: string;
@@ -34,6 +35,11 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
     const [showImportModal, setShowImportModal] = useState(false);
     const [importing, setImporting] = useState(false);
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+
+    // Aging report states
+    const [showAgingReport, setShowAgingReport] = useState(false);
+    const [agingReportData, setAgingReportData] = useState<any>(null);
+    const [agingReportType, setAgingReportType] = useState<'receivables' | 'payables'>('receivables');
 
     useEffect(() => {
         setView(subView);
@@ -63,7 +69,7 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
                 setPayables(res.data);
             }
         } catch (err) {
-            console.error("Fetch debt data failed:", err);
+            logger.error("Fetch debt data failed:", err);
         } finally {
             setLoading(false);
         }
@@ -173,9 +179,12 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
                         try {
                             const type = view === 'receivables' ? 'receivables' : 'payables';
                             const res = await debtService.getAgingReport(type as any);
-                            alert(JSON.stringify(res.data, null, 2)); // Placeholder, should show modal
+                            setAgingReportData(res.data);
+                            setAgingReportType(type as 'receivables' | 'payables');
+                            setShowAgingReport(true);
                         } catch (e) {
-                            console.error(e);
+                            logger.error(e);
+                            alert('Không thể tải báo cáo phân tích tuổi nợ.');
                         }
                     }
                 });
@@ -203,7 +212,7 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
             fetchData();
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     };
@@ -440,6 +449,100 @@ export const DebtManagementModule: React.FC<DebtManagementModuleProps> = ({ subV
                     </div>
                 </div>
             )}
+
+            {/* Aging Report Modal */}
+            {showAgingReport && agingReportData && (
+                <FormModal
+                    title={agingReportType === 'receivables' ? 'Phân tích tuổi nợ phải thu' : 'Phân tích tuổi nợ phải trả'}
+                    onClose={() => setShowAgingReport(false)}
+                    icon="analytics"
+                    sizeClass="max-w-4xl"
+                >
+                    <div className="space-y-4">
+                        {/* Summary */}
+                        <div className="grid grid-cols-4 gap-3">
+                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                                <div className="text-[10px] font-bold text-green-600 uppercase">0-30 ngày</div>
+                                <div className="text-xl font-black text-green-700 dark:text-green-400">
+                                    {formatNumber(agingReportData.buckets?.['0-30'] || 0)}
+                                </div>
+                            </div>
+                            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                                <div className="text-[10px] font-bold text-yellow-600 uppercase">31-60 ngày</div>
+                                <div className="text-xl font-black text-yellow-700 dark:text-yellow-400">
+                                    {formatNumber(agingReportData.buckets?.['31-60'] || 0)}
+                                </div>
+                            </div>
+                            <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg border border-orange-200 dark:border-orange-800">
+                                <div className="text-[10px] font-bold text-orange-600 uppercase">61-90 ngày</div>
+                                <div className="text-xl font-black text-orange-700 dark:text-orange-400">
+                                    {formatNumber(agingReportData.buckets?.['61-90'] || 0)}
+                                </div>
+                            </div>
+                            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+                                <div className="text-[10px] font-bold text-red-600 uppercase">Quá 90 ngày</div>
+                                <div className="text-xl font-black text-red-700 dark:text-red-400">
+                                    {formatNumber(agingReportData.buckets?.['90+'] || 0)}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Detail table */}
+                        {agingReportData.details && agingReportData.details.length > 0 ? (
+                            <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-100 dark:bg-slate-800">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left font-bold">Đối tác</th>
+                                            <th className="px-3 py-2 text-right font-bold">0-30 ngày</th>
+                                            <th className="px-3 py-2 text-right font-bold">31-60 ngày</th>
+                                            <th className="px-3 py-2 text-right font-bold">61-90 ngày</th>
+                                            <th className="px-3 py-2 text-right font-bold">Quá 90 ngày</th>
+                                            <th className="px-3 py-2 text-right font-bold">Tổng cộng</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {agingReportData.details.map((item: any, idx: number) => (
+                                            <tr key={idx} className="border-t border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                <td className="px-3 py-2 font-medium">{item.partner_name || item.partner_code || 'N/A'}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-green-600">{formatNumber(item['0-30'] || 0)}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-yellow-600">{formatNumber(item['31-60'] || 0)}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-orange-600">{formatNumber(item['61-90'] || 0)}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-red-600">{formatNumber(item['90+'] || 0)}</td>
+                                                <td className="px-3 py-2 text-right font-mono font-bold">{formatNumber(item.total || 0)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot className="bg-slate-100 dark:bg-slate-800 font-bold">
+                                        <tr>
+                                            <td className="px-3 py-2">TỔNG CỘNG</td>
+                                            <td className="px-3 py-2 text-right font-mono text-green-600">{formatNumber(agingReportData.buckets?.['0-30'] || 0)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-yellow-600">{formatNumber(agingReportData.buckets?.['31-60'] || 0)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-orange-600">{formatNumber(agingReportData.buckets?.['61-90'] || 0)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-red-600">{formatNumber(agingReportData.buckets?.['90+'] || 0)}</td>
+                                            <td className="px-3 py-2 text-right font-mono">{formatNumber(agingReportData.total || 0)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-slate-400">
+                                <span className="material-symbols-outlined text-4xl mb-2">inbox</span>
+                                <p>Không có dữ liệu công nợ để phân tích</p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <button
+                                onClick={() => setShowAgingReport(false)}
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </FormModal>
+            )}
         </div>
     );
 };
@@ -485,7 +588,7 @@ const DebtFormModal = ({ view, onClose, onRefresh }: { view: string, onClose: ()
             onRefresh();
             onClose();
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Có lỗi xảy ra khi lưu.");
         } finally {
             setLoading(false);

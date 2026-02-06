@@ -11,6 +11,7 @@ import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { ExcelImportModal } from './ExcelImportModal';
 import { EXPENSE_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 
 // --- SHARED MODAL COMPONENT ---
@@ -54,7 +55,7 @@ const SupplierFormModal = ({ onClose }: { onClose: () => void }) => {
                 setTaxMessage('❌ ' + (data.desc || 'Ngừng hoạt động hoặc Hủy bỏ'));
             }
         } catch (error) {
-            console.error(error);
+            logger.error(error);
             setTaxStatus('INVALID');
             setTaxMessage('❌ Không thể kiểm tra (Lỗi kết nối)');
         }
@@ -74,7 +75,7 @@ const SupplierFormModal = ({ onClose }: { onClose: () => void }) => {
             alert('Lưu nhà cung cấp thành công!');
             onClose();
         } catch (error) {
-            console.error(error);
+            logger.error(error);
             alert('Có lỗi xảy ra khi lưu nhà cung cấp');
         } finally {
             setLoading(false);
@@ -174,7 +175,7 @@ const ItemFormModal = ({ onClose }: { onClose: () => void }) => {
             alert('Lưu hàng hóa thành công!');
             onClose();
         } catch (error) {
-            console.error(error);
+            logger.error(error);
             alert('Có lỗi xảy ra khi lưu hàng hóa');
         } finally {
             setLoading(false);
@@ -283,7 +284,7 @@ const SupplierList = ({ onSelect, refreshSignal }: { onSelect?: (record: any) =>
     useEffect(() => {
         masterDataService.getPartners()
             .then((res: any) => setSuppliers(res.data))
-            .catch((err: any) => console.error("Fetch suppliers failed:", err))
+            .catch((err: any) => logger.error("Fetch suppliers failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -326,7 +327,7 @@ const ItemList = ({ onSelect, refreshSignal }: { onSelect?: (rec: any) => void, 
     useEffect(() => {
         productService.getProducts()
             .then(res => setItems(res.data))
-            .catch(err => console.error("Fetch products failed:", err))
+            .catch(err => logger.error("Fetch products failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -364,7 +365,7 @@ const ExpenseCategoryList = ({ onSelect, refreshSignal }: { onSelect?: (rec: any
                 else if (data && Array.isArray(data.data)) setCategories(data.data);
                 else setCategories([]);
             })
-            .catch(err => console.error("Fetch expense categories failed:", err))
+            .catch(err => logger.error("Fetch expense categories failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -418,7 +419,7 @@ const ExpenseVoucherList = ({ onSelect, refreshSignal }: { onSelect?: (rec: any)
                 else if (data && Array.isArray(data.data)) setVouchers(data.data);
                 else setVouchers([]);
             })
-            .catch(err => console.error("Fetch expense vouchers failed:", err))
+            .catch(err => logger.error("Fetch expense vouchers failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -463,7 +464,7 @@ const ExpenseReductionList = ({ onSelect, refreshSignal }: { onSelect?: (rec: an
                 else if (data && Array.isArray(data.data)) setVouchers(data.data);
                 else setVouchers([]);
             })
-            .catch(err => console.error("Fetch expense reduction failed:", err))
+            .catch(err => logger.error("Fetch expense reduction failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -511,7 +512,7 @@ const ExpenseReportView = () => {
                 else if (data && Array.isArray(data.data)) setReportData(data.data);
                 else setReportData([]);
             })
-            .catch(err => console.error("Fetch expense report failed:", err))
+            .catch(err => logger.error("Fetch expense report failed:", err))
             .finally(() => setLoading(false));
     }, [groupBy]);
 
@@ -570,7 +571,7 @@ const BudgetComparisonView = () => {
                 else if (data && Array.isArray(data.data)) setBudgetData(data.data);
                 else setBudgetData([]);
             })
-            .catch(err => console.error("Fetch budget comparison failed:", err))
+            .catch(err => logger.error("Fetch budget comparison failed:", err))
             .finally(() => setLoading(false));
     }, [fiscalYear]);
 
@@ -660,7 +661,7 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
                     address: settings.company_address || 'Địa chỉ đơn vị'
                 });
             })
-            .catch(err => console.error('Load company info failed:', err));
+            .catch(err => logger.error('Load company info failed:', err));
     }, []);
 
     useEffect(() => {
@@ -682,7 +683,7 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
 
         promise
             .then(res => setData(res.data))
-            .catch(err => console.error(`Fetch ${view} failed:`, err))
+            .catch(err => logger.error(`Fetch ${view} failed:`, err))
             .finally(() => setLoading(false));
     };
 
@@ -881,7 +882,7 @@ export const ExpenseModule: React.FC<ExpenseModuleProps> = ({ subView = 'voucher
             setRefreshSignal(s => s + 1);
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     };
@@ -1150,7 +1151,7 @@ const ExpenseFormModal = ({ onClose, documentType, initialData }: { onClose: () 
             }
             onClose();
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi lưu chứng từ.");
         } finally {
             setLoading(false);

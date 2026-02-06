@@ -4,6 +4,7 @@ import { GeneralVoucherDetailRow } from '../GeneralVoucherDetailRow'; // Main De
 import { voucherService, masterDataService, dimensionService } from '../../api';
 import { StagingArea } from './StagingArea';
 import type { VoucherLine } from './types/voucher.types';
+import logger from '../../utils/logger';
 
 interface GeneralVoucherFormProps {
     id?: string;
@@ -176,7 +177,7 @@ export const GeneralVoucherForm: React.FC<GeneralVoucherFormProps> = ({
                     resetForm(normalized as any);
                 }
             } catch (err) {
-                console.error('Failed to load voucher:', err);
+                logger.error('Failed to load voucher:', err);
             } finally {
                 if (isActive) setLoadingData(false);
             }

@@ -1,5 +1,5 @@
 // ========================================
-// ASSET ACCOUNTING INTEGRATION - HCSN (TT 24/2024)
+// ASSET ACCOUNTING INTEGRATION - DN (TT 99/2025)
 // ========================================
 // Module tự động tạo chứng từ kế toán cho nghiệp vụ tài sản
 

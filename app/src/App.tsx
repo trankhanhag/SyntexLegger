@@ -8,18 +8,17 @@ import { Reports } from './components/Reports';
 import { CashModule } from './components/CashModule';
 import { TaxModule } from './components/TaxModule';
 import { AssetModule } from './components/AssetModule';
-import { DebtManagementModule } from './components/DebtManagementModule'; // HCSN Debt Management
+import { DebtManagementModule } from './components/DebtManagementModule';
 import { SystemModule } from './components/SystemModule';
 import { HRModule } from './components/HRModule';
 import { RevenueModule } from './components/RevenueModule';
 import { ExpenseModule } from './components/ExpenseModule';
 import { InventoryModule } from './components/InventoryModule';
+import { PurchaseModule } from './components/PurchaseModule';
+import { SalesModule } from './components/SalesModule';
 import { ContractModule } from './components/ContractModule';
 import { ProjectModule } from './components/ProjectModule';
 import { DimensionModule } from './components/DimensionModule';
-// REMOVED: Treasury and FundSource modules (HCSN-specific)
-// import { TreasuryDashboard } from './components/Treasury/TreasuryDashboard';
-// import FundSourceModule from './components/FundSourceModule';
 import { GeneralModuleV2 as GeneralModule } from './components/GeneralModuleV2';
 
 import { Footer } from './components/Footer';
@@ -29,6 +28,7 @@ import { RightSidebar } from './components/RightSidebar';
 import { KeyboardShortcutsPanelWrapper } from './components/KeyboardShortcutsPanel';
 import { SearchCommandPalette, useSearchCommandPalette } from './components/SearchCommandPalette';
 import api from './api';
+import logger from './utils/logger';
 
 function App() {
   // Load state from localStorage on init
@@ -41,6 +41,8 @@ function App() {
   const [reportView, setReportView] = useState(savedState.reportView || 'balance_sheet');
   const [revenueView, setRevenueView] = useState(savedState.revenueView || 'receipt');
   const [cashView, setCashView] = useState(savedState.cashView || 'list');
+  const [purchaseView, setPurchaseView] = useState(savedState.purchaseView || 'overview');
+  const [salesView, setSalesView] = useState(savedState.salesView || 'overview');
   const [loanView, setLoanView] = useState(savedState.loanView || 'temp_advances');
   const [taxView, setTaxView] = useState(savedState.taxView || 'vat');
   const [expenseView, setExpenseView] = useState(savedState.expenseView || 'voucher');
@@ -51,9 +53,6 @@ function App() {
   const [projectView, setProjectView] = useState(savedState.projectView || 'list');
   const [dimView, setDimView] = useState(savedState.dimView || 'overview');
   const [sysView, setSysView] = useState(savedState.sysView || 'params');
-  // REMOVED: HCSN-specific views
-  // const [fundView, setFundView] = useState(savedState.fundView || 'list');
-  // const [treasuryView, setTreasuryView] = useState(savedState.treasuryView || 'dashboard');
   const [printSignal, setPrintSignal] = useState(0);
   const [exportSignal, setExportSignal] = useState(0);
   const [importSignal, setImportSignal] = useState(0);
@@ -62,12 +61,12 @@ function App() {
   useEffect(() => {
     const state = {
       activeTab, dashboardView, generalView, reportView, revenueView, cashView,
-      loanView, taxView, expenseView, inventoryView, assetView, hrView,
+      purchaseView, salesView, loanView, taxView, expenseView, inventoryView, assetView, hrView,
       contractView, projectView, dimView, sysView
     };
     localStorage.setItem('app_navigation_state', JSON.stringify(state));
   }, [activeTab, dashboardView, generalView, reportView, revenueView, cashView,
-    loanView, taxView, expenseView, inventoryView, assetView, hrView,
+    purchaseView, salesView, loanView, taxView, expenseView, inventoryView, assetView, hrView,
     contractView, projectView, dimView, sysView]);
 
   // Compute active view for Sidebar highlighting
@@ -78,6 +77,8 @@ function App() {
       report: reportView,
       revenue: revenueView,
       cash: cashView,
+      purchase: purchaseView,
+      sales: salesView,
       loan: loanView,
       tax: taxView,
       expense: expenseView,
@@ -91,7 +92,7 @@ function App() {
     };
     return viewMap[activeTab];
   }, [activeTab, dashboardView, generalView, reportView, revenueView, cashView,
-    loanView, taxView, expenseView, inventoryView, assetView, hrView,
+    purchaseView, salesView, loanView, taxView, expenseView, inventoryView, assetView, hrView,
     contractView, projectView, dimView, sysView]);
 
   // Page Header State (title, icon, and actions to be shown in Ribbon)
@@ -122,10 +123,10 @@ function App() {
         const response = await api.post('/login', { username: autoLoginUser, password: autoLoginPassword });
         if (response.data.token) {
           localStorage.setItem('token', response.data.token);
-          console.log('Auto-login successful');
+          logger.info('Auto-login successful');
         }
       } catch (error) {
-        console.error('Auto-login failed', error);
+        logger.error('Auto-login failed', error);
       }
     };
     autoLogin();
@@ -291,13 +292,6 @@ function App() {
       return;
     }
 
-    // REMOVED: Treasury navigation (HCSN-specific)
-    // if (viewId.startsWith('treasury_') || viewId === 'treasury') {
-    //   setActiveTab('treasury');
-    //   setTreasuryView(viewId === 'treasury' ? 'dashboard' : viewId.replace('treasury_', ''));
-    //   return;
-    // }
-
     // General Accounting Views
     if (['voucher', 'voucher_list', 'check', 'closing', 'allocation', 'revaluation', 'locking', 'account_list', 'cost_item', 'opening_balance'].includes(viewId)) {
       setActiveTab('general');
@@ -305,9 +299,18 @@ function App() {
       return;
     }
 
-    // Fallback for legacy prefixes if any
-    if (viewId.startsWith('sales_')) { setActiveTab('revenue'); setRevenueView(viewId.replace('sales_', '')); return; }
-    if (viewId.startsWith('purchase_')) { setActiveTab('expense'); setExpenseView(viewId.replace('purchase_', '')); return; }
+    // Purchase module navigation
+    if (viewId.startsWith('purchase_') || viewId === 'vendor_list') {
+      setActiveTab('purchase');
+      setPurchaseView(viewId);
+      return;
+    }
+    // Sales module navigation
+    if (viewId.startsWith('sales_') || viewId === 'customer_list') {
+      setActiveTab('sales');
+      setSalesView(viewId);
+      return;
+    }
   };
 
   return (
@@ -323,6 +326,8 @@ function App() {
           setReportView('overview');
           setRevenueView('overview');
           setCashView('overview');
+          setPurchaseView('overview');
+          setSalesView('overview');
           setLoanView('overview');
           setTaxView('overview');
           setExpenseView('overview');
@@ -384,6 +389,8 @@ function App() {
           )}
           {activeTab === 'report' && <Reports subView={reportView} printSignal={printSignal} exportSignal={exportSignal} importSignal={importSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
           {activeTab === 'cash' && <CashModule subView={cashView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'purchase' && <PurchaseModule subView={purchaseView} printSignal={printSignal} exportSignal={exportSignal} importSignal={importSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
+          {activeTab === 'sales' && <SalesModule subView={salesView} printSignal={printSignal} exportSignal={exportSignal} importSignal={importSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
           {activeTab === 'tax' && <TaxModule subView={taxView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
           {activeTab === 'revenue' && <RevenueModule subView={revenueView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
           {activeTab === 'expense' && <ExpenseModule subView={expenseView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
@@ -396,11 +403,6 @@ function App() {
           {activeTab === 'dimension' && <DimensionModule subView={dimView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
 
           {activeTab === 'system' && <SystemModule subView={sysView} printSignal={printSignal} onSetHeader={setPageHeader} onNavigate={handleNavigate} />}
-
-
-          {/* REMOVED: HCSN-specific modules */}
-          {/* {activeTab === 'fund' && <FundSourceModule subView={fundView} onSetHeader={setPageHeader} onNavigate={handleNavigate} />} */}
-          {/* {activeTab === 'treasury' && <TreasuryDashboard subView={treasuryView} onNavigate={handleNavigate} />} */}
         </div>
 
         <RightSidebar />

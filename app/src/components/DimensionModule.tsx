@@ -9,6 +9,7 @@ import { useSimplePrint } from '../hooks/usePrintHandler';
 import { PivotReportModule } from './PivotReportModule';
 import { ExcelImportModal } from './ExcelImportModal';
 import { DIMENSION_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 interface DimensionModuleProps {
     subView?: string;
@@ -72,7 +73,7 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
                 setGroups(res.data);
             }
         } catch (err) {
-            console.error("Fetch dimension data failed:", err);
+            logger.error("Fetch dimension data failed:", err);
         } finally {
             setLoading(false);
         }
@@ -89,7 +90,7 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
             fetchData();
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     }, [selectedRow, view, fetchData]);
@@ -193,7 +194,7 @@ export const DimensionModule: React.FC<DimensionModuleProps> = ({ subView = 'lis
     useEffect(() => {
         dimensionService.getConfigs()
             .then(res => setConfigs(res.data))
-            .catch(err => console.error("Initial configs fetch failed:", err));
+            .catch(err => logger.error("Initial configs fetch failed:", err));
     }, []);
 
     // Print handler

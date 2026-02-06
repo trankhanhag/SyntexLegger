@@ -8,6 +8,7 @@ import { SmartTable, type ColumnDef } from '../SmartTable';
 import { masterDataService } from '../../api';
 import { ExcelImportModal, type ColumnDef as ImportColumnDef } from '../ExcelImportModal';
 import { formatNumber } from '../../utils/format';
+import logger from '../../utils/logger';
 
 interface ProductsProps {
     onSelectionChange?: (v: any) => void;
@@ -105,7 +106,7 @@ export const Products: React.FC<ProductsProps> = ({
                 description: p.description
             })));
         } catch (err) {
-            console.error("Failed to fetch products:", err);
+            logger.error("Failed to fetch products:", err);
         } finally {
             setLoading(false);
         }

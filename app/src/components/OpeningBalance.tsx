@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { masterDataService, openingBalanceService, hrService, bankService } from '../api';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { FormModal } from './FormModal';
+import logger from '../utils/logger';
 
 // Standard Modal Component (Matching GeneralModule style)
 const Modal = ({ title, onClose, children, footer }: { title: string, onClose: () => void, children: React.ReactNode, footer?: React.ReactNode }) => (
@@ -77,7 +78,7 @@ const DetailedBalanceModal = ({ account, onClose, onSave }: { account: any, onCl
 
                 setSubjects(unique);
             } catch (e) {
-                console.error("Error loading subjects:", e);
+                logger.error("Error loading subjects:", e);
             }
         };
         loadData();
@@ -236,7 +237,7 @@ const OpeningBalance = () => {
             merged.sort((a: any, b: any) => (a.account_code || '').localeCompare(b.account_code || ''));
             setBalances(merged);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
         } finally {
             setLoading(false);
         }
@@ -293,7 +294,7 @@ const OpeningBalance = () => {
             await openingBalanceService.save(period, payload);
             alert('Đã lưu số dư đầu kỳ thành công!');
         } catch (err: any) {
-            console.error(err);
+            logger.error(err);
             alert('Lỗi khi lưu: ' + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);
@@ -310,7 +311,7 @@ const OpeningBalance = () => {
             const res = await openingBalanceService.transfer(fromYear, toYear);
             alert(res.data.message);
         } catch (err: any) {
-            console.error(err);
+            logger.error(err);
             alert('Lỗi kết chuyển: ' + (err.response?.data?.message || err.message));
         } finally {
             setTransferLoading(false);

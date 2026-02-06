@@ -8,10 +8,202 @@ import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { AuditTrailModule } from './AuditTrailModule';
 import { useSimplePrint, triggerBrowserPrint } from '../hooks/usePrintHandler';
+import { BackupRestoreView } from './BackupRestoreView';
+import logger from '../utils/logger';
 
 // --- MOCK DATA ---
 
 // Mock data removed
+
+// --- ACCESS LOGS VIEW (Consistent design with AuditTrailModule) ---
+// Moved before SystemModule to avoid hoisting issues with const arrow functions
+
+interface AccessLogsViewProps {
+    logs: any[];
+    loading: boolean;
+    onRefresh: () => void;
+}
+
+const AccessLogsView: React.FC<AccessLogsViewProps> = ({ logs, loading, onRefresh }) => {
+    const [filterUser, setFilterUser] = useState('');
+    const [filterAction, setFilterAction] = useState('');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
+
+    // Get unique users and actions for filter dropdowns
+    const uniqueUsers = [...new Set(logs.map(l => l.user).filter(Boolean))];
+    const uniqueActions = [...new Set(logs.map(l => l.action).filter(Boolean))];
+
+    // Filter logs
+    const filteredLogs = logs.filter(log => {
+        if (filterUser && log.user !== filterUser) return false;
+        if (filterAction && log.action !== filterAction) return false;
+        if (filterDateFrom && new Date(log.timestamp) < new Date(filterDateFrom)) return false;
+        if (filterDateTo && new Date(log.timestamp) > new Date(filterDateTo + 'T23:59:59')) return false;
+        return true;
+    });
+
+    // Stats
+    const loginCount = logs.filter(l => l.action === 'LOGIN').length;
+    const updateCount = logs.filter(l => l.action === 'UPDATE' || l.action === 'Cập nhật').length;
+    const createCount = logs.filter(l => l.action === 'Thêm mới' || l.action === 'CREATE').length;
+
+    const logColumns: ColumnDef[] = [
+        { field: 'timestamp', headerName: 'Thời gian', width: 'w-48', align: 'center', renderCell: (v: string) => formatDateTimeVN(v) },
+        { field: 'user', headerName: 'Người dùng', width: 'w-32' },
+        {
+            field: 'action', headerName: 'Tác vụ', width: 'w-28', align: 'center', renderCell: (v: string) => (
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${v === 'Thêm mới' || v === 'LOGIN' || v === 'CREATE' ? 'bg-emerald-50 text-emerald-600' : v === 'UPDATE' || v === 'Cập nhật' ? 'bg-amber-50 text-amber-600' : v === 'DELETE' || v === 'Xóa' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>{v}</span>
+            )
+        },
+        { field: 'target', headerName: 'Đối tượng', width: 'w-48' },
+        { field: 'detail', headerName: 'Chi tiết thay đổi', width: 'flex-1' },
+    ];
+
+    return (
+        <div className="flex flex-col h-full">
+            {/* Header with Summary */}
+            <div className="p-4 bg-gradient-to-r from-red-50 to-orange-50 dark:from-slate-800 dark:to-slate-700 border-b">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-2xl text-red-600">history</span>
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-slate-800 dark:text-white">Nhật ký truy cập</h2>
+                            <p className="text-sm text-slate-500">Theo dõi lịch sử đăng nhập và các tác vụ thay đổi dữ liệu</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onRefresh}
+                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 rounded-lg border shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                    >
+                        <span className={`material-symbols-outlined text-sm ${loading ? 'animate-spin' : ''}`}>refresh</span>
+                        <span className="text-sm font-medium">Làm mới</span>
+                    </button>
+                </div>
+
+                {/* Stats Summary */}
+                <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                            <span className="material-symbols-outlined text-sm">list</span>
+                            Tổng bản ghi
+                        </div>
+                        <div className="text-lg font-bold text-slate-800 dark:text-white">{logs.length}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                            <span className="material-symbols-outlined text-sm text-emerald-500">login</span>
+                            Đăng nhập
+                        </div>
+                        <div className="text-lg font-bold text-emerald-600">{loginCount}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                            <span className="material-symbols-outlined text-sm text-amber-500">edit</span>
+                            Cập nhật
+                        </div>
+                        <div className="text-lg font-bold text-amber-600">{updateCount}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
+                            <span className="material-symbols-outlined text-sm text-blue-500">add_circle</span>
+                            Thêm mới
+                        </div>
+                        <div className="text-lg font-bold text-blue-600">{createCount}</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filter Bar - Consistent with AuditTrailModule */}
+            <div className="bg-gray-50 dark:bg-slate-800 p-4 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-4">
+                    <select
+                        value={filterUser}
+                        onChange={(e) => setFilterUser(e.target.value)}
+                        className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600 min-w-[140px]"
+                    >
+                        <option value="">Tất cả người dùng</option>
+                        {uniqueUsers.map(user => (
+                            <option key={user} value={user}>{user}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={filterAction}
+                        onChange={(e) => setFilterAction(e.target.value)}
+                        className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600 min-w-[140px]"
+                    >
+                        <option value="">Tất cả tác vụ</option>
+                        {uniqueActions.map(action => (
+                            <option key={action} value={action}>{action}</option>
+                        ))}
+                    </select>
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500">Từ:</span>
+                        <input
+                            type="date"
+                            value={filterDateFrom}
+                            onChange={(e) => setFilterDateFrom(e.target.value)}
+                            className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500">Đến:</span>
+                        <input
+                            type="date"
+                            value={filterDateTo}
+                            onChange={(e) => setFilterDateTo(e.target.value)}
+                            className="px-3 py-2 border rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600"
+                        />
+                    </div>
+
+                    {(filterUser || filterAction || filterDateFrom || filterDateTo) && (
+                        <button
+                            onClick={() => {
+                                setFilterUser('');
+                                setFilterAction('');
+                                setFilterDateFrom('');
+                                setFilterDateTo('');
+                            }}
+                            className="px-3 py-2 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1"
+                        >
+                            <span className="material-symbols-outlined text-sm">close</span>
+                            Xóa bộ lọc
+                        </button>
+                    )}
+
+                    <div className="ml-auto text-sm text-slate-500">
+                        Hiển thị: <span className="font-bold">{filteredLogs.length}</span> / {logs.length} bản ghi
+                    </div>
+                </div>
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-hidden relative">
+                {loading && (
+                    <div className="absolute inset-0 bg-white/50 dark:bg-slate-900/50 flex items-center justify-center z-10 backdrop-blur-sm">
+                        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                )}
+                {filteredLogs.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                        <span className="material-symbols-outlined text-6xl mb-4">history_off</span>
+                        <p className="text-lg font-bold">Không có dữ liệu nhật ký</p>
+                        <p className="text-sm">Chưa có hoạt động nào được ghi nhận hoặc không khớp bộ lọc</p>
+                    </div>
+                ) : (
+                    <SmartTable data={filteredLogs} columns={logColumns} keyField="id" minRows={15} />
+                )}
+            </div>
+        </div>
+    );
+};
+
+// --- SYSTEM MODULE MAIN ---
 
 interface SystemModuleProps {
     subView?: string;
@@ -62,7 +254,7 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
                 setLogs(res.data);
             }
         } catch (err) {
-            console.error("Fetch system data failed:", err);
+            logger.error("Fetch system data failed:", err);
         } finally {
             setLoading(false);
         }
@@ -161,18 +353,6 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${v === 'Thành công' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{v}</span>
             )
         },
-    ];
-
-    const logColumns: ColumnDef[] = [
-        { field: 'timestamp', headerName: 'Thời gian', width: 'w-48', align: 'center', renderCell: (v: string) => formatDateTimeVN(v) },
-        { field: 'user', headerName: 'Người dùng', width: 'w-32' },
-        {
-            field: 'action', headerName: 'Tác vụ', width: 'w-28', align: 'center', renderCell: (v: string) => (
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${v === 'Thêm mới' || v === 'LOGIN' ? 'bg-emerald-50 text-emerald-600' : v === 'UPDATE' || v === 'Cập nhật' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-600'}`}>{v}</span>
-            )
-        },
-        { field: 'target', headerName: 'Đối tượng', width: 'w-48' },
-        { field: 'detail', headerName: 'Chi tiết thay đổi', width: 'flex-1' },
     ];
 
     // ModuleOverview for System module
@@ -381,8 +561,10 @@ export const SystemModule: React.FC<SystemModuleProps> = ({ subView = 'params', 
 
                 {view === 'users' && <SmartTable data={users} columns={userColumns} keyField="id" minRows={15} />}
                 {view === 'perms' && <SmartTable data={roles} columns={permColumns} keyField="id" minRows={15} />}
-                {view === 'backup' && <SmartTable data={[]} columns={backupColumns} keyField="id" minRows={15} />}
-                {view === 'logs' && <SmartTable data={logs} columns={logColumns} keyField="id" minRows={15} />}
+                {view === 'backup' && <BackupRestoreView />}
+                {view === 'logs' && (
+                    <AccessLogsView logs={logs} loading={loading} onRefresh={fetchData} />
+                )}
             </div>
 
             {/* MODALS */}

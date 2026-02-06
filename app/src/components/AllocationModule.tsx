@@ -2,6 +2,7 @@ import React from 'react';
 import { masterDataService, assetService, voucherService } from '../api';
 import { normalizeDateValue, toInputDateValue, formatMonthVN, VIETNAMESE_MONTHS } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
+import logger from '../utils/logger';
 
 // Simple Modal Wrapper
 const Modal = ({ title, onClose, children, panelClass }: { title: string, onClose: () => void, children: React.ReactNode, panelClass?: string }) => (
@@ -111,7 +112,7 @@ export const Allocation: React.FC<AllocationProps> = ({ onClose, lockedUntil }) 
             setSelectedItems(selectableItems.map(i => i.id));
 
         } catch (err) {
-            console.error("Failed to fetch allocation data:", err);
+            logger.error("Failed to fetch allocation data:", err);
         } finally {
             setLoading(false);
         }
@@ -202,7 +203,7 @@ export const Allocation: React.FC<AllocationProps> = ({ onClose, lockedUntil }) 
 
             setStep(4);
         } catch (err) {
-            console.error("Allocation failed:", err);
+            logger.error("Allocation failed:", err);
             alert("Lỗi khi thực hiện phân bổ.");
         } finally {
             setLoading(false);

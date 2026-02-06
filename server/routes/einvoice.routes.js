@@ -1,6 +1,6 @@
 /**
  * E-Invoice API Routes
- * SyntexHCSN - Express Router for E-Invoice integration
+ * SyntexLegger - Express Router for E-Invoice integration
  *
  * Supports: VNPT Invoice, Viettel S-Invoice, BKAV eHoadon, MISA meInvoice
  */

@@ -27,21 +27,21 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
     // PHÂN HỆ KẾ TOÁN TỔNG HỢP
     general: {
         title: 'Phân hệ Kế toán Tổng hợp',
-        description: 'Quản lý ngân sách, chứng từ, sổ cái và báo cáo tài chính theo TT 99/2025/TT-BTC. Trung tâm xử lý số liệu doanh nghiệp.',
+        description: 'Quản lý chứng từ, sổ cái và báo cáo tài chính theo TT 99/2025/TT-BTC. Trung tâm xử lý số liệu kế toán doanh nghiệp.',
         icon: 'account_balance',
         iconColor: 'blue',
         workflow: [
-            { icon: 'edit_document', title: 'Lập Dự toán', description: 'Xây dựng và phân bổ dự toán năm', color: 'blue', targetView: 'fund_budget' },
-            { icon: 'upload_file', title: 'Nhập Chứng từ', description: 'Ghi nhận nghiệp vụ phát sinh', color: 'amber', targetView: 'voucher_list' },
+            { icon: 'upload_file', title: 'Nhập Chứng từ', description: 'Ghi nhận nghiệp vụ phát sinh', color: 'blue', targetView: 'voucher_list' },
+            { icon: 'fact_check', title: 'Kiểm tra', description: 'Đối chiếu và kiểm soát số liệu', color: 'amber', targetView: 'check' },
             { icon: 'published_with_changes', title: 'Kết chuyển', description: 'Xử lý cuối kỳ và khóa sổ', color: 'purple', targetView: 'closing' },
             { icon: 'summarize', title: 'Báo cáo', description: 'Lập BCTC theo TT 99/2025', color: 'green', targetView: 'balance_sheet_dn' },
         ],
         features: [
-            { icon: 'account_balance_wallet', title: 'Trung tâm Chi phí', description: 'Quản lý danh mục trung tâm', targetView: 'fund_list' },
-            { icon: 'edit_note', title: 'Quản lý Dự toán', description: 'Lập, phân bổ, điều chỉnh', targetView: 'fund_budget' },
             { icon: 'receipt_long', title: 'Chứng từ Kế toán', description: 'Quản lý toàn bộ chứng từ', targetView: 'voucher_list' },
-            { icon: 'visibility_off', title: 'TK Ngoài bảng', description: 'Theo dõi TK 008, 00... (Dự toán)', targetView: 'fund_off_balance' },
+            { icon: 'account_tree', title: 'Hệ thống Tài khoản', description: 'Danh mục TK theo TT 99', targetView: 'account_list' },
             { icon: 'menu_book', title: 'Sổ Kế toán', description: 'Sổ cái, Nhật ký chung', targetView: 'general_ledger' },
+            { icon: 'account_balance_wallet', title: 'Số dư đầu kỳ', description: 'Nhập số dư đầu năm', targetView: 'opening_balance' },
+            { icon: 'category', title: 'Khoản mục Chi phí', description: 'Danh mục khoản mục', targetView: 'cost_item' },
             { icon: 'lock_clock', title: 'Khóa sổ Kỳ', description: 'Khóa sổ, ngăn chặn chỉnh sửa', targetView: 'locking' },
         ],
     },
@@ -98,7 +98,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         iconColor: 'amber',
         workflow: [
             { icon: 'edit_note', title: 'Đề xuất Chi', description: 'Lập đề xuất, giấy đề nghị', color: 'blue', targetView: 'expense_voucher' },
-            { icon: 'approval', title: 'Phê duyệt', description: 'Kiểm soát và phê duyệt chi', color: 'amber', targetView: 'sys_budget_control' },
+            { icon: 'approval', title: 'Phê duyệt', description: 'Kiểm soát và phê duyệt chi', color: 'amber', targetView: 'expense_voucher' },
             { icon: 'payments', title: 'Thực hiện Chi', description: 'Thanh toán, chi trả', color: 'green', targetView: 'expense_payment' },
             { icon: 'receipt_long', title: 'Hoàn ứng/Quyết toán', description: 'Hoàn chứng từ, quyết toán', color: 'teal', targetView: 'loan_temp_advances' },
         ],
@@ -108,7 +108,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
             { icon: 'article', title: 'Chứng từ Chi', description: 'Quản lý phiếu đề nghị, thanh toán', targetView: 'expense_voucher' },
             { icon: 'groups', title: 'Công nợ Phải trả', description: 'Theo dõi nợ nhà cung cấp', targetView: 'loan_payables' },
             { icon: 'pie_chart', title: 'Phân bổ Chi phí', description: 'Phân bổ theo trung tâm chi phí', targetView: 'allocation' },
-            { icon: 'shield', title: 'Kiểm soát Chi', description: 'Cảnh báo vượt định mức', targetView: 'sys_budget_control' },
+            { icon: 'shield', title: 'Kiểm soát Chi', description: 'Cảnh báo vượt định mức', targetView: 'sys_audit_trail' },
         ],
     },
 
@@ -126,7 +126,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         ],
         features: [
             { icon: 'inventory', title: 'Danh mục TSCĐ', description: 'Quản lý tài sản cố định hữu hình', targetView: 'asset_fixed_list' },
-            { icon: 'handyman', title: 'CCDC', description: 'Công cụ dụng cụ, đồ dùng', targetView: 'ccdc' },
+            { icon: 'handyman', title: 'CCDC', description: 'Công cụ dụng cụ, đồ dùng', targetView: 'asset_ccdc' },
             { icon: 'construction', title: 'Hạ tầng', description: 'Tài sản kết cấu hạ tầng', targetView: 'infra_list' },
             { icon: 'trending_down', title: 'Khấu hao/Phân bổ', description: 'Tính và ghi nhận hao mòn', targetView: 'asset_depreciation' },
             { icon: 'qr_code_2', title: 'Theo dõi Nguồn', description: 'Nguồn hình thành tài sản', targetView: 'asset_report_source' },
@@ -150,7 +150,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
             { icon: 'category', title: 'Danh mục Vật tư', description: 'Quản lý mã hàng, ĐVT', targetView: 'inventory_items' },
             { icon: 'add_shopping_cart', title: 'Phiếu Nhập', description: 'Nhập kho từ mua, ĐCNB', targetView: 'inventory_receipt' },
             { icon: 'local_shipping', title: 'Phiếu Xuất', description: 'Xuất kho bán, sử dụng', targetView: 'inventory_issue' },
-            { icon: 'format_list_numbered', title: 'Thẻ Kho', description: 'Theo dõi chi tiết từng mã', targetView: 'inventory_ledger' },
+            { icon: 'format_list_numbered', title: 'Thẻ Kho', description: 'Theo dõi chi tiết từng mã', targetView: 'inventory_card' },
             { icon: 'sync_alt', title: 'Điều chuyển', description: 'Điều chuyển kho nội bộ', targetView: 'inventory_transfer' },
             { icon: 'summarize', title: 'Báo cáo NXT', description: 'Báo cáo nhập xuất tồn', targetView: 'inventory_status' },
         ],
@@ -195,7 +195,7 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         ],
         features: [
             { icon: 'account_balance', title: 'BCTC', description: 'Báo cáo tài chính theo TT 99/2025', targetView: 'balance_sheet_dn' },
-            { icon: 'receipt_long', title: 'Sổ Kế toán', description: 'In sổ cái, sổ chi tiết', targetView: 'general_ledger' },
+            { icon: 'menu_book', title: 'Sổ Kế toán', description: 'Bảng CĐTK, Sổ Cái, Sổ chi tiết', targetView: 'trial_balance' },
             { icon: 'request_quote', title: 'Báo cáo Nội bộ', description: 'So sánh kế hoạch - thực hiện', targetView: 'budget_performance' },
             { icon: 'assessment', title: 'Báo cáo Quản trị', description: 'Phân tích, thống kê', targetView: 'financial_analysis' },
             { icon: 'upload_file', title: 'Xuất XML', description: 'Xuất CSDL quốc gia', targetView: 'xml_export' },
@@ -361,14 +361,14 @@ export const MODULE_CONFIGS: Record<string, ModuleConfig> = {
         iconColor: 'purple',
         workflow: [
             { icon: 'admin_panel_settings', title: 'Phân quyền', description: 'Gán quyền theo vai trò', color: 'blue', targetView: 'sys_permission' },
-            { icon: 'account_balance', title: 'Kiểm soát NS', description: 'Cấu hình hạn mức và kiểm soát chi', color: 'amber', targetView: 'sys_budget_control' },
+            { icon: 'history_edu', title: 'Kiểm toán', description: 'Nhật ký kiểm toán hệ thống', color: 'amber', targetView: 'sys_audit_trail' },
             { icon: 'history_edu', title: 'Audit Log', description: 'Nhật ký kiểm toán hệ thống', color: 'green', targetView: 'sys_audit_trail' },
             { icon: 'backup', title: 'Sao lưu', description: 'Backup và phục hồi dữ liệu', color: 'teal', targetView: 'sys_backup' },
         ],
         features: [
             { icon: 'group', title: 'Người dùng', description: 'Quản lý tài khoản đăng nhập', targetView: 'sys_users' }, // Note: Sidebar uses 'sys_users', config used 'sys_user'. Updated to match Sidebar.
             { icon: 'security', title: 'Vai trò & Quyền', description: 'Phân quyền chức năng', targetView: 'sys_perms' }, // Sidebar uses 'sys_perms'
-            { icon: 'account_balance', title: 'Kiểm soát Ngân sách', description: 'Thiết lập quy tắc kiểm soát chi', targetView: 'sys_budget_control' },
+            { icon: 'history_edu', title: 'Nhật ký Kiểm toán', description: 'Xem lịch sử thao tác hệ thống', targetView: 'sys_audit_trail' },
             { icon: 'tune', title: 'Tham số', description: 'Cấu hình hệ thống', targetView: 'sys_params' },
             { icon: 'backup', title: 'Sao lưu', description: 'Backup/Restore dữ liệu', targetView: 'sys_backup' },
             { icon: 'history', title: 'Log Hệ thống', description: 'Xem nhật ký hoạt động', targetView: 'sys_audit_trail' },

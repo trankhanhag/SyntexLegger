@@ -1,6 +1,6 @@
 /**
  * App Configuration
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
@@ -16,7 +16,7 @@ const createApp = (db) => {
     app.set('trust proxy', 1);
 
     // CORS Configuration
-    const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:4173')
+    const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:4173')
         .split(',')
         .map(origin => origin.trim())
         .filter(Boolean);
@@ -38,9 +38,54 @@ const createApp = (db) => {
         app.use(middleware.requestLogger);
     }
 
-    // Health Check
+    // Health Check - Basic (for load balancers)
     app.get('/api/health', (req, res) => {
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    });
+
+    // Health Check - Detailed (for monitoring)
+    app.get('/api/health/detailed', async (req, res) => {
+        const startTime = Date.now();
+        const health = {
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            version: process.env.npm_package_version || '1.0.0',
+            environment: process.env.NODE_ENV || 'development',
+            checks: {}
+        };
+
+        // Check database connection
+        try {
+            await new Promise((resolve, reject) => {
+                db.get('SELECT 1', (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+            health.checks.database = { status: 'ok', responseTime: Date.now() - startTime };
+        } catch (err) {
+            health.status = 'degraded';
+            health.checks.database = { status: 'error', error: err.message };
+        }
+
+        // Memory usage
+        const memUsage = process.memoryUsage();
+        health.checks.memory = {
+            status: 'ok',
+            heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB',
+            heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + 'MB',
+            rss: Math.round(memUsage.rss / 1024 / 1024) + 'MB'
+        };
+
+        // Warn if memory usage is high (>500MB)
+        if (memUsage.heapUsed > 500 * 1024 * 1024) {
+            health.checks.memory.status = 'warning';
+            health.status = health.status === 'ok' ? 'warning' : health.status;
+        }
+
+        health.responseTime = Date.now() - startTime + 'ms';
+        res.status(health.status === 'ok' ? 200 : 503).json(health);
     });
 
     // Register All Routes

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import api, { voucherService } from '../api';
 import { SmartTable, type ColumnDef } from './SmartTable';
 import { normalizeDateValue, toInputDateValue } from '../utils/dateUtils';
+import logger from '../utils/logger';
 
 // Debounce helper
 const debounce = (func: Function, wait: number) => {
@@ -43,7 +44,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
             const accRes = await api.get('/accounts');
             setAccounts(accRes.data);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
         } finally {
             setLoading(false);
         }
@@ -69,7 +70,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
         try {
             await api.put(`/staging/${id}`, { [field]: value });
         } catch (err) {
-            console.error("Failed to save", err);
+            logger.error("Failed to save", err);
         }
     };
 
@@ -109,7 +110,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
         try {
             await api.put(`/staging/${id}`, updates);
         } catch (err) {
-            console.error("Failed to update staging row", err);
+            logger.error("Failed to update staging row", err);
         }
     };
 
@@ -188,7 +189,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
                     await voucherService.save(payload);
                     await Promise.all(rows.map(r => updateRow(r.id, { is_valid: true, error_log: 'Đã ghi sổ' })));
                 } catch (err) {
-                    console.error("Failed to post voucher:", err);
+                    logger.error("Failed to post voucher:", err);
                     failedDocs.push(docNo);
                     await Promise.all(rows.map(r => updateRow(r.id, { is_valid: false, error_log: 'Lỗi ghi sổ' })));
                 }
@@ -238,7 +239,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
             const res = await api.post('/staging', newRow);
             setTransactions(prev => [...prev, res.data.data]);
         } catch (err) {
-            console.error("Failed to commit row", err);
+            logger.error("Failed to commit row", err);
             // Optionally show toast error
         }
     };
@@ -249,7 +250,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
             await api.delete('/staging');
             setTransactions([]);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
         }
     };
 
@@ -259,7 +260,7 @@ export const Spreadsheet: React.FC<{ refreshSignal?: number }> = ({ refreshSigna
             await api.post('/staging/reset');
             loadData();
         } catch (err) {
-            console.error(err);
+            logger.error(err);
         }
     };
 

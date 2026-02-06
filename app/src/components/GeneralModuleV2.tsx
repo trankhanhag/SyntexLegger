@@ -287,8 +287,6 @@ export const GeneralModuleV2: React.FC<GeneralModuleV2Props> = ({
                 {subView === 'locking' && <PeriodLock onClose={onCloseModal} onRefresh={handleRefresh} />}
                 {subView === 'check' && <Reconciliation onClose={onCloseModal} />}
 
-                {/* FundSourceModule removed - không dùng cho Doanh nghiệp */}
-
                 {/* Master Data Views */}
                 {subView === 'cost_item' && <CostItemTable type={costType} refreshSignal={refreshSignal} />}
                 {subView === 'cost_revenue' && <CostItemTable type="Thu" refreshSignal={refreshSignal} />}

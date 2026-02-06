@@ -10,6 +10,7 @@ import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { useSimplePrint } from '../hooks/usePrintHandler';
 import { ExcelImportModal } from './ExcelImportModal';
 import { EMPLOYEE_TEMPLATE, TIMEKEEPING_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 interface HRModuleProps {
     subView?: string;
@@ -70,6 +71,7 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
             case 'timekeeping': return { title: 'Bảng chấm công', icon: 'event_available', desc: 'Theo dõi ngày công, nghỉ phép và tăng ca trong kỳ' };
             case 'insurance': return { title: 'Bảo hiểm & Khấu trừ', icon: 'health_and_safety', desc: 'Theo dõi trích nộp BHXH, BHYT, BHTN và Kinh phí công đoàn' };
             case 'report_insurance': return { title: 'Báo cáo Bảo hiểm', icon: 'description', desc: 'Báo cáo & Đối soát với cơ quan BHXH' };
+            case 'report_salary': return { title: 'Bảng thanh toán tiền lương', icon: 'summarize', desc: 'Bảng kê chi tiết thanh toán lương cho nhân viên' };
             case 'payroll': return { title: 'Bảng tính lương', icon: 'payments', desc: 'Tính toán lương, thưởng và các khoản khấu trừ thực lĩnh' };
             case 'timesheet': return { title: 'Bảng chấm công', icon: 'event_available', desc: 'Theo dõi ngày công, nghỉ phép và tăng ca trong kỳ' };
             default: return { title: 'Quản lý Nhân sự', icon: 'groups', desc: 'Hệ thống quản trị nguồn nhân lực và tiền lương' };
@@ -103,7 +105,7 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
             } else if (view === 'timekeeping' || view === 'timesheet') {
                 const res = await hrService.getTimekeeping({ period });
                 setTimekeeping(res.data);
-            } else if (view === 'payroll') {
+            } else if (view === 'payroll' || view === 'report_salary') {
                 const res = await hrService.getPayroll({ period });
                 // Enforce Traceability
                 const enriched = res.data.map((p: any) => ({
@@ -121,7 +123,7 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
                 setPayroll(enriched);
             }
         } catch (err) {
-            console.error("Fetch HR data failed:", err);
+            logger.error("Fetch HR data failed:", err);
         } finally {
             setLoading(false);
         }
@@ -253,7 +255,7 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
             fetchData();
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     };
@@ -318,6 +320,22 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
         { field: 'insurance_deduction', headerName: 'Trích BH', type: 'number', width: 'w-28', align: 'right', renderCell: (v: number) => <span className="font-mono text-red-600">{formatNumber(v)}</span> },
         { field: 'income_tax', headerName: 'Thuế TNCN', type: 'number', width: 'w-28', align: 'right', renderCell: (v: number) => <span className="font-mono text-red-600">{formatNumber(v)}</span> },
         { field: 'net_salary', headerName: 'Thực lĩnh', type: 'number', width: 'w-36', align: 'right', renderCell: (v: any) => <span className="font-mono font-black text-blue-600 text-base">{formatNumber(Number(v))}</span> },
+    ];
+
+    // Salary Report Columns (Bảng thanh toán tiền lương - more detailed)
+    const salaryReportColumns: ColumnDef[] = [
+        { field: 'id', headerName: 'Mã NV', width: 'w-20', fontClass: 'font-bold' },
+        { field: 'name', headerName: 'Họ và tên', width: 'w-36' },
+        { field: 'department', headerName: 'Phòng ban', width: 'w-28' },
+        { field: 'position', headerName: 'Chức vụ', width: 'w-28' },
+        { field: 'salary_coefficient', headerName: 'Hệ số', width: 'w-16', align: 'center', renderCell: (v: number) => <span className="font-mono">{Number(v || 0).toFixed(2)}</span> },
+        { field: 'actual_days', headerName: 'Ngày công', width: 'w-20', align: 'center' },
+        { field: 'gross_salary', headerName: 'Lương Gross', type: 'number', width: 'w-28', align: 'right', renderCell: (v: number) => <span className="font-mono">{formatNumber(v)}</span> },
+        { field: 'allowance', headerName: 'Phụ cấp', type: 'number', width: 'w-24', align: 'right', renderCell: (v: number) => <span className="font-mono text-green-600">{formatNumber(v)}</span> },
+        { field: 'insurance_deduction', headerName: 'Trừ BHXH', type: 'number', width: 'w-24', align: 'right', renderCell: (v: number) => <span className="font-mono text-red-500">{formatNumber(v)}</span> },
+        { field: 'income_tax', headerName: 'Trừ thuế', type: 'number', width: 'w-24', align: 'right', renderCell: (v: number) => <span className="font-mono text-red-500">{formatNumber(v)}</span> },
+        { field: 'net_salary', headerName: 'Thực lĩnh', type: 'number', width: 'w-32', align: 'right', renderCell: (v: any) => <span className="font-mono font-black text-blue-600">{formatNumber(Number(v))}</span> },
+        { field: 'signature', headerName: 'Ký nhận', width: 'w-24', align: 'center', renderCell: () => <span className="text-slate-300">___________</span> },
     ];
 
     // Contracts & Decisions Columns
@@ -442,6 +460,53 @@ export const HRModule: React.FC<HRModuleProps> = ({ subView = 'employees', print
                         discrepancies={discrepancies}
                         onDiscrepanciesUpdate={setDiscrepancies}
                     />
+                ) : view === 'report_salary' ? (
+                    <div className="flex flex-col h-full">
+                        {/* Report Header */}
+                        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 border-b print:bg-white">
+                            <div className="text-center mb-4">
+                                <h2 className="text-lg font-bold text-slate-800 dark:text-white">BẢNG THANH TOÁN TIỀN LƯƠNG</h2>
+                                <p className="text-sm text-slate-600 dark:text-slate-300">Kỳ lương: {period}</p>
+                            </div>
+                            {payroll.length > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-600 dark:text-slate-400">Tổng số nhân viên: <strong>{payroll.length}</strong></span>
+                                    <span className="text-slate-600 dark:text-slate-400">
+                                        Tổng thực lĩnh: <strong className="text-blue-600">{formatNumber(payroll.reduce((sum, p) => sum + Number(p.net_salary?.value || p.net_salary || 0), 0))} VNĐ</strong>
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        {/* Report Table */}
+                        <div className="flex-1 overflow-auto">
+                            <SmartTable
+                                data={payroll}
+                                columns={salaryReportColumns}
+                                keyField="id"
+                                onSelectionChange={setSelectedRow}
+                                minRows={15}
+                                showTotalRow={true}
+                                emptyMessage="Chưa có dữ liệu lương cho kỳ này. Vui lòng tính lương trước."
+                            />
+                        </div>
+                        {/* Report Footer */}
+                        <div className="p-4 border-t bg-slate-50 dark:bg-slate-800 print:bg-white">
+                            <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                                <div>
+                                    <p className="font-bold text-slate-700 dark:text-slate-300">Người lập bảng</p>
+                                    <p className="text-slate-500 text-xs mt-1">(Ký, ghi rõ họ tên)</p>
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-700 dark:text-slate-300">Kế toán trưởng</p>
+                                    <p className="text-slate-500 text-xs mt-1">(Ký, ghi rõ họ tên)</p>
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-700 dark:text-slate-300">Giám đốc</p>
+                                    <p className="text-slate-500 text-xs mt-1">(Ký, ghi rõ họ tên, đóng dấu)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 ) : (
                     <SmartTable
                         data={
@@ -697,7 +762,7 @@ const EmployeeFormModal = ({ initialData, onClose, onSave }: { initialData?: any
 
     useEffect(() => {
         // Load Salary Grades
-        hrService.getSalaryGrades().then(res => setSalaryGrades(res.data)).catch(console.error);
+        hrService.getSalaryGrades().then(res => setSalaryGrades(res.data)).catch(logger.error);
     }, []);
 
     const handleLevelChange = (level: number) => {
@@ -719,7 +784,7 @@ const EmployeeFormModal = ({ initialData, onClose, onSave }: { initialData?: any
             onSave();
         } catch (err) {
             alert("Lỗi khi lưu thông tin");
-            console.error(err);
+            logger.error(err);
         } finally {
             setLoading(false);
         }

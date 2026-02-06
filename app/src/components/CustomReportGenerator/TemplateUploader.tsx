@@ -213,7 +213,7 @@ export const TemplateUploader: React.FC<TemplateUploaderProps> = ({
                     <li>Đặt tiêu đề cột ở dòng đầu tiên hoặc dòng thứ 2</li>
                     <li>Sử dụng tên cột rõ ràng: "Số chứng từ", "Ngày hạch toán", "Số tiền"...</li>
                     <li>Tránh merge cells ở các dòng tiêu đề</li>
-                    <li>Có thể dùng mẫu báo cáo có sẵn của TT24/2024</li>
+                    <li>Có thể dùng mẫu báo cáo có sẵn của TT 99/2025 (Doanh nghiệp)</li>
                 </ul>
             </div>
         </div>

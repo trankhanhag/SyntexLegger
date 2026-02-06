@@ -1,6 +1,6 @@
 /**
  * Audit Trail Middleware
- * SyntexHCSN - Automatic audit logging for all API operations
+ * SyntexLegger - Automatic audit logging for all API operations
  *
  * Provides automatic audit trail logging for:
  * - Voucher operations (create, update, delete, post)
@@ -10,6 +10,7 @@
  */
 
 const auditService = require('../services/audit.service');
+const logger = require('../src/utils/logger');
 
 /**
  * Map HTTP methods to action types
@@ -187,7 +188,7 @@ const createAuditMiddleware = () => {
                     });
                 }
             } catch (auditError) {
-                console.error('Audit logging error:', auditError);
+                logger.error('Audit logging error:', auditError);
                 // Don't fail the request if audit logging fails
             }
         });
@@ -251,7 +252,7 @@ const logCustomAudit = async (req, auditData) => {
             source: 'API'
         });
     } catch (error) {
-        console.error('Custom audit logging error:', error);
+        logger.error('Custom audit logging error:', error);
     }
 };
 
@@ -288,7 +289,7 @@ const voucherAuditMiddleware = (db) => {
                         req.auditOldValues = { voucher, items };
                     }
                 } catch (error) {
-                    console.error('Error fetching old voucher for audit:', error);
+                    logger.error('Error fetching old voucher for audit:', error);
                 }
             }
         }
@@ -327,7 +328,7 @@ const budgetAuditMiddleware = (db) => {
                     req.auditOldValues = oldEntity;
                 }
             } catch (error) {
-                console.error('Error fetching old budget entity for audit:', error);
+                logger.error('Error fetching old budget entity for audit:', error);
             }
         }
 
@@ -352,7 +353,7 @@ const sessionAuditMiddleware = () => {
                         username: data.user?.username || req.body.username,
                         ip_address: req.ip,
                         user_agent: req.headers['user-agent']
-                    }).catch(err => console.error('Session audit error:', err));
+                    }).catch(err => logger.error('Session audit error:', err));
 
                     // Log login action
                     auditService.logAudit({
@@ -364,7 +365,7 @@ const sessionAuditMiddleware = () => {
                         user_id: data.user?.id,
                         ip_address: req.ip,
                         user_agent: req.headers['user-agent']
-                    }).catch(err => console.error('Login audit error:', err));
+                    }).catch(err => logger.error('Login audit error:', err));
                 }
 
                 return originalJson.call(this, data);
@@ -382,7 +383,7 @@ const sessionAuditMiddleware = () => {
                     username: req.user.username,
                     user_id: req.user.id,
                     ip_address: req.ip
-                }).catch(err => console.error('Logout audit error:', err));
+                }).catch(err => logger.error('Logout audit error:', err));
             }
         }
 

@@ -1,6 +1,6 @@
 /**
  * Middleware Index - Export all middleware
- * SyntexHCSN - Ke toan HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Enterprise Accounting System (TT 99/2025)
  */
 
 const authMiddleware = require('./auth.middleware');
@@ -8,8 +8,11 @@ const webhookMiddleware = require('./webhook.middleware');
 const errorMiddleware = require('./error.middleware');
 const validationMiddleware = require('./validation.middleware');
 const auditMiddleware = require('./audit.middleware');
+const errors = require('../src/errors');
 
 module.exports = {
+    // Custom errors & async handler
+    ...errors,
     // Auth middleware
     verifyToken: authMiddleware.verifyToken,
     requireRole: authMiddleware.requireRole,

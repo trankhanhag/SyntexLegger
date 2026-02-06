@@ -1625,8 +1625,11 @@ export const SmartTable: React.FC<SmartTableProps> = ({
                                 onClick={() => {
                                     if (rawSelectedValue.source?.type === 'link') {
                                         window.location.hash = rawSelectedValue.source.target;
-                                    } else {
-                                        alert("Modal source not implemented yet");
+                                    } else if (rawSelectedValue.source?.type === 'modal') {
+                                        // For modal type, show source information
+                                        const label = rawSelectedValue.source.label || 'Chi tiết';
+                                        const target = rawSelectedValue.source.target || '';
+                                        alert(`📊 Nguồn dữ liệu: ${label}\n\nTham chiếu: ${target}\nGiá trị: ${rawSelectedValue.value}\nCông thức: ${rawSelectedValue.formula || 'N/A'}`);
                                     }
                                 }}
                                 title={`Đi đến nguồn: ${rawSelectedValue.source.label || 'Chi tiết'}`}

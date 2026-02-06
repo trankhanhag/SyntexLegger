@@ -1,6 +1,6 @@
 /**
  * Off-Balance Tracking APIs
- * SyntexHCSN - Theo dõi tài khoản ngoài bảng theo TT 24/2024
+ * SyntexLegger - Theo dõi tài khoản ngoài bảng theo TT 99/2025
  */
 
 function getOffBalanceLogs(db) {

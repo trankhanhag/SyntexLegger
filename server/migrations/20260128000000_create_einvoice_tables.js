@@ -1,6 +1,6 @@
 /**
  * E-Invoice Integration Tables Migration
- * SyntexHCSN - Store e-invoice provider configs and imported invoices
+ * SyntexLegger - Store e-invoice provider configs and imported invoices
  */
 
 /**

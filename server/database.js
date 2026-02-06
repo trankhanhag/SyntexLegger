@@ -5,11 +5,15 @@ const DBSOURCE = "db_v2.sqlite";
 const DEFAULT_ADMIN_USER = process.env.DEFAULT_ADMIN_USER || 'admin';
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || 'admin';
 
+// Flag to disable sample data insertion (set to true for production)
+const DISABLE_SAMPLE_DATA = process.env.DISABLE_SAMPLE_DATA === 'true' || true;
+
 // ========================================
-// HỆ THỐNG TÀI KHOẢN HÀNH CHÍNH SỰ NGHIỆP  
-// Theo Thông tư 24/2024/TT-BTC (Hiệu lực từ 01/01/2025)
+// HỆ THỐNG TÀI KHOẢN DOANH NGHIỆP
+// Theo Thông tư 99/2025/TT-BTC (Hiệu lực từ 01/01/2026)
+// Không bao gồm tài khoản ngoại bảng (0xx)
 // ========================================
-const { ALL_ACCOUNTS_TT24 } = require('./hcsn_tt24_accounts');
+const { DN_ACCOUNTS_TT99 } = require('./dn_tt99_accounts');
 
 // Old DN Chart of Accounts (TT 200/2014) - COMMENTED OUT
 /* const DEFAULT_ACCOUNTS = [
@@ -101,7 +105,7 @@ const { ALL_ACCOUNTS_TT24 } = require('./hcsn_tt24_accounts');
     // ... (Old chart truncated for brevity in view, assuming we are appending after this or fixing table creation)
 
     // ===============================================
-    // SYSTEM SETTINGS TABLE & SEEDING (HCSN Unit Info)
+    // SYSTEM SETTINGS TABLE & SEEDING (DN Unit Info)
     // ===============================================
     db.run(`CREATE TABLE IF NOT EXISTS system_settings (
         key TEXT PRIMARY KEY,
@@ -110,9 +114,9 @@ const { ALL_ACCOUNTS_TT24 } = require('./hcsn_tt24_accounts');
         if (err) {
             console.error("Error creating system_settings table", err);
         } else {
-            // Seed Default HCSN Unit Info if not exists
+            // Seed Default DN Unit Info if not exists
             const defaultSettings = [
-                { key: 'unit_name', value: 'Đơn vị HCSN Mẫu' },
+                { key: 'unit_name', value: 'Doanh nghiệp Mẫu' },
                 { key: 'unit_address', value: 'Số 123, Đường Chính, TP. Hà Nội' },
                 { key: 'unit_tax_code', value: '0101234567' },
                 { key: 'unit_chapter', value: '018' }, // Mã chương
@@ -120,7 +124,7 @@ const { ALL_ACCOUNTS_TT24 } = require('./hcsn_tt24_accounts');
                 { key: 'unit_parent_agency', value: 'UBND Thành Phố' },
                 { key: 'unit_head_name', value: 'Nguyễn Văn A' }, 
                 { key: 'unit_chief_accountant', value: 'Trần Thị B' },
-                { key: 'accounting_regime', value: 'CIRCULAR_24_2024' },
+                { key: 'accounting_regime', value: 'CIRCULAR_99_2025' },
                 { key: 'base_currency', value: 'VND' },
                 { key: 'decimal_format', value: 'vi-VN' },
                 { key: 'allow_negative_inventory', value: '0' },
@@ -169,8 +173,8 @@ const { ALL_ACCOUNTS_TT24 } = require('./hcsn_tt24_accounts');
     { code: '911', name: 'Xác định kết quả kinh doanh', category: 'XÁC ĐỊNH KQKD' }
 ]; */
 
-//  Use HCSN TT24 Accounts
-const DEFAULT_ACCOUNTS = ALL_ACCOUNTS_TT24;
+// Use Enterprise TT99/2025 Accounts (without off-balance accounts)
+const DEFAULT_ACCOUNTS = DN_ACCOUNTS_TT99;
 
 
 let db = new sqlite3.Database(DBSOURCE, (err) => {
@@ -199,7 +203,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             db.get("SELECT count(*) as count FROM companies", (err, row) => {
                 if (!err && row && row.count === 0) {
                     db.run(`INSERT INTO companies (id, name, address, tax_code) VALUES (?, ?, ?, ?)`,
-                        ['1', 'Đơn vị HCSN Mẫu', '123 Đường Mẫu, Hà Nội', '0101234567'], (err) => {
+                        ['1', 'Doanh nghiệp Mẫu', '123 Đường Mẫu, Hà Nội', '0101234567'], (err) => {
                             // Default company seeded
                         });
                 }
@@ -286,16 +290,18 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 tax_code TEXT,
                 address TEXT
             )`, () => {
-                const insert = 'INSERT OR IGNORE INTO partners (partner_code, partner_name, tax_code, address) VALUES (?,?,?,?)';
-                const samplePartners = [
-                    ['NCC001', 'Công ty Cổ phần Thép Việt', '0101234567', 'Số 1 Đào Duy Anh, Hà Nội'],
-                    ['NCC002', 'Công ty TNHH Nam Anh', '0309876543', '123 Cách Mạng Tháng 8, TP HCM'],
-                    ['NCC_RISK', 'DN Bỏ Trốn (Fake)', '999000111', 'Khu ổ chuột, Hà Nội'],
-                    ['KH001', 'Đại lý Bán lẻ Toàn Cầu', '0102223334', 'Khu Công nghiệp Quế Võ, Bắc Ninh'],
-                    ['KH002', 'Cửa hàng Nội thất Minh Quân', '0405556667', '32Lý Thường Kiệt, Đà Nẵng']
-                ];
-                samplePartners.forEach(p => db.run(insert, p));
-                // Partners seeded
+                // Sample partners (DISABLED FOR PRODUCTION)
+                if (!DISABLE_SAMPLE_DATA) {
+                    const insert = 'INSERT OR IGNORE INTO partners (partner_code, partner_name, tax_code, address) VALUES (?,?,?,?)';
+                    const samplePartners = [
+                        ['NCC001', 'Công ty Cổ phần Thép Việt', '0101234567', 'Số 1 Đào Duy Anh, Hà Nội'],
+                        ['NCC002', 'Công ty TNHH Nam Anh', '0309876543', '123 Cách Mạng Tháng 8, TP HCM'],
+                        ['NCC_RISK', 'DN Bỏ Trốn (Fake)', '999000111', 'Khu ổ chuột, Hà Nội'],
+                        ['KH001', 'Đại lý Bán lẻ Toàn Cầu', '0102223334', 'Khu Công nghiệp Quế Võ, Bắc Ninh'],
+                        ['KH002', 'Cửa hàng Nội thất Minh Quân', '0405556667', '32Lý Thường Kiệt, Đà Nẵng']
+                    ];
+                    samplePartners.forEach(p => db.run(insert, p));
+                }
             });
 
             // 4. Table: General Ledger (NEW)
@@ -313,26 +319,27 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                 item_code TEXT,
                 sub_item_code TEXT
             )`, () => {
-                // Seed some initial balances for demo
-                const insert = 'INSERT OR IGNORE INTO general_ledger (id, trx_date, posted_at, doc_no, description, account_code, reciprocal_acc, debit_amount, credit_amount, origin_staging_id) VALUES (?,?,?,?,?,?,?,?,?,?)';
-                const now = new Date().toISOString();
-                const sampleGL = [
-                    ['seed_1', '2024-01-01', now, 'PK001', 'Số dư đầu kỳ 242', '242', '111', 120000000, 0, 'seed'],
-                    ['seed_2', '2024-01-01', now, 'PK001', 'Số dư đầu kỳ 242', '111', '242', 0, 120000000, 'seed'],
-                    ['seed_3', '2024-01-01', now, 'PK002', 'Số dư ngoại tệ USD', '1112', '111', 125000000, 0, 'seed'],
-                    ['seed_4', '2024-01-01', now, 'PK002', 'Số dư ngoại tệ USD', '111', '1112', 0, 125000000, 'seed'],
-                    ['seed_5', '2024-12-01', now, 'DT001', 'Doanh thu bán lẻ', '111', '511', 450000000, 0, 'seed'],
-                    ['seed_6', '2024-12-01', now, 'DT001', 'Doanh thu bán lẻ', '511', '111', 0, 450000000, 'seed'],
-                    ['seed_7', '2024-12-01', now, 'CP001', 'Chi phí quản lý', '642', '111', 280000000, 0, 'seed'],
-                    ['seed_8', '2024-12-01', now, 'CP001', 'Chi phí quản lý', '111', '642', 0, 280000000, 'seed'],
-                    ['seed_9', '2024-12-05', now, 'PC015', 'Chi tiếp khách quá mức', '6428', '111', 100000000, 0, 'seed'],
-                    ['seed_10', '2024-12-05', now, 'PC015', 'Chi tiếp khách quá mức', '111', '6428', 0, 100000000, 'seed'],
-                    ['seed_11', '2024-12-10', now, 'PC099', 'Mua hàng từ DN rủi ro', '156', '331', 50000000, 0, 'seed'],
-                    ['seed_12', '2024-12-10', now, 'PC099', 'Mua hàng từ DN rủi ro', '331', '156', 0, 50000000, 'seed'],
-                    ['seed_risk_p', '2024-12-10', now, 'PC099', 'Mua hàng từ DN rủi ro', 'NCC_RISK', '', 0, 0, 'seed']
-                ];
-                sampleGL.forEach(row => db.run(insert, row));
-                // General Ledger sample data seeded
+                // Seed some initial balances for demo (DISABLED FOR PRODUCTION)
+                if (!DISABLE_SAMPLE_DATA) {
+                    const insert = 'INSERT OR IGNORE INTO general_ledger (id, trx_date, posted_at, doc_no, description, account_code, reciprocal_acc, debit_amount, credit_amount, origin_staging_id) VALUES (?,?,?,?,?,?,?,?,?,?)';
+                    const now = new Date().toISOString();
+                    const sampleGL = [
+                        ['seed_1', '2024-01-01', now, 'PK001', 'Số dư đầu kỳ 242', '242', '111', 120000000, 0, 'seed'],
+                        ['seed_2', '2024-01-01', now, 'PK001', 'Số dư đầu kỳ 242', '111', '242', 0, 120000000, 'seed'],
+                        ['seed_3', '2024-01-01', now, 'PK002', 'Số dư ngoại tệ USD', '1112', '111', 125000000, 0, 'seed'],
+                        ['seed_4', '2024-01-01', now, 'PK002', 'Số dư ngoại tệ USD', '111', '1112', 0, 125000000, 'seed'],
+                        ['seed_5', '2024-12-01', now, 'DT001', 'Doanh thu bán lẻ', '111', '511', 450000000, 0, 'seed'],
+                        ['seed_6', '2024-12-01', now, 'DT001', 'Doanh thu bán lẻ', '511', '111', 0, 450000000, 'seed'],
+                        ['seed_7', '2024-12-01', now, 'CP001', 'Chi phí quản lý', '642', '111', 280000000, 0, 'seed'],
+                        ['seed_8', '2024-12-01', now, 'CP001', 'Chi phí quản lý', '111', '642', 0, 280000000, 'seed'],
+                        ['seed_9', '2024-12-05', now, 'PC015', 'Chi tiếp khách quá mức', '6428', '111', 100000000, 0, 'seed'],
+                        ['seed_10', '2024-12-05', now, 'PC015', 'Chi tiếp khách quá mức', '111', '6428', 0, 100000000, 'seed'],
+                        ['seed_11', '2024-12-10', now, 'PC099', 'Mua hàng từ DN rủi ro', '156', '331', 50000000, 0, 'seed'],
+                        ['seed_12', '2024-12-10', now, 'PC099', 'Mua hàng từ DN rủi ro', '331', '156', 0, 50000000, 'seed'],
+                        ['seed_risk_p', '2024-12-10', now, 'PC099', 'Mua hàng từ DN rủi ro', 'NCC_RISK', '', 0, 0, 'seed']
+                    ];
+                    sampleGL.forEach(row => db.run(insert, row));
+                }
 
                 // 4.1. Migration: Add partner_code to general_ledger
                 db.all("PRAGMA table_info(general_ledger)", (err, columns) => {
@@ -375,26 +382,27 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             error_log TEXT,
             raw_data TEXT
         )`, () => {
-            // Seed Sample Data if empty
-            db.get("SELECT count(*) as count FROM staging_transactions", (err, row) => {
-                if (err) return console.error(err.message);
-                if (row.count === 0) {
-                    // Seeding sample transactions
-                    const insert = `INSERT INTO staging_transactions (id, batch_id, row_index, trx_date, doc_no, description, debit_acc, credit_acc, amount, partner_code, is_valid) VALUES (?,?,?,?,?,?,?,?,?,?,?)`;
+            // Seed Sample Data if empty (DISABLED FOR PRODUCTION)
+            if (!DISABLE_SAMPLE_DATA) {
+                db.get("SELECT count(*) as count FROM staging_transactions", (err, row) => {
+                    if (err) return console.error(err.message);
+                    if (row.count === 0) {
+                        const insert = `INSERT INTO staging_transactions (id, batch_id, row_index, trx_date, doc_no, description, debit_acc, credit_acc, amount, partner_code, is_valid) VALUES (?,?,?,?,?,?,?,?,?,?,?)`;
 
-                    const samples = [
-                        ['trx_001', 'batch_init', 1, '2024-03-20', 'PKT001', 'Kết chuyển thuế GTGT đầu kỳ', '3331', '1331', 15000000, '', 1],
-                        ['trx_002', 'batch_init', 2, '2024-03-21', 'PKT002', 'Trích khấu hao TSCD tháng 3', '642', '214', 5000000, '', 1],
-                        ['trx_003', 'batch_init', 3, '2024-03-22', 'PKT003', 'Phân bổ chi phí trả trước', '642', '242', 2000000, '', 1],
-                        ['trx_004', 'batch_init', 4, '2024-03-23', 'PKT004', 'Bút toán điều chỉnh sai sót năm trước', '421', '331', 10000000, 'NCC_A', 1],
-                        ['trx_005', 'batch_init', 5, '2024-03-25', 'PKT005', 'Tiền thưởng lễ cho nhân viên', '642', '334', 3500000, '', 1],
-                    ];
+                        const samples = [
+                            ['trx_001', 'batch_init', 1, '2024-03-20', 'PKT001', 'Kết chuyển thuế GTGT đầu kỳ', '3331', '1331', 15000000, '', 1],
+                            ['trx_002', 'batch_init', 2, '2024-03-21', 'PKT002', 'Trích khấu hao TSCD tháng 3', '642', '214', 5000000, '', 1],
+                            ['trx_003', 'batch_init', 3, '2024-03-22', 'PKT003', 'Phân bổ chi phí trả trước', '642', '242', 2000000, '', 1],
+                            ['trx_004', 'batch_init', 4, '2024-03-23', 'PKT004', 'Bút toán điều chỉnh sai sót năm trước', '421', '331', 10000000, 'NCC_A', 1],
+                            ['trx_005', 'batch_init', 5, '2024-03-25', 'PKT005', 'Tiền thưởng lễ cho nhân viên', '642', '334', 3500000, '', 1],
+                        ];
 
-                    samples.forEach(s => {
-                        db.run(insert, s);
-                    });
-                }
-            });
+                        samples.forEach(s => {
+                            db.run(insert, s);
+                        });
+                    }
+                });
+            }
         });
 
         // 6. Table: Vouchers (Header) - NEW
@@ -437,12 +445,12 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             budget_estimate_id TEXT,
             FOREIGN KEY (voucher_id) REFERENCES vouchers (id) ON DELETE CASCADE
         )`, () => {
-            // Seed sample voucher if empty
+            // Seed sample voucher if empty (DISABLED FOR PRODUCTION)
             db.get("SELECT count(*) as count FROM vouchers", (err, row) => {
                 if (err) return;
-                if (row.count === 0) {
+                if (row.count === 0 && !DISABLE_SAMPLE_DATA) {
                     const vId = `v_${Date.now()}`;
-                    db.run(`INSERT INTO vouchers (id, doc_no, doc_date, post_date, description, type, total_amount, created_at) 
+                    db.run(`INSERT INTO vouchers (id, doc_no, doc_date, post_date, description, type, total_amount, created_at)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                         [vId, 'PK0001', '2024-03-20', '2024-03-20', 'Kết chuyển thuế đầu kỳ', 'GENERAL', 15000000, new Date().toISOString()]);
 
@@ -509,40 +517,40 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     }
                 });
 
-                // --- SEED MISSING VOUCHERS FOR SALES/PURCHASE/CASH (Fix for User Issue) ---
-                db.get("SELECT count(*) as count FROM vouchers WHERE id = 'v_sales_001'", (err, row) => {
-                    if (err) return;
-                    if (row.count === 0) {
-                        const now = new Date().toISOString();
-                        const insertVoucher = `INSERT INTO vouchers (id, doc_no, doc_date, post_date, description, type, total_amount, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-                        const insertItem = `INSERT INTO voucher_items (voucher_id, description, debit_acc, credit_acc, amount, dim1, dim2, partner_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+                // --- SEED MISSING VOUCHERS FOR SALES/PURCHASE/CASH (DISABLED FOR PRODUCTION) ---
+                if (!DISABLE_SAMPLE_DATA) {
+                    db.get("SELECT count(*) as count FROM vouchers WHERE id = 'v_sales_001'", (err, row) => {
+                        if (err) return;
+                        if (row.count === 0) {
+                            const now = new Date().toISOString();
+                            const insertVoucher = `INSERT INTO vouchers (id, doc_no, doc_date, post_date, description, type, total_amount, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+                            const insertItem = `INSERT INTO voucher_items (voucher_id, description, debit_acc, credit_acc, amount, dim1, dim2, partner_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
 
-                        // 1. Sales Invoice IV001
-                        const v1 = `v_sales_001`;
-                        db.run(insertVoucher, [v1, 'IV001', '2024-03-01', '2024-03-01', 'Bán hàng hóa đợt 1', 'SALES_INVOICE', 55000000, now]);
-                        db.run(insertItem, [v1, 'Doanh thu bán hàng', '131', '5111', 50000000, '', '', 'KH001']);
-                        db.run(insertItem, [v1, 'Thuế GTGT đầu ra', '131', '3331', 5000000, '', '', 'KH001']);
+                            // 1. Sales Invoice IV001
+                            const v1 = `v_sales_001`;
+                            db.run(insertVoucher, [v1, 'IV001', '2024-03-01', '2024-03-01', 'Bán hàng hóa đợt 1', 'SALES_INVOICE', 55000000, now]);
+                            db.run(insertItem, [v1, 'Doanh thu bán hàng', '131', '5111', 50000000, '', '', 'KH001']);
+                            db.run(insertItem, [v1, 'Thuế GTGT đầu ra', '131', '3331', 5000000, '', '', 'KH001']);
 
-                        // 2. Sales Invoice IV002
-                        const v2 = `v_sales_002`;
-                        db.run(insertVoucher, [v2, 'IV002', '2024-03-05', '2024-03-05', 'Bán dịch vụ tư vấn', 'SALES_INVOICE', 13200000, now]);
-                        db.run(insertItem, [v2, 'Doanh thu dịch vụ', '131', '5113', 12000000, '', '', 'KH002']);
-                        db.run(insertItem, [v2, 'Thuế GTGT đầu ra', '131', '3331', 1200000, '', '', 'KH002']);
+                            // 2. Sales Invoice IV002
+                            const v2 = `v_sales_002`;
+                            db.run(insertVoucher, [v2, 'IV002', '2024-03-05', '2024-03-05', 'Bán dịch vụ tư vấn', 'SALES_INVOICE', 13200000, now]);
+                            db.run(insertItem, [v2, 'Doanh thu dịch vụ', '131', '5113', 12000000, '', '', 'KH002']);
+                            db.run(insertItem, [v2, 'Thuế GTGT đầu ra', '131', '3331', 1200000, '', '', 'KH002']);
 
-                        // 3. Purchase Invoice PNK-24-001
-                        const v3 = `v_pur_001`;
-                        db.run(insertVoucher, [v3, 'PNK-24-001', '2024-10-02', '2024-10-02', 'Nhập kho thép cuộn phi 6', 'PURCHASE_INVOICE', 220000000, now]);
-                        db.run(insertItem, [v3, 'Giá vốn hàng nhập', '1561', '331', 200000000, '', '', 'NCC001']);
-                        db.run(insertItem, [v3, 'Thuế GTGT đầu vào', '1331', '331', 20000000, '', '', 'NCC001']);
+                            // 3. Purchase Invoice PNK-24-001
+                            const v3 = `v_pur_001`;
+                            db.run(insertVoucher, [v3, 'PNK-24-001', '2024-10-02', '2024-10-02', 'Nhập kho thép cuộn phi 6', 'PURCHASE_INVOICE', 220000000, now]);
+                            db.run(insertItem, [v3, 'Giá vốn hàng nhập', '1561', '331', 200000000, '', '', 'NCC001']);
+                            db.run(insertItem, [v3, 'Thuế GTGT đầu vào', '1331', '331', 20000000, '', '', 'NCC001']);
 
-                        // 4. Cash Payment (Chi phí tiếp khách)
-                        const v4 = `v_cash_001`;
-                        db.run(insertVoucher, [v4, 'PC099', '2024-12-05', '2024-12-05', 'Chi tiếp khách quá mức', 'CASH_OUT', 100000000, now]);
-                        db.run(insertItem, [v4, 'Chi phí QLDN', '6428', '1111', 100000000, '', '', '']);
-
-                        // Vouchers seeded
-                    }
-                });
+                            // 4. Cash Payment (Chi phí tiếp khách)
+                            const v4 = `v_cash_001`;
+                            db.run(insertVoucher, [v4, 'PC099', '2024-12-05', '2024-12-05', 'Chi tiếp khách quá mức', 'CASH_OUT', 100000000, now]);
+                            db.run(insertItem, [v4, 'Chi phí QLDN', '6428', '1111', 100000000, '', '', '']);
+                        }
+                    });
+                }
 
                 // 7.2. Migration: Add status to vouchers
                 db.all("PRAGMA table_info(vouchers)", (err, columns) => {
@@ -575,8 +583,11 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
             status TEXT DEFAULT 'active',
             created_at TEXT
         )`, () => {
-                const insert = 'INSERT OR IGNORE INTO bank_accounts (id, bank_name, acc_no, api_key, created_at) VALUES (?,?,?,?,?)';
-                db.run(insert, ['bank_1', 'Vietcombank', '0011001234567', 'API-999-888', new Date().toISOString()]);
+                // Sample bank account (DISABLED FOR PRODUCTION)
+                if (!DISABLE_SAMPLE_DATA) {
+                    const insert = 'INSERT OR IGNORE INTO bank_accounts (id, bank_name, acc_no, api_key, created_at) VALUES (?,?,?,?,?)';
+                    db.run(insert, ['bank_1', 'Vietcombank', '0011001234567', 'API-999-888', new Date().toISOString()]);
+                }
             });
             // 9. Table: Allocations (Matching Payments to Invoices)
             db.run(`CREATE TABLE IF NOT EXISTS allocations (
@@ -665,7 +676,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     // Checklist tasks seeded
                 });
 
-                // 12. Table: Fixed Assets (LEGACY - Disabled, replaced by HCSN TT 24/2024 schema below)
+                // 12. Table: Fixed Assets (LEGACY - Disabled, replaced by DN TT 99/2025 schema below)
                 /*
                 db.run(`CREATE TABLE IF NOT EXISTS fixed_assets (
                     id TEXT PRIMARY KEY,
@@ -700,16 +711,18 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     allocated REAL,
                     remaining REAL
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO ccdc_items (id, code, name, start_date, cost, life_months, allocated, remaining) VALUES (?,?,?,?,?,?,?,?)';
-                    const sampleCCDC = [
-                        ['C1', 'CC001', 'Ghế xoay nhân viên', '2024-01-15', 1200000, 12, 600000, 600000],
-                        ['C2', 'CC002', 'Bộ lưu điện UPS 1000VA', '2024-02-01', 2500000, 24, 200000, 2300000]
-                    ];
-                    sampleCCDC.forEach(c => db.run(insert, c));
-                    // CCDC items seeded
+                    // Sample CCDC items (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO ccdc_items (id, code, name, start_date, cost, life_months, allocated, remaining) VALUES (?,?,?,?,?,?,?,?)';
+                        const sampleCCDC = [
+                            ['C1', 'CC001', 'Ghế xoay nhân viên', '2024-01-15', 1200000, 12, 600000, 600000],
+                            ['C2', 'CC002', 'Bộ lưu điện UPS 1000VA', '2024-02-01', 2500000, 24, 200000, 2300000]
+                        ];
+                        sampleCCDC.forEach(c => db.run(insert, c));
+                    }
                 });
 
-                // 14. Table: Employees (Updated for HCSN)
+                // 14. Table: Employees (Updated for DN)
                 db.run(`CREATE TABLE IF NOT EXISTS employees (
                     id TEXT PRIMARY KEY,
                     code TEXT UNIQUE,
@@ -717,7 +730,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     position TEXT,           -- Chức vụ
                     department TEXT,         -- Phòng ban
                     
-                    -- Thông tin Lương HCSN
+                    -- Thông tin Lương DN
                     salary_grade_id TEXT,    -- Mã ngạch lương (CV, CVC...)
                     salary_level INTEGER,    -- Bậc lương
                     salary_coefficient REAL, -- Hệ số lương
@@ -741,7 +754,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     // Seed data logic can be updated later if needed
                 });
 
-                // 15. Table: Ngạch/Bậc lương (Salary Grades) - HCSN
+                // 15. Table: Ngạch/Bậc lương (Salary Grades) - DN
                 db.run(`CREATE TABLE IF NOT EXISTS salary_grades (
                     id TEXT PRIMARY KEY,
                     code TEXT UNIQUE,        -- Mã ngạch (01.003 - Chuyên viên cao cấp)
@@ -753,7 +766,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     description TEXT
                 )`);
 
-                // 16. Table: Phụ cấp nhân viên (Employee Allowances) - HCSN
+                // 16. Table: Phụ cấp nhân viên (Employee Allowances) - DN
                 db.run(`CREATE TABLE IF NOT EXISTS employee_allowances (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     employee_id TEXT,
@@ -790,12 +803,14 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     overtime_hours INTEGER,
                     FOREIGN KEY (employee_id) REFERENCES employees (id)
                 )`, () => {
-                    // Seed initial timekeeping for current employees
-                    const insert = 'INSERT OR IGNORE INTO timekeeping (employee_id, period, standard_days, actual_days, overtime_hours) VALUES (?,?,?,?,?)';
-                    const now = new Date().toISOString().substring(0, 7);
-                    db.run(insert, ['NV001', now, 22, 22, 4]);
-                    db.run(insert, ['NV002', now, 22, 20, 0]);
-                    db.run(insert, ['NV003', now, 22, 21, 8]);
+                    // Sample timekeeping (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO timekeeping (employee_id, period, standard_days, actual_days, overtime_hours) VALUES (?,?,?,?,?)';
+                        const now = new Date().toISOString().substring(0, 7);
+                        db.run(insert, ['NV001', now, 22, 22, 4]);
+                        db.run(insert, ['NV002', now, 22, 20, 0]);
+                        db.run(insert, ['NV003', now, 22, 21, 8]);
+                    }
                 });
 
                 // 15. Table: Sales Orders
@@ -808,8 +823,11 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     amount REAL,
                     status TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO sales_orders (id, date, doc_no, customer, description, amount, status) VALUES (?,?,?,?,?,?,?)';
-                    db.run(insert, ['SO001', '2024-03-01', 'DH001', 'Công ty TNHH ABC', 'Đặt hàng tháng 3', 50000000, 'Đã duyệt']);
+                    // Sample sales orders (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO sales_orders (id, date, doc_no, customer, description, amount, status) VALUES (?,?,?,?,?,?,?)';
+                        db.run(insert, ['SO001', '2024-03-01', 'DH001', 'Công ty TNHH ABC', 'Đặt hàng tháng 3', 50000000, 'Đã duyệt']);
+                    }
                 });
 
                 // 16. Table: Sales Invoices
@@ -827,9 +845,12 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     dim1 TEXT,
                     dim2 TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO sales_invoices (id, date, doc_no, customer, description, amount, tax, total, contract_code, project_code, dim1, dim2) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)';
-                    db.run(insert, ['IV001', '2024-03-01', 'HD0001', 'Công ty TNHH ABC', 'Bán hàng hóa đợt 1', 50000000, 5000000, 55000000, 'HĐ-2024-001', 'DA001', '', '']);
-                    db.run(insert, ['IV002', '2024-03-05', 'HD0002', 'Khách lẻ - Anh Nam', 'Bán dịch vụ tư vấn', 12000000, 1200000, 13200000, '', '', '', '']);
+                    // Sample sales invoices (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO sales_invoices (id, date, doc_no, customer, description, amount, tax, total, contract_code, project_code, dim1, dim2) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)';
+                        db.run(insert, ['IV001', '2024-03-01', 'HD0001', 'Công ty TNHH ABC', 'Bán hàng hóa đợt 1', 50000000, 5000000, 55000000, 'HĐ-2024-001', 'DA001', '', '']);
+                        db.run(insert, ['IV002', '2024-03-05', 'HD0002', 'Khách lẻ - Anh Nam', 'Bán dịch vụ tư vấn', 12000000, 1200000, 13200000, '', '', '', '']);
+                    }
                 });
 
                 // 17. Table: Purchase Orders
@@ -842,10 +863,13 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     status TEXT,
                     deliveryDate TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO purchase_orders (id, docNo, date, supplier, amount, status, deliveryDate) VALUES (?,?,?,?,?,?,?)';
-                    db.run(insert, [1, 'PO-24-001', '2024-10-01', 'Công ty TNHH Thép Việt', 500000000, 'Đã duyệt', '2024-10-15']);
-                    db.run(insert, [2, 'PO-24-002', '2024-10-05', 'Nhà máy Xi măng Nghi Sơn', 300000000, 'Chờ duyệt', '2024-10-20']);
-                    db.run(insert, [3, 'PO-24-003', '2024-10-10', 'Hợp tác xã Gạch men Bình Dương', 150000000, 'Đang giao', '2024-10-12']);
+                    // Sample purchase orders (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO purchase_orders (id, docNo, date, supplier, amount, status, deliveryDate) VALUES (?,?,?,?,?,?,?)';
+                        db.run(insert, [1, 'PO-24-001', '2024-10-01', 'Công ty TNHH Thép Việt', 500000000, 'Đã duyệt', '2024-10-15']);
+                        db.run(insert, [2, 'PO-24-002', '2024-10-05', 'Nhà máy Xi măng Nghi Sơn', 300000000, 'Chờ duyệt', '2024-10-20']);
+                        db.run(insert, [3, 'PO-24-003', '2024-10-10', 'Hợp tác xã Gạch men Bình Dương', 150000000, 'Đang giao', '2024-10-12']);
+                    }
                 });
 
                 // 17.1 Table: Purchase Invoices (NEW)
@@ -861,11 +885,14 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     total REAL,
                     type TEXT -- 'INBOUND' or 'SERVICE'
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO purchase_invoices (id, date, doc_no, description, warehouse, supplier, amount, tax, total, type) VALUES (?,?,?,?,?,?,?,?,?,?)';
-                    db.run(insert, [1, '2024-10-02', 'PNK-24-001', 'Nhập kho thép cuộn phi 6', 'Kho chính', 'Công ty TNHH Thép Việt', 200000000, 20000000, 220000000, 'INBOUND']);
-                    db.run(insert, [2, '2024-10-06', 'PNK-24-002', 'Nhập kho xi măng bao PC40', 'Kho phu', 'Nhà máy Xi măng Nghi Sơn', 120000000, 12000000, 132000000, 'INBOUND']);
-                    db.run(insert, [3, '2024-10-10', 'SVC-24-001', 'Cước tiền điện T10/2024', '', 'Điện lực Hà Nội', 15000000, 1500000, 16500000, 'SERVICE']);
-                    db.run(insert, [4, '2024-10-11', 'SVC-24-002', 'Cước tiền nước T10/2024', '', 'Nước sạch Sông Đà', 2000000, 100000, 2100000, 'SERVICE']);
+                    // Sample purchase invoices (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO purchase_invoices (id, date, doc_no, description, warehouse, supplier, amount, tax, total, type) VALUES (?,?,?,?,?,?,?,?,?,?)';
+                        db.run(insert, [1, '2024-10-02', 'PNK-24-001', 'Nhập kho thép cuộn phi 6', 'Kho chính', 'Công ty TNHH Thép Việt', 200000000, 20000000, 220000000, 'INBOUND']);
+                        db.run(insert, [2, '2024-10-06', 'PNK-24-002', 'Nhập kho xi măng bao PC40', 'Kho phu', 'Nhà máy Xi măng Nghi Sơn', 120000000, 12000000, 132000000, 'INBOUND']);
+                        db.run(insert, [3, '2024-10-10', 'SVC-24-001', 'Cước tiền điện T10/2024', '', 'Điện lực Hà Nội', 15000000, 1500000, 16500000, 'SERVICE']);
+                        db.run(insert, [4, '2024-10-11', 'SVC-24-002', 'Cước tiền nước T10/2024', '', 'Nước sạch Sông Đà', 2000000, 100000, 2100000, 'SERVICE']);
+                    }
                 });
 
                 // 18. Table: Contracts
@@ -875,14 +902,20 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     name TEXT,
                     partner TEXT,
                     date TEXT,
+                    end_date TEXT,
                     value REAL,
                     received_or_paid REAL,
                     status TEXT,
                     type TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO contracts (id, code, name, partner, date, value, received_or_paid, status, type) VALUES (?,?,?,?,?,?,?,?,?)';
-                    db.run(insert, ['S1', 'HĐB-2024-001', 'Cung cấp giải pháp ERP', 'Tập đoàn Vingroup', '2024-01-15', 1500000000, 500000000, 'Đang thực hiện', 'sales']);
-                    db.run(insert, ['P1', 'HĐM-2024-001', 'Thuê văn phòng Landmark 81', 'Vinhomes Central Park', '2024-01-01', 1200000000, 600000000, 'Đang thực hiện', 'purchase']);
+                    // Add end_date column if not exists (for existing databases)
+                    db.run(`ALTER TABLE contracts ADD COLUMN end_date TEXT`, () => {});
+                    // Sample contracts (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO contracts (id, code, name, partner, date, value, received_or_paid, status, type) VALUES (?,?,?,?,?,?,?,?,?)';
+                        db.run(insert, ['S1', 'HĐB-2024-001', 'Cung cấp giải pháp ERP', 'Tập đoàn Vingroup', '2024-01-15', 1500000000, 500000000, 'Đang thực hiện', 'sales']);
+                        db.run(insert, ['P1', 'HĐM-2024-001', 'Thuê văn phòng Landmark 81', 'Vinhomes Central Park', '2024-01-01', 1200000000, 600000000, 'Đang thực hiện', 'purchase']);
+                    }
                 });
 
                 // 18.1. Table: Contract Appendices (NEW)
@@ -896,8 +929,11 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     content TEXT,
                     FOREIGN KEY (contract_id) REFERENCES contracts (id)
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO contract_appendices (id, contract_id, code, name, date, value, content) VALUES (?,?,?,?,?,?,?)';
-                    db.run(insert, ['A1', 'S1', 'PL01/HĐB-2024-001', 'Bổ sung module báo cáo BI', '2024-02-15', 200000000, 'Thêm các mẫu báo cáo quản trị nâng cao']);
+                    // Sample contract appendices (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO contract_appendices (id, contract_id, code, name, date, value, content) VALUES (?,?,?,?,?,?,?)';
+                        db.run(insert, ['A1', 'S1', 'PL01/HĐB-2024-001', 'Bổ sung module báo cáo BI', '2024-02-15', 200000000, 'Thêm các mẫu báo cáo quản trị nâng cao']);
+                    }
                 });
 
                 // 19. Table: Projects
@@ -912,8 +948,11 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     progress INTEGER,
                     status TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO projects (id, code, name, customer, budget, start, end, progress, status) VALUES (?,?,?,?,?,?,?,?,?)';
-                    db.run(insert, ['DA001', 'PRJ-HCM-001', 'Triển khai ERP tại HCM', 'VietCorp', 2000000000, '2024-01-01', '2024-12-31', 45, 'Đang triển khai']);
+                    // Sample projects (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO projects (id, code, name, customer, budget, start, end, progress, status) VALUES (?,?,?,?,?,?,?,?,?)';
+                        db.run(insert, ['DA001', 'PRJ-HCM-001', 'Triển khai ERP tại HCM', 'VietCorp', 2000000000, '2024-01-01', '2024-12-31', 45, 'Đang triển khai']);
+                    }
                 });
 
                 // 19.1. Table: Project Tasks (NEW)
@@ -927,9 +966,12 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     status TEXT,
                     FOREIGN KEY (project_id) REFERENCES projects (id)
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO project_tasks (id, project_id, task, owner, deadline, progress, status) VALUES (?,?,?,?,?,?,?)';
-                    db.run(insert, ['T1', 'DA001', 'Khảo sát quy trình nghiệp vụ', 'Nguyễn Văn A', '2024-02-15', 100, 'Hoàn thành']);
-                    db.run(insert, ['T2', 'DA001', 'Thiết kế giải pháp tổng thể', 'Trần Thị B', '2024-04-30', 60, 'Đang thực hiện']);
+                    // Sample project tasks (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO project_tasks (id, project_id, task, owner, deadline, progress, status) VALUES (?,?,?,?,?,?,?)';
+                        db.run(insert, ['T1', 'DA001', 'Khảo sát quy trình nghiệp vụ', 'Nguyễn Văn A', '2024-02-15', 100, 'Hoàn thành']);
+                        db.run(insert, ['T2', 'DA001', 'Thiết kế giải pháp tổng thể', 'Trần Thị B', '2024-04-30', 60, 'Đang thực hiện']);
+                    }
                 });
 
                 // 19.2. Table: Project Budget Lines (NEW)
@@ -940,10 +982,13 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     budget REAL,
                     FOREIGN KEY (project_id) REFERENCES projects (id)
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO project_budget_lines (id, project_id, category, budget) VALUES (?,?,?,?)';
-                    db.run(insert, ['B1', 'DA001', 'Chi phí nhân sự', 1200000000]);
-                    db.run(insert, ['B2', 'DA001', 'Thiết bị & Bản quyền', 500000000]);
-                    db.run(insert, ['B3', 'DA001', 'Chi phí triển khai/Đi lại', 300000000]);
+                    // Sample project budget lines (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO project_budget_lines (id, project_id, category, budget) VALUES (?,?,?,?)';
+                        db.run(insert, ['B1', 'DA001', 'Chi phí nhân sự', 1200000000]);
+                        db.run(insert, ['B2', 'DA001', 'Thiết bị & Bản quyền', 500000000]);
+                        db.run(insert, ['B3', 'DA001', 'Chi phí triển khai/Đi lại', 300000000]);
+                    }
                 });
 
                 // 20. Table: Loan Contracts
@@ -956,8 +1001,11 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     status TEXT,
                     date TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO loan_contracts (id, docNo, partner, limit_amount, collateral, status, date) VALUES (?,?,?,?,?,?,?)';
-                    db.run(insert, [1, 'HDV-001-2024', 'Ngân hàng VCB - CN Hà Đông', 5000000000, 'Bất động sản số 21 Láng Hạ', 'Hợp lệ', '2024-01-15']);
+                    // Sample loan contracts (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO loan_contracts (id, docNo, partner, limit_amount, collateral, status, date) VALUES (?,?,?,?,?,?,?)';
+                        db.run(insert, [1, 'HDV-001-2024', 'Ngân hàng VCB - CN Hà Đông', 5000000000, 'Bất động sản số 21 Láng Hạ', 'Hợp lệ', '2024-01-15']);
+                    }
                 });
 
                 // 20.1. Table: Debt Notes (NEW)
@@ -972,13 +1020,15 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     purpose TEXT,
                     FOREIGN KEY (contract_id) REFERENCES loan_contracts (id)
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO debt_notes (id, contract_id, doc_no, amount, rate, start_date, end_date, purpose) VALUES (?,?,?,?,?,?,?,?)';
-                    const sampleNotes = [
-                        [101, 1, 'KU-VCB-01', 2000000000, 8.5, '2024-02-01', '2024-08-01', 'Bổ sung vốn lưu động'],
-                        [102, 1, 'KU-VCB-02', 1500000000, 8.7, '2024-04-15', '2024-10-15', 'Mua nguyên vật liệu']
-                    ];
-                    sampleNotes.forEach(n => db.run(insert, n));
-                    // Debt notes seeded
+                    // Sample debt notes (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO debt_notes (id, contract_id, doc_no, amount, rate, start_date, end_date, purpose) VALUES (?,?,?,?,?,?,?,?)';
+                        const sampleNotes = [
+                            [101, 1, 'KU-VCB-01', 2000000000, 8.5, '2024-02-01', '2024-08-01', 'Bổ sung vốn lưu động'],
+                            [102, 1, 'KU-VCB-02', 1500000000, 8.7, '2024-04-15', '2024-10-15', 'Mua nguyên vật liệu']
+                        ];
+                        sampleNotes.forEach(n => db.run(insert, n));
+                    }
                 });
 
                 // 21. Table: Dimensions
@@ -989,11 +1039,14 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     type INTEGER, -- 1 to 5
                     description TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO dimensions (id, code, name, type, description) VALUES (?,?,?,?,?)';
-                    db.run(insert, ['D1-001', 'M1-001', 'Đối tượng thống kê 1A', 1, 'Mô tả cho mã thống kê 1A']);
+                    // Sample dimensions (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO dimensions (id, code, name, type, description) VALUES (?,?,?,?,?)';
+                        db.run(insert, ['D1-001', 'M1-001', 'Đối tượng thống kê 1A', 1, 'Mô tả cho mã thống kê 1A']);
+                    }
                 });
 
-                // 22. Table: Dimension Configs
+                // 22. Table: Dimension Configs (SEED DATA - Configuration)
                 db.run(`CREATE TABLE IF NOT EXISTS dimension_configs (
                     id INTEGER PRIMARY KEY,
                     name TEXT,
@@ -1002,6 +1055,7 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     isMandatory INTEGER,
                     note TEXT
                 )`, () => {
+                    // Dimension configs are SEED DATA - always insert
                     const insert = 'INSERT OR IGNORE INTO dimension_configs (id, name, label, isActive, isMandatory, note) VALUES (?,?,?,?,?,?)';
                     [1, 2, 3, 4, 5].forEach(i => {
                         db.run(insert, [i, `Dimension ${i}`, `Tên chiều ${i}`, 1, 0, `Ghi chú cho chiều ${i}`]);
@@ -1016,8 +1070,11 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     dim_type INTEGER,
                     description TEXT
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO dimension_groups (id, code, name, dim_type, description) VALUES (?,?,?,?,?)';
-                    db.run(insert, ['G1', 'GRP-01', 'Nhóm thống kê Alpha', 1, 'Gom nhóm các đối tượng loại Alpha']);
+                    // Sample dimension groups (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO dimension_groups (id, code, name, dim_type, description) VALUES (?,?,?,?,?)';
+                        db.run(insert, ['G1', 'GRP-01', 'Nhóm thống kê Alpha', 1, 'Gom nhóm các đối tượng loại Alpha']);
+                    }
                 });
 
                 // 22.2. Table: Dimension Group Members (NEW)
@@ -1028,8 +1085,11 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                     FOREIGN KEY (group_id) REFERENCES dimension_groups (id) ON DELETE CASCADE,
                     FOREIGN KEY (dimension_id) REFERENCES dimensions (id) ON DELETE CASCADE
                 )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO dimension_group_members (group_id, dimension_id) VALUES (?,?)';
-                    db.run(insert, ['G1', 'D1-001']);
+                    // Sample dimension group members (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO dimension_group_members (group_id, dimension_id) VALUES (?,?)';
+                        db.run(insert, ['G1', 'D1-001']);
+                    }
                 });
 
                 // 23. Table: Budgets (Norms)
@@ -1045,15 +1105,17 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
 
                     db.all("PRAGMA table_info(budgets)", (err, columns) => {
                         const seedBudgets = () => {
-                            db.get("SELECT count(*) as count FROM budgets", (err, row) => {
-                                if (err) return;
-                                if (row && row.count === 0) {
-                                    const insert = 'INSERT INTO budgets (account_code, period, budget_amount, notes, created_at) VALUES (?,?,?,?,?)';
-                                    db.run(insert, ['642', '2024-12', 50000000, 'Ngân sách chi phí quản lý T12', new Date().toISOString()]);
-                                    db.run(insert, ['641', '2024-12', 30000000, 'Ngân sách chi phí bán hàng T12', new Date().toISOString()]);
-                                    // Budgets seeded
-                                }
-                            });
+                            // Sample budgets (DISABLED FOR PRODUCTION)
+                            if (!DISABLE_SAMPLE_DATA) {
+                                db.get("SELECT count(*) as count FROM budgets", (err, row) => {
+                                    if (err) return;
+                                    if (row && row.count === 0) {
+                                        const insert = 'INSERT INTO budgets (account_code, period, budget_amount, notes, created_at) VALUES (?,?,?,?,?)';
+                                        db.run(insert, ['642', '2024-12', 50000000, 'Ngân sách chi phí quản lý T12', new Date().toISOString()]);
+                                        db.run(insert, ['641', '2024-12', 30000000, 'Ngân sách chi phí bán hàng T12', new Date().toISOString()]);
+                                    }
+                                });
+                            }
                         };
 
                         if (!err && columns) {
@@ -1091,12 +1153,13 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
                         type TEXT,
                         conversion_units TEXT -- JSON string for unit matrix
                     )`, () => {
-                    const insert = 'INSERT OR IGNORE INTO products (code, name, unit, price, tax, type) VALUES (?,?,?,?,?,?)';
-                    db.run(insert, ['VT001', 'Thép cuộn phi 6', 'Kg', 20000, 10, 'Vật tư']);
-                    db.run(insert, ['VT002', 'Xi măng PC40', 'Bao 50kg', 80000, 8, 'Vật tư']);
-                    db.run(insert, ['DV001', 'Cước vận chuyển', 'Chuyến', 500000, 10, 'Dịch vụ']);
-                    // Products seeded
-                    // Database schema initialized
+                    // Sample products (DISABLED FOR PRODUCTION)
+                    if (!DISABLE_SAMPLE_DATA) {
+                        const insert = 'INSERT OR IGNORE INTO products (code, name, unit, price, tax, type) VALUES (?,?,?,?,?,?)';
+                        db.run(insert, ['VT001', 'Thép cuộn phi 6', 'Kg', 20000, 10, 'Vật tư']);
+                        db.run(insert, ['VT002', 'Xi măng PC40', 'Bao 50kg', 80000, 8, 'Vật tư']);
+                        db.run(insert, ['DV001', 'Cước vận chuyển', 'Chuyến', 500000, 10, 'Dịch vụ']);
+                    }
 
                     // 25. Table: System Logs (NEW)
                     db.run(`CREATE TABLE IF NOT EXISTS system_logs (
@@ -1142,17 +1205,16 @@ let db = new sqlite3.Database(DBSOURCE, (err) => {
 });
 
 // ========================================
-// HCSN TABLES - Thêm mới theo TT 24/2024/TT-BTC
+// DN TABLES - Thêm mới theo TT 99/2025/TT-BTC
 // ========================================
 
-// Load hệ thống tài khoản HCSN (Already imported at top of file)
-// const { ALL_ACCOUNTS_TT24 } = require('./hcsn_tt24_accounts');
+// Load hệ thống tài khoản DN (Already imported at top of file)
 
 // [REMOVED] Duplicate fund_sources table creation. Uses new schema defined later.
 
 // [REMOVED] Duplicate budget_estimates table creation. Uses new schema defined later.
 
-// Bảng: Tài sản Cố định HCSN (Fixed Assets) - TT 24/2024
+// Bảng: Tài sản Cố định (Fixed Assets) - TT 99/2025
 db.run(`CREATE TABLE IF NOT EXISTS fixed_assets (
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
@@ -1183,62 +1245,60 @@ db.run(`CREATE TABLE IF NOT EXISTS fixed_assets (
     if (err) return console.error("Error creating 'fixed_assets':", err);
     // fixed_assets table initialized
 
-    // Seed sample data
-    const assets = [
-        {
-            id: 'fa-001',
-            code: 'TSCD-001',
-            name: 'Máy tính Dell Latitude 7420',
-            category: 'TANGIBLE',
-            account_code: '211',
-            original_value: 25000000,
-            depreciation_method: 'STRAIGHT_LINE',
-            useful_life: 3,
-            depreciation_rate: 33.33,
-            purchase_date: '2023-01-15',
-            usage_date: '2023-01-20',
-            dept: 'Phòng IT',
-            status: 'ACTIVE',
-            asset_condition: 'GOOD'
-        },
-        {
-            id: 'fa-002',
-            code: 'TSCD-002',
-            name: 'Bàn làm việc gỗ cao cấp',
-            category: 'TANGIBLE',
-            account_code: '211',
-            original_value: 8000000,
-            depreciation_method: 'STRAIGHT_LINE',
-            useful_life: 5,
-            depreciation_rate: 20,
-            purchase_date: '2022-06-01',
-            usage_date: '2022-06-05',
-            dept: 'Phòng Hành chính',
-            status: 'ACTIVE',
-            asset_condition: 'GOOD'
-        }
-    ];
+    // Seed sample data (DISABLED FOR PRODUCTION)
+    if (!DISABLE_SAMPLE_DATA) {
+        const assets = [
+            {
+                id: 'fa-001',
+                code: 'TSCD-001',
+                name: 'Máy tính Dell Latitude 7420',
+                category: 'TANGIBLE',
+                account_code: '211',
+                original_value: 25000000,
+                depreciation_method: 'STRAIGHT_LINE',
+                useful_life: 3,
+                depreciation_rate: 33.33,
+                purchase_date: '2023-01-15',
+                usage_date: '2023-01-20',
+                dept: 'Phòng IT',
+                status: 'ACTIVE',
+                asset_condition: 'GOOD'
+            },
+            {
+                id: 'fa-002',
+                code: 'TSCD-002',
+                name: 'Bàn làm việc gỗ cao cấp',
+                category: 'TANGIBLE',
+                account_code: '211',
+                original_value: 8000000,
+                depreciation_method: 'STRAIGHT_LINE',
+                useful_life: 5,
+                depreciation_rate: 20,
+                purchase_date: '2022-06-01',
+                usage_date: '2022-06-05',
+                dept: 'Phòng Hành chính',
+                status: 'ACTIVE',
+                asset_condition: 'GOOD'
+            }
+        ];
 
-    const insertSQL = `INSERT OR IGNORE INTO fixed_assets 
-        (id, code, name, asset_category, account_code, original_value, accumulated_depreciation, net_value,
-         depreciation_method, useful_life, depreciation_rate, purchase_date, usage_date, dept, status, asset_condition, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
+        const insertSQL = `INSERT OR IGNORE INTO fixed_assets
+            (id, code, name, asset_category, account_code, original_value, accumulated_depreciation, net_value,
+             depreciation_method, useful_life, depreciation_rate, purchase_date, usage_date, dept, status, asset_condition, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
 
-    assets.forEach(a => {
-        db.run(insertSQL, [
-            a.id, a.code, a.name, a.category, a.account_code,
-            a.original_value, a.original_value,
-            a.depreciation_method, a.useful_life, a.depreciation_rate,
-            a.purchase_date, a.usage_date, a.dept, a.status, a.asset_condition
-        ]);
-    });
-
-    // Sample fixed assets seeded
-
-
+        assets.forEach(a => {
+            db.run(insertSQL, [
+                a.id, a.code, a.name, a.category, a.account_code,
+                a.original_value, a.original_value,
+                a.depreciation_method, a.useful_life, a.depreciation_rate,
+                a.purchase_date, a.usage_date, a.dept, a.status, a.asset_condition
+            ]);
+        });
+    }
 });
 
-// Bảng: Tài sản kết cấu hạ tầng (Infrastructure Assets) - MỚI TT 24/2024
+// Bảng: Tài sản kết cấu hạ tầng (Infrastructure Assets) - TT 99/2025
 db.run(`CREATE TABLE IF NOT EXISTS infrastructure_assets (
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE,
@@ -1270,7 +1330,7 @@ db.run(`CREATE TABLE IF NOT EXISTS infrastructure_assets (
     // infrastructure_assets table initialized
 });
 
-// Bảng: Công cụ dụng cụ (CCDC - Chi phí trả trước) - HCSN
+// Bảng: Công cụ dụng cụ (CCDC - Chi phí trả trước) - DN
 db.run(`CREATE TABLE IF NOT EXISTS ccdc_items (
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
@@ -1287,24 +1347,26 @@ db.run(`CREATE TABLE IF NOT EXISTS ccdc_items (
 )`, (err) => {
     if (err) console.error("Error creating 'ccdc_items':", err);
 
-    // Seed sample CCDC data
-    db.get("SELECT COUNT(*) as count FROM ccdc_items", (checkErr, row) => {
-        if (!checkErr && (!row || row.count === 0)) {
-            const sampleCCDC = [
-                { id: 'ccdc_001', code: 'CCDC001', name: 'Ghế xoay nhân viên', start_date: '2025-07-01', cost: 1200000, life_months: 12, allocated: 0, remaining: 1200000 },
-                { id: 'ccdc_002', code: 'CCDC002', name: 'Bộ lưu điện UPS 1000VA', start_date: '2025-06-01', cost: 2500000, life_months: 12, allocated: 0, remaining: 2500000 },
-                { id: 'ccdc_003', code: 'CCDC003', name: 'Phần mềm Office 365 (1 năm)', start_date: '2025-01-01', cost: 3600000, life_months: 12, allocated: 0, remaining: 3600000 }
-            ];
-            sampleCCDC.forEach(item => {
-                db.run(`INSERT OR IGNORE INTO ccdc_items (id, code, name, start_date, cost, life_months, allocated, remaining, created_at) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-                    [item.id, item.code, item.name, item.start_date, item.cost, item.life_months, item.allocated, item.remaining]);
-            });
-        }
-    });
+    // Seed sample CCDC data (DISABLED FOR PRODUCTION)
+    if (!DISABLE_SAMPLE_DATA) {
+        db.get("SELECT COUNT(*) as count FROM ccdc_items", (checkErr, row) => {
+            if (!checkErr && (!row || row.count === 0)) {
+                const sampleCCDC = [
+                    { id: 'ccdc_001', code: 'CCDC001', name: 'Ghế xoay nhân viên', start_date: '2025-07-01', cost: 1200000, life_months: 12, allocated: 0, remaining: 1200000 },
+                    { id: 'ccdc_002', code: 'CCDC002', name: 'Bộ lưu điện UPS 1000VA', start_date: '2025-06-01', cost: 2500000, life_months: 12, allocated: 0, remaining: 2500000 },
+                    { id: 'ccdc_003', code: 'CCDC003', name: 'Phần mềm Office 365 (1 năm)', start_date: '2025-01-01', cost: 3600000, life_months: 12, allocated: 0, remaining: 3600000 }
+                ];
+                sampleCCDC.forEach(item => {
+                    db.run(`INSERT OR IGNORE INTO ccdc_items (id, code, name, start_date, cost, life_months, allocated, remaining, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+                        [item.id, item.code, item.name, item.start_date, item.cost, item.life_months, item.allocated, item.remaining]);
+                });
+            }
+        });
+    }
 });
 
-// Bảng: Lịch sử phân bổ chi phí trả trước (Allocation History) - HCSN
+// Bảng: Lịch sử phân bổ chi phí trả trước (Allocation History) - DN
 db.run(`CREATE TABLE IF NOT EXISTS allocation_history (
     id TEXT PRIMARY KEY,
     period TEXT NOT NULL,
@@ -1321,7 +1383,7 @@ db.run(`CREATE TABLE IF NOT EXISTS allocation_history (
     // allocation_history table initialized
 });
 
-// Bảng: Theo dõi tài khoản ngoài bảng (Off-Balance Tracking) - MỚI TT 24/2024
+// Bảng: Theo dõi tài khoản ngoài bảng (Off-Balance Tracking) - TT 99/2025
 db.run(`CREATE TABLE IF NOT EXISTS off_balance_tracking (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_code TEXT,
@@ -1334,18 +1396,21 @@ db.run(`CREATE TABLE IF NOT EXISTS off_balance_tracking (
     created_at TEXT
 )`, () => {
     // off_balance_tracking table initialized
-    db.get("SELECT COUNT(*) as count FROM off_balance_tracking", (err, row) => {
-        if (!err && row.count === 0) {
-            const insert = `INSERT INTO off_balance_tracking (account_code, transaction_date, doc_no, description, increase_amount, decrease_amount, balance, created_at) VALUES (?,?,?,?,?,?,?,?)`;
-            const now = new Date().toISOString();
-            db.run(insert, ['008', '2026-01-01', 'DT001', 'Dự toán chi hoạt động năm 2026', 5000000000, 0, 5000000000, now]);
-            db.run(insert, ['008', '2026-01-15', 'CK001', 'Chuyển khoản thanh toán lương tháng 1', 0, 450000000, 4550000000, now]);
-            db.run(insert, ['012', '2026-01-20', 'LC001', 'Lệnh chi tiền thực chi - Mua sắm máy móc', 120000000, 0, 120000000, now]);
-        }
-    });
+    // Sample off-balance data (DISABLED FOR PRODUCTION)
+    if (!DISABLE_SAMPLE_DATA) {
+        db.get("SELECT COUNT(*) as count FROM off_balance_tracking", (err, row) => {
+            if (!err && row.count === 0) {
+                const insert = `INSERT INTO off_balance_tracking (account_code, transaction_date, doc_no, description, increase_amount, decrease_amount, balance, created_at) VALUES (?,?,?,?,?,?,?,?)`;
+                const now = new Date().toISOString();
+                db.run(insert, ['008', '2026-01-01', 'DT001', 'Dự toán chi hoạt động năm 2026', 5000000000, 0, 5000000000, now]);
+                db.run(insert, ['008', '2026-01-15', 'CK001', 'Chuyển khoản thanh toán lương tháng 1', 0, 450000000, 4550000000, now]);
+                db.run(insert, ['012', '2026-01-20', 'LC001', 'Lệnh chi tiền thực chi - Mua sắm máy móc', 120000000, 0, 120000000, now]);
+            }
+        });
+    }
 });
 
-// Bảng: Đầu tư dài hạn (Long-term Investments) - MỚI TT 24/2024
+// Bảng: Đầu tư dài hạn (Long-term Investments) - TT 99/2025
 db.run(`CREATE TABLE IF NOT EXISTS long_term_investments (
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
@@ -1374,7 +1439,7 @@ db.run(`CREATE TABLE IF NOT EXISTS long_term_investments (
     // long_term_investments table initialized
 });
 
-// Bảng: Danh mục loại thu sự nghiệp (Revenue Categories) - HCSN
+// Bảng: Danh mục loại thu sự nghiệp (Revenue Categories) - DN
 db.run(`CREATE TABLE IF NOT EXISTS revenue_categories (
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
@@ -1412,7 +1477,7 @@ db.run(`CREATE TABLE IF NOT EXISTS revenue_categories (
     });
 });
 
-// Bảng: Biên lai thu tiền (Revenue Receipts) - HCSN
+// Bảng: Biên lai thu tiền (Revenue Receipts) - DN
 db.run(`CREATE TABLE IF NOT EXISTS revenue_receipts (
     id TEXT PRIMARY KEY,
     receipt_no TEXT UNIQUE NOT NULL,
@@ -1432,7 +1497,7 @@ db.run(`CREATE TABLE IF NOT EXISTS revenue_receipts (
     -- Số tiền
     amount REAL NOT NULL,
     
-    -- Liên kết HCSN
+    -- Liên kết DN
     fund_source_id TEXT,
     budget_estimate_id TEXT,
     item_code TEXT,
@@ -1469,7 +1534,7 @@ db.all("PRAGMA table_info(revenue_receipts)", (err, columns) => {
     }
 });
 
-// Bảng: Danh mục Khoản mục chi (Expense Categories) - HCSN
+// Bảng: Danh mục Khoản mục chi (Expense Categories) - DN
 db.run(`CREATE TABLE IF NOT EXISTS expense_categories (
     id TEXT PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
@@ -1511,7 +1576,7 @@ db.run(`CREATE TABLE IF NOT EXISTS expense_categories (
     }
 });
 
-// Bảng: Phiếu chi / Chứng từ chi (Expense Vouchers) - HCSN
+// Bảng: Phiếu chi / Chứng từ chi (Expense Vouchers) - DN
 db.run(`CREATE TABLE IF NOT EXISTS expense_vouchers (
     id TEXT PRIMARY KEY,
     voucher_no TEXT UNIQUE NOT NULL,
@@ -1571,7 +1636,7 @@ db.all("PRAGMA table_info(expense_vouchers)", (err, columns) => {
 
 
 
-// Bảng: Lịch sử khấu hao TSCĐ (Asset Depreciation Log) - MỚI TT 24/2024
+// Bảng: Lịch sử khấu hao TSCĐ (Asset Depreciation Log) - TT 99/2025
 db.run(`CREATE TABLE IF NOT EXISTS asset_depreciation_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     asset_id TEXT NOT NULL,
@@ -1702,7 +1767,7 @@ db.run(`CREATE TABLE IF NOT EXISTS asset_movements (
 });
 
 // ==========================================
-// HUMAN RESOURCES & SALARY (TT 24/2024 & ND 204)
+// HUMAN RESOURCES & SALARY (TT 99/2025 & ND 204)
 // ==========================================
 
 // Bảng: Ngạch lương (Salary Grades) - Nghị định 204
@@ -1737,7 +1802,7 @@ db.run(`CREATE TABLE IF NOT EXISTS employees (
     department TEXT,
     position TEXT,
     
-    -- Thông tin lương HCSN
+    -- Thông tin lương DN
     salary_grade_id TEXT,
     salary_level INTEGER DEFAULT 1,
     salary_coefficient REAL DEFAULT 2.34,
@@ -1758,20 +1823,21 @@ db.run(`CREATE TABLE IF NOT EXISTS employees (
     if (err) console.error("Error creating 'employees':", err);
     else {
         // employees table initialized
-        // Seed Admin Employee if empty
-        db.get("SELECT count(*) as count FROM employees", (err, row) => {
-            if (row && row.count === 0) {
-                // Seeding sample employees
-                const adminId = 'EMP_001';
-                db.run(`INSERT INTO employees (id, code, name, department, position, salary_grade_id, salary_level, salary_coefficient, status) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [adminId, 'NV001', 'Nguyễn Văn Admin', 'Ban Giám đốc', 'Giám đốc', 'MN_01002', 1, 4.40, 'ACTIVE']);
-            }
-        });
+        // Seed Admin Employee if empty (DISABLED FOR PRODUCTION)
+        if (!DISABLE_SAMPLE_DATA) {
+            db.get("SELECT count(*) as count FROM employees", (err, row) => {
+                if (row && row.count === 0) {
+                    const adminId = 'EMP_001';
+                    db.run(`INSERT INTO employees (id, code, name, department, position, salary_grade_id, salary_level, salary_coefficient, status)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [adminId, 'NV001', 'Nguyễn Văn Admin', 'Ban Giám đốc', 'Giám đốc', 'MN_01002', 1, 4.40, 'ACTIVE']);
+                }
+            });
+        }
     }
 });
 
-// Bảng: Danh mục Phụ cấp (Allowance Types) - HCSN
+// Bảng: Danh mục Phụ cấp (Allowance Types) - DN
 db.serialize(() => {
     db.run("DROP TABLE IF EXISTS allowance_types");
     db.run(`CREATE TABLE allowance_types (
@@ -1954,7 +2020,7 @@ db.run(`CREATE TABLE IF NOT EXISTS insurance_discrepancies (
     // insurance_discrepancies table initialized
 });
 
-// Migration: Thêm cột cho chart_of_accounts để hỗ trợ TT 24/2024
+// Migration: Thêm cột cho chart_of_accounts để hỗ trợ TT 99/2025
 db.all("PRAGMA table_info(chart_of_accounts)", (err, columns) => {
     if (!err && columns && columns.length > 0) {
         const hasAccountType = columns.some(c => c.name === 'account_type');
@@ -2010,7 +2076,7 @@ db.all("PRAGMA table_info(voucher_items)", (err, columns) => {
 
 
 // ========================================
-// PHÂN HỆ KHO VẬT TƯ - HCSN (TT 24/2024)
+// PHÂN HỆ KHO VẬT TƯ - DN (TT 99/2025)
 // ========================================
 
 // Bảng: Danh mục Vật tư (Materials)
@@ -2032,18 +2098,19 @@ db.run(`CREATE TABLE IF NOT EXISTS materials (
     if (err) return console.error("Error creating 'materials':", err);
     // materials table initialized
 
-    // Seed sample materials
-    const insert = 'INSERT OR IGNORE INTO materials (id, code, name, category, unit, account_code, unit_price, min_stock, max_stock, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
-    const now = new Date().toISOString();
-    const samples = [
-        [`mat_${Date.now()}_1`, 'VL001', 'Giấy A4', 'MATERIAL', 'Ream', '151', 50000, 10, 100, 'ACTIVE', now],
-        [`mat_${Date.now()}_2`, 'VL002', 'Bút bi', 'MATERIAL', 'Cái', '151', 3000, 50, 500, 'ACTIVE', now],
-        [`mat_${Date.now()}_3`, 'CCDC001', 'Bàn làm việc', 'TOOLS', 'Cái', '152', 2000000, 0, 50, 'ACTIVE', now],
-        [`mat_${Date.now()}_4`, 'CCDC002', 'Ghế xoay văn phòng', 'TOOLS', 'Cái', '152', 1500000, 0, 50, 'ACTIVE', now],
-        [`mat_${Date.now()}_5`, 'HH001', 'Sách giáo khoa Toán 10', 'GOODS', 'Cuốn', '153', 45000, 100, 1000, 'ACTIVE', now]
-    ];
-    samples.forEach(s => db.run(insert, s));
-    // Sample materials seeded
+    // Seed sample materials (DISABLED FOR PRODUCTION)
+    if (!DISABLE_SAMPLE_DATA) {
+        const insert = 'INSERT OR IGNORE INTO materials (id, code, name, category, unit, account_code, unit_price, min_stock, max_stock, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
+        const now = new Date().toISOString();
+        const samples = [
+            [`mat_${Date.now()}_1`, 'VL001', 'Giấy A4', 'MATERIAL', 'Ream', '151', 50000, 10, 100, 'ACTIVE', now],
+            [`mat_${Date.now()}_2`, 'VL002', 'Bút bi', 'MATERIAL', 'Cái', '151', 3000, 50, 500, 'ACTIVE', now],
+            [`mat_${Date.now()}_3`, 'CCDC001', 'Bàn làm việc', 'TOOLS', 'Cái', '152', 2000000, 0, 50, 'ACTIVE', now],
+            [`mat_${Date.now()}_4`, 'CCDC002', 'Ghế xoay văn phòng', 'TOOLS', 'Cái', '152', 1500000, 0, 50, 'ACTIVE', now],
+            [`mat_${Date.now()}_5`, 'HH001', 'Sách giáo khoa Toán 10', 'GOODS', 'Cuốn', '153', 45000, 100, 1000, 'ACTIVE', now]
+        ];
+        samples.forEach(s => db.run(insert, s));
+    }
 });
 
 // Bảng: Phiếu nhập kho vật tư (Material Receipts)
@@ -2174,7 +2241,7 @@ db.run(`CREATE TABLE IF NOT EXISTS inventory_cards (
 });
 
 // ========================================
-// QUẢN LÝ CÔNG NỢ VÀ TẠM ỨNG - HCSN (TT 24/2024)
+// QUẢN LÝ CÔNG NỢ VÀ TẠM ỨNG - DN (TT 99/2025)
 // ========================================
 
 // Bảng: Tạm ứng (TK 141 - Advances to employees)
@@ -2332,8 +2399,8 @@ db.run(`CREATE TABLE IF NOT EXISTS payable_payments (
 
 
 // ================================================================
-// HCSN BUDGET MANAGEMENT SYSTEM (TT 24/2024)
-// Hệ thống Quản lý Dự toán HCSN
+// BUDGET MANAGEMENT SYSTEM (TT 99/2025)
+// Hệ thống Quản lý Dự toán DN
 // ================================================================
 
 // Bảng: Nguồn kinh phí (Fund Sources)
@@ -2407,23 +2474,25 @@ db.run(`CREATE TABLE IF NOT EXISTS budget_estimates (
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_estimates_item ON budget_estimates(item_code)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_estimates_version ON budget_estimates(version)`);
 
-    // Seed sample revenue budgets for testing
-    const sampleBudgets = [
-        { id: 'BE_HP_2026', company_id: '1', fiscal_year: 2026, item_code: 'HP', item_name: 'Học phí', allocated_amount: 5000000000, budget_type: 'REVENUE', estimate_type: 'YEARLY' },
-        { id: 'BE_VP_2026', company_id: '1', fiscal_year: 2026, item_code: 'VP', item_name: 'Viện phí', allocated_amount: 8000000000, budget_type: 'REVENUE', estimate_type: 'YEARLY' },
-        { id: 'BE_SXKD_2026', company_id: '1', fiscal_year: 2026, item_code: 'SXKD', item_name: 'Hoạt động SXKD', allocated_amount: 2000000000, budget_type: 'REVENUE', estimate_type: 'YEARLY' }
-    ];
+    // Seed sample revenue budgets for testing (DISABLED FOR PRODUCTION)
+    if (!DISABLE_SAMPLE_DATA) {
+        const sampleBudgets = [
+            { id: 'BE_HP_2026', company_id: '1', fiscal_year: 2026, item_code: 'HP', item_name: 'Học phí', allocated_amount: 5000000000, budget_type: 'REVENUE', estimate_type: 'YEARLY' },
+            { id: 'BE_VP_2026', company_id: '1', fiscal_year: 2026, item_code: 'VP', item_name: 'Viện phí', allocated_amount: 8000000000, budget_type: 'REVENUE', estimate_type: 'YEARLY' },
+            { id: 'BE_SXKD_2026', company_id: '1', fiscal_year: 2026, item_code: 'SXKD', item_name: 'Hoạt động SXKD', allocated_amount: 2000000000, budget_type: 'REVENUE', estimate_type: 'YEARLY' }
+        ];
 
-    db.serialize(() => {
-        const stmt = db.prepare(`INSERT OR IGNORE INTO budget_estimates 
-            (id, company_id, fiscal_year, item_code, item_name, allocated_amount, budget_type, estimate_type, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        db.serialize(() => {
+            const stmt = db.prepare(`INSERT OR IGNORE INTO budget_estimates
+                (id, company_id, fiscal_year, item_code, item_name, allocated_amount, budget_type, estimate_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
-        sampleBudgets.forEach(b => {
-            stmt.run(b.id, b.company_id, b.fiscal_year, b.item_code, b.item_name, b.allocated_amount, b.budget_type, b.estimate_type, new Date().toISOString());
+            sampleBudgets.forEach(b => {
+                stmt.run(b.id, b.company_id, b.fiscal_year, b.item_code, b.item_name, b.allocated_amount, b.budget_type, b.estimate_type, new Date().toISOString());
+            });
+            stmt.finalize();
         });
-        stmt.finalize();
-    });
+    }
 });
 
 // Bảng: Phân bổ Dự toán (Budget Allocations)
@@ -2460,7 +2529,7 @@ db.run(`CREATE TABLE IF NOT EXISTS budget_allocations (
 
 
 // ================================================================
-// COMPREHENSIVE AUDIT TRAIL SYSTEM (TT 24/2024 Compliance)
+// COMPREHENSIVE AUDIT TRAIL SYSTEM (TT 99/2025 Compliance)
 // Hệ thống Dấu vết Kiểm toán
 // ================================================================
 
@@ -2641,8 +2710,8 @@ db.run(`CREATE TABLE IF NOT EXISTS reconciliation_records (
 
 
 // ================================================================
-// BUDGET CONTROL SYSTEM (TT 24/2024)
-// Hệ thống Kiểm soát Ngân sách HCSN
+// BUDGET CONTROL SYSTEM (TT 99/2025)
+// Hệ thống Kiểm soát Ngân sách DN
 // ================================================================
 
 // Bảng: Budget Periods - Manage budget period locks
@@ -2684,26 +2753,28 @@ db.run(`CREATE TABLE IF NOT EXISTS budget_periods (
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_periods_company ON budget_periods(company_id)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_budget_periods_status ON budget_periods(status)`);
 
-    // Seed default budget periods for current and next year
-    const currentYear = new Date().getFullYear();
-    const months = [
-        'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
-        'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
-    ];
+    // Seed default budget periods for current and next year (DISABLED FOR PRODUCTION)
+    if (!DISABLE_SAMPLE_DATA) {
+        const currentYear = new Date().getFullYear();
+        const months = [
+            'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+            'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+        ];
 
-    [currentYear, currentYear + 1].forEach(year => {
-        months.forEach((name, idx) => {
-            const periodNum = idx + 1;
-            const startDate = `${year}-${String(periodNum).padStart(2, '0')}-01`;
-            const endDate = new Date(year, periodNum, 0).toISOString().split('T')[0];
+        [currentYear, currentYear + 1].forEach(year => {
+            months.forEach((name, idx) => {
+                const periodNum = idx + 1;
+                const startDate = `${year}-${String(periodNum).padStart(2, '0')}-01`;
+                const endDate = new Date(year, periodNum, 0).toISOString().split('T')[0];
 
-            db.run(`INSERT OR IGNORE INTO budget_periods
-                (id, company_id, fiscal_year, period_type, period_number, period_name, start_date, end_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [`BP_${year}_M${periodNum}`, '1', year, 'MONTHLY', periodNum, name, startDate, endDate]
-            );
+                db.run(`INSERT OR IGNORE INTO budget_periods
+                    (id, company_id, fiscal_year, period_type, period_number, period_name, start_date, end_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [`BP_${year}_M${periodNum}`, '1', year, 'MONTHLY', periodNum, name, startDate, endDate]
+                );
+            });
         });
-    });
+    }
 });
 
 // Bảng: Budget Authorization - Spending authorization workflow

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { allocationService } from '../api';
 import { formatDateVN } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
+import logger from '../utils/logger';
 
 const Modal = ({ title, onClose, children }: { title: string, onClose: () => void, children: React.ReactNode }) => (
     <FormModal title={title} onClose={onClose} icon="account_balance_wallet" sizeClass="max-w-4xl">
@@ -56,7 +57,7 @@ export const ReverseAllocation = ({ onClose, paymentVoucher, isReverse = false }
                     setAllocations(suggestion);
                 }
             } catch (err) {
-                console.error("Failed to fetch unpaid invoices:", err);
+                logger.error("Failed to fetch unpaid invoices:", err);
             } finally {
                 setLoading(false);
             }
@@ -96,7 +97,7 @@ export const ReverseAllocation = ({ onClose, paymentVoucher, isReverse = false }
             alert(isReverse ? "Đã hoàn nhập đối trừ thành công!" : "Đã đối trừ công nợ thành công!");
             onClose();
         } catch (err) {
-            console.error("Failed to save allocations:", err);
+            logger.error("Failed to save allocations:", err);
             alert(isReverse ? "Lỗi khi hoàn nhập đối trừ." : "Lỗi khi đối trừ công nợ.");
         }
     };

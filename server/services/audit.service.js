@@ -1,6 +1,6 @@
 /**
  * Audit Trail Service
- * SyntexHCSN - Hệ thống Dấu vết Kiểm toán theo TT 24/2024/TT-BTC
+ * SyntexLegger - Hệ thống Dấu vết Kiểm toán theo TT 99/2025/TT-BTC
  *
  * Provides comprehensive audit logging for all accounting transactions
  * with change tracking, anomaly detection, and compliance reporting.

@@ -12,6 +12,7 @@ import { FormModal } from '../FormModal';
 import type { VoucherLine } from './types/voucher.types';
 import { formatCurrency, isValidAccountCode } from './utils/voucher.utils';
 import { downloadExcelTemplate, VOUCHER_TEMPLATE } from '../../utils/excelTemplates';
+import logger from '../../utils/logger';
 
 // Column mapping for Excel import
 const COLUMN_MAPPING = {
@@ -230,7 +231,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                 setErrorMessage('Không tìm thấy dữ liệu hợp lệ trong file');
             }
         } catch (err: any) {
-            console.error('Import error:', err);
+            logger.error('Import error:', err);
             setStatus('error');
             setErrorMessage(err.message || 'Không thể đọc file');
         }

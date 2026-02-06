@@ -11,6 +11,7 @@ import { PrintPreviewModal, type VoucherView } from './PrintTemplates';
 import { triggerBrowserPrint } from '../hooks/usePrintHandler';
 import { ExcelImportModal } from './ExcelImportModal';
 import { ASSET_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 // --- TYPES ---
 interface AssetModuleProps {
@@ -36,7 +37,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     const [selectedRow, setSelectedRow] = useState<any>(null);
 
     // Modals Control
-    const [modalMode, setModalMode] = useState<'create_fixed' | 'create_infra' | 'create_invest' | 'invest_income' | 'depreciation' | 'decrease' | 'maintenance' | 'condition' | 'transfer' | 'revaluation' | 'create_inventory' | 'inventory_detail' | 'view_card' | null>(null);
+    const [modalMode, setModalMode] = useState<'create_fixed' | 'create_infra' | 'create_invest' | 'create_ccdc' | 'invest_income' | 'depreciation' | 'decrease' | 'maintenance' | 'condition' | 'transfer' | 'revaluation' | 'create_inventory' | 'inventory_detail' | 'view_card' | null>(null);
     const [editingItem, setEditingItem] = useState<any>(null); // Track item being edited
 
     // Print Preview State
@@ -60,6 +61,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     const isInvestIncomeView = subView === 'invest_income';
     const isInfraModuleView = subView.startsWith('infra') && !isInfraReportView;
     const isInvestModuleView = subView.startsWith('invest');
+    const isCCDCView = subView === 'ccdc' || subView === 'asset_ccdc';
 
     const sumBy = (items: any[], field: string) =>
         items.reduce((acc, item) => acc + (Number(item?.[field]) || 0), 0);
@@ -108,9 +110,19 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
     ];
 
     const ccdcColumns: ColumnDef[] = [
-        { field: 'code', headerName: 'Mã CCDC', width: 'w-24', fontClass: 'font-bold' },
-        { field: 'name', headerName: 'Tên Công cụ', width: 'min-w-[200px]' },
+        { field: 'code', headerName: 'Mã CCDC', width: 'w-28', fontClass: 'font-bold' },
+        { field: 'name', headerName: 'Tên Công cụ dụng cụ', width: 'min-w-[200px]' },
+        { field: 'category', headerName: 'Loại', width: 'w-32', renderCell: (v: string) => {
+            const labels: Record<string, string> = { 'TOOL': 'Dụng cụ', 'EQUIPMENT': 'Thiết bị', 'FURNITURE': 'Nội thất', 'OTHER': 'Khác' };
+            return <span className="text-xs px-2 py-1 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">{labels[v] || v || 'Chưa phân loại'}</span>;
+        }},
+        { field: 'department', headerName: 'Bộ phận', width: 'w-36' },
+        { field: 'start_date', headerName: 'Ngày ghi nhận', width: 'w-28', align: 'center', type: 'date' },
         { field: 'cost', headerName: 'Giá trị', type: 'number', width: 'w-32', align: 'right', renderCell: (v: number) => <span className="font-mono font-bold text-teal-600">{formatNumber(v)}</span> },
+        { field: 'life_months', headerName: 'Thời gian PB', width: 'w-28', align: 'center', renderCell: (v: number) => <span>{v} tháng</span> },
+        { field: 'allocated', headerName: 'Đã phân bổ', type: 'number', width: 'w-32', align: 'right', renderCell: (v: number) => <span className="font-mono text-red-500">{formatNumber(v)}</span> },
+        { field: 'remaining', headerName: 'Còn lại', type: 'number', width: 'w-32', align: 'right', renderCell: (v: number) => <span className="font-mono font-bold text-green-600">{formatNumber(v)}</span> },
+        { field: 'status', headerName: 'Trạng thái', width: 'w-24', renderCell: (v: string) => <span className={`text-xs px-2 py-1 rounded font-bold ${v === 'ACTIVE' ? 'bg-green-100 text-green-700' : v === 'DISPOSED' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{v === 'ACTIVE' ? 'Đang dùng' : v === 'DISPOSED' ? 'Đã thanh lý' : v || 'Đang dùng'}</span> },
     ];
 
     const inventoryColumns: ColumnDef[] = [
@@ -261,7 +273,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
             setCcdc(ccdcRes.data || []);
             setInventory(inventoryRecordsRes.data || []);
         } catch (err) {
-            console.error("Failed to fetch asset data:", err);
+            logger.error("Failed to fetch asset data:", err);
         } finally {
             setLoading(false);
         }
@@ -540,7 +552,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
         if (isAssetSourceReportView) return assetSourceRows;
         if (subView.startsWith('infra')) return infraAssets;
         if (subView.startsWith('invest')) return investments;
-        if (subView === 'ccdc') return ccdc; // Support legacy CCDC view
+        if (isCCDCView) return ccdc; // Support legacy CCDC view
         if (subView === 'asset_inventory') return inventory;
         return assets; // Default to Fixed Assets
     };
@@ -551,7 +563,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
         if (isAssetSourceReportView) return assetSourceColumns;
         if (subView.startsWith('infra')) return infraColumns;
         if (subView.startsWith('invest')) return investColumns;
-        if (subView === 'ccdc') return ccdcColumns;
+        if (isCCDCView) return ccdcColumns;
         if (subView === 'asset_inventory') return inventoryColumns;
         return fixedAssetColumns;
     };
@@ -563,7 +575,7 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
         if (isInvestIncomeView) return { title: 'Thu nhập Đầu tư', icon: 'payments' };
         if (subView.startsWith('infra')) return { title: 'Quản lý Tài sản Kết cấu Hạ tầng', icon: 'location_city' };
         if (subView.startsWith('invest')) return { title: 'Quản lý Đầu tư Dài hạn', icon: 'account_balance' };
-        if (subView === 'ccdc') return { title: 'Quản lý Công cụ dụng cụ', icon: 'home_repair_service' };
+        if (isCCDCView) return { title: 'Quản lý Công cụ dụng cụ', icon: 'home_repair_service' };
         if (subView === 'asset_inventory') return { title: 'Kiểm kê Tài sản', icon: 'inventory' };
         return { title: 'Quản lý Tài sản Cố định (TSCĐ)', icon: 'domain' };
     };
@@ -589,6 +601,8 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
                 actions.push({ label: 'Đầu tư mới', icon: 'payments', onClick: () => setModalMode('create_invest'), primary: !isInvestIncomeView });
             } else if (subView === 'asset_inventory') {
                 actions.push({ label: 'Tạo phiếu kiểm kê', icon: 'post_add', onClick: () => setModalMode('create_inventory'), primary: true });
+            } else if (isCCDCView) {
+                actions.push({ label: 'Ghi nhận CCDC', icon: 'add_circle', onClick: () => setModalMode('create_ccdc'), primary: true });
             }
 
             actions.push({ label: 'Làm mới', icon: 'refresh', onClick: fetchData });
@@ -610,6 +624,11 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
                     actions.push({
                         label: 'Sửa đầu tư', icon: 'edit',
                         onClick: () => { setEditingItem(selectedRow); setModalMode('create_invest'); }
+                    });
+                } else if (isCCDCView) {
+                    actions.push({
+                        label: 'Sửa CCDC', icon: 'edit',
+                        onClick: () => { setEditingItem(selectedRow); setModalMode('create_ccdc'); }
                     });
                 }
 
@@ -643,18 +662,18 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
 
         try {
             if (subView.startsWith('infra')) {
-                // If API supports delete: await assetService.deleteInfrastructure(selectedRow.id);
-                alert("Chức năng xóa hạ tầng đang phát triển");
+                await assetService.deleteInfrastructure(selectedRow.id);
             } else if (subView.startsWith('invest')) {
-                // If API supports delete: await assetService.deleteInvestment(selectedRow.id);
-                alert("Chức năng xóa đầu tư đang phát triển");
+                await assetService.deleteInvestment(selectedRow.id);
+            } else if (isCCDCView) {
+                await assetService.deleteCCDC(selectedRow.id);
             } else {
                 await assetService.deleteFixedAsset(selectedRow.id, { reason: 'Xóa trực tiếp', approval_no: 'AUTO', decrease_date: toInputDateValue() });
             }
             fetchData();
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     };
@@ -714,6 +733,9 @@ export const AssetModule: React.FC<AssetModuleProps> = ({ subView = 'asset_fixed
             )}
             {modalMode === 'create_invest' && (
                 <InvestmentModal onClose={() => { setModalMode(null); setEditingItem(null); }} onRefresh={fetchData} fundSources={fundSources} initialData={editingItem} />
+            )}
+            {modalMode === 'create_ccdc' && (
+                <CCDCFormModal onClose={() => { setModalMode(null); setEditingItem(null); }} onRefresh={fetchData} initialData={editingItem} />
             )}
             {modalMode === 'invest_income' && (
                 <InvestmentIncomeModal
@@ -827,7 +849,7 @@ const FixedAssetModal = ({ onClose, onRefresh, fundSources, initialData }: any) 
             }
             alert(initialData ? "Cập nhật TSCĐ thành công!" : "Ghi tăng TSCĐ thành công!");
             onRefresh(); onClose();
-        } catch (e) { alert("Lỗi khi lưu"); console.error(e); }
+        } catch (e) { alert("Lỗi khi lưu"); logger.error(e); }
     };
 
     return (
@@ -885,6 +907,103 @@ const FixedAssetModal = ({ onClose, onRefresh, fundSources, initialData }: any) 
     );
 };
 
+// --- CCDC FORM MODAL ---
+const CCDCFormModal = ({ onClose, onRefresh, initialData }: any) => {
+    const [data, setData] = useState(initialData || {
+        code: '', name: '', category: 'TOOL', cost: 0, life_months: 12,
+        department: '', start_date: toInputDateValue(), status: 'ACTIVE'
+    });
+
+    const handleSave = async () => {
+        try {
+            if (!data.code || !data.name || !data.cost) {
+                alert('Vui lòng nhập đầy đủ: Mã CCDC, Tên và Giá trị');
+                return;
+            }
+            if (initialData?.id) {
+                await assetService.updateCCDC(initialData.id, data);
+            } else {
+                await assetService.createCCDC({
+                    ...data,
+                    allocated: 0,
+                    remaining: data.cost
+                });
+            }
+            alert(initialData ? "Cập nhật CCDC thành công!" : "Ghi nhận CCDC thành công!");
+            onRefresh(); onClose();
+        } catch (e) { alert("Lỗi khi lưu CCDC"); logger.error(e); }
+    };
+
+    return (
+        <FormModal title={initialData ? "Sửa Công cụ dụng cụ" : "Ghi nhận Công cụ dụng cụ mới"} onClose={onClose} icon="handyman">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                    <div>
+                        <label className="form-label">Mã CCDC <span className="text-red-500">*</span></label>
+                        <input className="form-input" value={data.code} onChange={e => setData({ ...data, code: e.target.value })} placeholder="VD: CCDC001" />
+                    </div>
+                    <div>
+                        <label className="form-label">Tên Công cụ dụng cụ <span className="text-red-500">*</span></label>
+                        <input className="form-input" value={data.name} onChange={e => setData({ ...data, name: e.target.value })} placeholder="VD: Máy khoan cầm tay" />
+                    </div>
+                    <div>
+                        <label className="form-label">Loại CCDC</label>
+                        <select className="form-input" value={data.category} onChange={e => setData({ ...data, category: e.target.value })}>
+                            <option value="TOOL">Dụng cụ (152)</option>
+                            <option value="EQUIPMENT">Thiết bị văn phòng</option>
+                            <option value="FURNITURE">Đồ nội thất</option>
+                            <option value="OTHER">Khác</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="form-label">Bộ phận sử dụng</label>
+                        <input className="form-input" value={data.department} onChange={e => setData({ ...data, department: e.target.value })} placeholder="VD: Phòng Kỹ thuật" />
+                    </div>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <label className="form-label">Giá trị (VNĐ) <span className="text-red-500">*</span></label>
+                        <input type="number" className="form-input font-bold text-right" value={data.cost} onChange={e => setData({ ...data, cost: Number(e.target.value) })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="form-label">Thời gian phân bổ (tháng)</label>
+                            <input type="number" className="form-input" value={data.life_months} onChange={e => setData({ ...data, life_months: Number(e.target.value) })} min={1} />
+                        </div>
+                        <div>
+                            <label className="form-label">Ngày ghi nhận</label>
+                            <DateInput className="form-input" value={data.start_date} onChange={v => setData({ ...data, start_date: v })} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="form-label">Trạng thái</label>
+                        <select className="form-input" value={data.status} onChange={e => setData({ ...data, status: e.target.value })}>
+                            <option value="ACTIVE">Đang sử dụng</option>
+                            <option value="DISPOSED">Đã thanh lý</option>
+                        </select>
+                    </div>
+                    {initialData && (
+                        <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                <span className="font-bold">Đã phân bổ:</span> {new Intl.NumberFormat('vi-VN').format(initialData.allocated || 0)} VNĐ
+                            </p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                <span className="font-bold">Còn lại:</span> {new Intl.NumberFormat('vi-VN').format(initialData.remaining || data.cost)} VNĐ
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+                <button onClick={onClose} className="form-button-secondary">Hủy</button>
+                <button onClick={handleSave} className="form-button-primary">
+                    {initialData ? 'Cập nhật' : 'Ghi nhận CCDC'}
+                </button>
+            </div>
+        </FormModal>
+    );
+};
+
 const InfrastructureModal = ({ onClose, onRefresh, fundSources, initialData }: any) => {
     const [data, setData] = useState(initialData || {
         code: '', name: '', category: 'ROAD', original_value: 0,
@@ -900,7 +1019,7 @@ const InfrastructureModal = ({ onClose, onRefresh, fundSources, initialData }: a
             }
             alert(initialData ? "Cập nhật hạ tầng thành công!" : "Ghi nhận Hạ tầng thành công!");
             onRefresh(); onClose();
-        } catch (e) { alert("Lỗi khi lưu"); console.error(e); }
+        } catch (e) { alert("Lỗi khi lưu"); logger.error(e); }
     };
 
     return (
@@ -956,7 +1075,7 @@ const InvestmentModal = ({ onClose, onRefresh, fundSources, initialData }: any) 
             }
             alert(initialData ? "Cập nhật khoản đầu tư thành công!" : "Tạo khoản đầu tư thành công!");
             onRefresh(); onClose();
-        } catch (e) { alert("Lỗi khi lưu"); console.error(e); }
+        } catch (e) { alert("Lỗi khi lưu"); logger.error(e); }
     };
 
     return (
@@ -1018,7 +1137,7 @@ const InvestmentIncomeModal = ({ onClose, onRefresh, investments, initialInvestm
             onRefresh(); onClose();
         } catch (e) {
             alert("Lỗi khi ghi nhận thu nhập");
-            console.error(e);
+            logger.error(e);
         }
     };
 
@@ -1088,7 +1207,7 @@ const TransferAssetModal = ({ onClose, onRefresh, assets }: any) => {
         try {
             await assetService.transferAsset(data);
             alert("Đã điều chuyển tài sản!"); onRefresh(); onClose();
-        } catch (e) { alert("Lỗi khi điều chuyển"); console.error(e); }
+        } catch (e) { alert("Lỗi khi điều chuyển"); logger.error(e); }
     };
 
     return <FormModal title="Điều chuyển Tài sản" onClose={onClose}>
@@ -1129,7 +1248,7 @@ const RevaluationModal = ({ onClose, onRefresh, assets }: any) => {
         try {
             await assetService.revaluateAsset(data.asset_id, data);
             alert("Đã đánh giá lại tài sản!"); onRefresh(); onClose();
-        } catch (e) { alert("Lỗi khi đánh giá lại"); console.error(e); }
+        } catch (e) { alert("Lỗi khi đánh giá lại"); logger.error(e); }
     };
 
     return <FormModal title="Đánh giá lại Tài sản" onClose={onClose}>
@@ -1166,7 +1285,7 @@ const CreateInventoryModal = ({ onClose, onRefresh }: any) => {
         try {
             await assetService.createInventory(data);
             alert("Đã tạo phiếu kiểm kê!"); onRefresh(); onClose();
-        } catch (e) { alert("Lỗi khi tạo"); console.error(e); }
+        } catch (e) { alert("Lỗi khi tạo"); logger.error(e); }
     };
 
     return <FormModal title="Tạo phiếu Kiểm kê Tài sản" onClose={onClose}>
@@ -1216,7 +1335,7 @@ const InventoryDetailModal = ({ inventory, onClose, assets }: any) => {
             });
             setNewItem({ asset_id: '', actual_quantity: 1, actual_condition: 'GOOD', actual_location: '', reason: '', notes: '' });
             loadReport();
-        } catch (e) { console.error(e); alert("Lỗi thêm chi tiết"); }
+        } catch (e) { logger.error(e); alert("Lỗi thêm chi tiết"); }
     };
 
     return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -1406,7 +1525,7 @@ const DisposeModal = ({ onClose, onRefresh, assets }: any) => {
         try {
             await assetService.deleteFixedAsset(data.id, data);
             alert("Đã ghi giảm TSCĐ thành công!"); onRefresh(); onClose();
-        } catch (e) { alert("Lỗi khi ghi giảm"); console.error(e); }
+        } catch (e) { alert("Lỗi khi ghi giảm"); logger.error(e); }
     };
 
     return <FormModal title="Ghi giảm/Thanh lý Tài sản" onClose={onClose}>

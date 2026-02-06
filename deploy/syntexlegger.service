@@ -1,0 +1,35 @@
+[Unit]
+Description=SyntexLegger - Enterprise Accounting System (TT 99/2025)
+Documentation=https://github.com/yourorg/syntexlegger
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/syntexlegger/server
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=10
+
+# Environment
+Environment=NODE_ENV=production
+Environment=PORT=5000
+EnvironmentFile=/var/www/syntexlegger/server/.env
+
+# Logging
+StandardOutput=append:/var/log/syntexlegger/app.log
+StandardError=append:/var/log/syntexlegger/error.log
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/syntexlegger/server/data
+ReadWritePaths=/var/www/syntexlegger/server/uploads
+ReadWritePaths=/var/www/syntexlegger/server/backups
+ReadWritePaths=/var/www/syntexlegger/server/logs
+
+[Install]
+WantedBy=multi-user.target

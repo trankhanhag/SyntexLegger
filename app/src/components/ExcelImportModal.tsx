@@ -19,6 +19,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { FormModal } from './FormModal';
 import { formatNumber } from '../utils/format';
 import { downloadExcelTemplate, type TemplateDefinition } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 // ============================================
 // TYPES
@@ -182,7 +183,7 @@ export function ExcelImportModal<T = any>({
                 setErrorMessage('Không tìm thấy dữ liệu hợp lệ trong file');
             }
         } catch (err: any) {
-            console.error('Import error:', err);
+            logger.error('Import error:', err);
             setStatus('error');
             setErrorMessage(err.message || 'Không thể đọc file');
         }

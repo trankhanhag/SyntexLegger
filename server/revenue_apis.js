@@ -1,8 +1,9 @@
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./src/utils/logger');
 
 /**
- * Revenue Module APIs for HCSN
- * Quản lý Thu sự nghiệp theo TT 24/2024
+ * Revenue Module APIs
+ * Quản lý Doanh thu doanh nghiệp theo TT 99/2025
  */
 
 // ==================== REVENUE CATEGORIES ====================
@@ -32,7 +33,7 @@ function getCategories(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get revenue categories error:', err);
+                logger.error('Get revenue categories error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -60,7 +61,7 @@ function createCategory(db) {
         db.run(sql, [id, code, name, revenue_type, account_code || '511', description, new Date().toISOString()],
             function (err) {
                 if (err) {
-                    console.error('Create revenue category error:', err);
+                    logger.error('Create revenue category error:', err);
                     return res.status(500).json({ error: err.message });
                 }
                 res.status(201).json({ id, code, name, revenue_type });
@@ -125,7 +126,7 @@ function getReceipts(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get receipts error:', err);
+                logger.error('Get receipts error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -149,7 +150,7 @@ function getReceiptDetail(db) {
 
         db.get(sql, [id], (err, row) => {
             if (err) {
-                console.error('Get receipt detail error:', err);
+                logger.error('Get receipt detail error:', err);
                 return res.status(500).json({ error: err.message });
             }
             if (!row) {
@@ -206,7 +207,7 @@ function createReceipt(db) {
             notes, document_type || 'RECEIPT', req.user?.username, now, now
         ], function (err) {
             if (err) {
-                console.error('Create receipt error:', err);
+                logger.error('Create receipt error:', err);
                 return res.status(500).json({ error: err.message });
             }
 
@@ -226,7 +227,7 @@ function createReceipt(db) {
                 debitAcc, creditAcc, amount, payer_id_card || null, id
             ], (ledgerErr) => {
                 if (ledgerErr) {
-                    console.error('Auto-create ledger error:', ledgerErr);
+                    logger.error('Auto-create ledger error:', ledgerErr);
                 }
             });
 
@@ -240,7 +241,7 @@ function createReceipt(db) {
 
                 db.run(budgetSql, [amount, amount, now, budget_estimate_id], (budgetErr) => {
                     if (budgetErr) {
-                        console.error('Update budget estimate error:', budgetErr);
+                        logger.error('Update budget estimate error:', budgetErr);
                     }
                 });
             }
@@ -294,7 +295,7 @@ function updateReceipt(db) {
             new Date().toISOString(), id
         ], function (err) {
             if (err) {
-                console.error('Update receipt error:', err);
+                logger.error('Update receipt error:', err);
                 return res.status(500).json({ error: err.message });
             }
             if (this.changes === 0) {
@@ -315,7 +316,7 @@ function deleteReceipt(db) {
 
         db.run('DELETE FROM revenue_receipts WHERE id = ?', [id], function (err) {
             if (err) {
-                console.error('Delete receipt error:', err);
+                logger.error('Delete receipt error:', err);
                 return res.status(500).json({ error: err.message });
             }
             if (this.changes === 0) {
@@ -390,7 +391,7 @@ function getRevenueReport(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get revenue report error:', err);
+                logger.error('Get revenue report error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -428,7 +429,7 @@ function getBudgetComparison(db) {
 
             db.all(sql, [fiscal_year], (err, rows) => {
                 if (err) {
-                    console.error('[BUDGET_COMP_ERROR] SQL Error:', err.message);
+                    logger.error('[BUDGET_COMP_ERROR] SQL Error:', err.message);
                     return res.status(500).json({
                         error: err.message,
                         context: 'db.all callback error',
@@ -439,7 +440,7 @@ function getBudgetComparison(db) {
                 res.json(rows);
             });
         } catch (fatal) {
-            console.error('[BUDGET_COMP_FATAL]', fatal);
+            logger.error('[BUDGET_COMP_FATAL]', fatal);
             return res.status(500).json({
                 error: fatal.message,
                 context: 'Fatal catch block',

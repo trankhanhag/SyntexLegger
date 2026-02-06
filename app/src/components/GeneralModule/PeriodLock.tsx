@@ -7,6 +7,7 @@ import React from 'react';
 import { settingsService } from '../../api';
 import { DateInput } from '../DateInput';
 import { FormModal } from '../FormModal';
+import logger from '../../utils/logger';
 
 interface PeriodLockProps {
     onClose: () => void;
@@ -25,7 +26,7 @@ export const PeriodLock: React.FC<PeriodLockProps> = ({ onClose, onRefresh }) =>
                     setLockedDate(res.data.locked_until_date);
                 }
             } catch (err) {
-                console.error("Failed to fetch settings:", err);
+                logger.error("Failed to fetch settings:", err);
             } finally {
                 setLoading(false);
             }
@@ -40,7 +41,7 @@ export const PeriodLock: React.FC<PeriodLockProps> = ({ onClose, onRefresh }) =>
             onRefresh();
             onClose();
         } catch (err) {
-            console.error("Failed to update lock date:", err);
+            logger.error("Failed to update lock date:", err);
             alert("Lỗi khi cập nhật ngày khóa sổ.");
         }
     };

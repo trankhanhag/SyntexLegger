@@ -1,6 +1,6 @@
 /**
  * Authentication API Tests
- * SyntexHCSN - Unit Tests
+ * SyntexLegger - Unit Tests
  */
 
 const request = require('supertest');

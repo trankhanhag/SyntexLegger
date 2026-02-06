@@ -3,6 +3,7 @@ import { masterDataService, voucherService } from '../api';
 import { normalizeDateValue, toInputDateValue } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
 import { DateInput } from './DateInput';
+import logger from '../utils/logger';
 
 // Simple Modal Wrapper
 const Modal = ({ title, onClose, children, panelClass }: { title: string, onClose: () => void, children: React.ReactNode, panelClass?: string }) => (
@@ -48,7 +49,7 @@ export const Revaluation: React.FC<RevaluationProps> = ({ onClose, lockedUntil }
                     setAccounts(fc);
                 }
             } catch (err) {
-                console.error("Failed to fetch FC balances:", err);
+                logger.error("Failed to fetch FC balances:", err);
             } finally {
                 setLoading(false);
             }
@@ -129,7 +130,7 @@ export const Revaluation: React.FC<RevaluationProps> = ({ onClose, lockedUntil }
             await voucherService.save(voucher);
             setStep(4);
         } catch (err) {
-            console.error("Revaluation failed:", err);
+            logger.error("Revaluation failed:", err);
             alert("Lỗi khi thực hiện đánh giá lại ngoại tệ.");
         } finally {
             setLoading(false);

@@ -1,6 +1,6 @@
 /**
  * Audit Trail Routes
- * SyntexHCSN - Hệ thống Dấu vết Kiểm toán theo TT 24/2024/TT-BTC
+ * SyntexLegger - Hệ thống Dấu vết Kiểm toán theo TT 99/2025/TT-BTC
  *
  * Provides API endpoints for audit trail management, querying,
  * anomaly detection, and compliance reporting.
@@ -570,7 +570,7 @@ module.exports = (db) => {
 
     /**
      * GET /api/audit/report/compliance
-     * Generate compliance report for TT 24/2024
+     * Generate compliance report for TT 99/2025
      */
     router.get('/audit/report/compliance', verifyToken, requireRole('admin', 'chief_accountant'), (req, res) => {
         const { fiscal_year } = req.query;

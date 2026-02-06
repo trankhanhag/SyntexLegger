@@ -10,6 +10,7 @@ import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { ExcelImportModal } from './ExcelImportModal';
 import { CASH_RECEIPT_TEMPLATE, CASH_PAYMENT_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 interface CashData {
     cash: number;
@@ -254,7 +255,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                         .catch(err => {
                             // Suppress 404 for seeded/legacy data
                             if (err.response?.status !== 404) {
-                                console.error("Failed to fetch voucher detail", err);
+                                logger.error("Failed to fetch voucher detail", err);
                             }
 
                             // Fallback to selectedRow (GL Data)
@@ -411,7 +412,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
             const res = await masterDataService.getCashBalances();
             setData(res.data);
         } catch (err) {
-            console.error("Failed to load balances", err);
+            logger.error("Failed to load balances", err);
         } finally {
             setLoading(false);
         }
@@ -427,7 +428,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                     address: settings.company_address || 'Địa chỉ đơn vị'
                 });
             })
-            .catch(err => console.error('Load company info failed:', err));
+            .catch(err => logger.error('Load company info failed:', err));
     }, []);
 
     useEffect(() => {
@@ -436,13 +437,13 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                 try {
                     const res = await bankService.getStaging();
                     setBankStaging(res.data);
-                } catch (err) { console.error(err); }
+                } catch (err) { logger.error(err); }
             }
             if (subView === 'bank_config') {
                 try {
                     const res = await bankService.getAccounts();
                     setBankConnections(res.data);
-                } catch (err) { console.error(err); }
+                } catch (err) { logger.error(err); }
             }
         };
 
@@ -453,7 +454,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
                 const name = settings.company_name || 'SYNTEX CORP';
                 const address = settings.company_address || 'Hà Nội, Việt Nam';
                 setCompanyInfo({ name, address });
-            } catch (err) { console.error(err); }
+            } catch (err) { logger.error(err); }
         };
 
         loadBalances();
@@ -538,7 +539,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
             loadBalances();
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     };
@@ -678,7 +679,7 @@ export const CashModule: React.FC<CashModuleProps> = ({ subView = 'list', printS
             setData(res.data);
             setSelectedRow(null); // Clear selection
         } catch (err) {
-            console.error("Failed to save cash voucher:", err);
+            logger.error("Failed to save cash voucher:", err);
             alert("Lỗi khi lưu chứng từ quỹ.");
         }
     };

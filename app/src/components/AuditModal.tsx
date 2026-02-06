@@ -2,6 +2,7 @@ import React from 'react';
 import { auditService } from '../api';
 import { FormModal } from './FormModal';
 import { triggerBrowserPrint } from '../hooks/usePrintHandler';
+import logger from '../utils/logger';
 
 // Simple Modal Wrapper reproduced here to avoid dependency cycle or heavy imports
 const Modal = ({ title, onClose, children }: { title: string, onClose: () => void, children: React.ReactNode }) => (
@@ -24,7 +25,7 @@ export const TaxHealthReport = ({ onClose, isModal = false, onNavigate }: { onCl
             const res = await auditService.healthCheck();
             setResult(res.data);
         } catch (err) {
-            console.error("Audit failed:", err);
+            logger.error("Audit failed:", err);
             setResult(null);
             setError('Không thể tải dữ liệu kiểm tra. Vui lòng thử lại.');
         } finally {

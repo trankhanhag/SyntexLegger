@@ -1,10 +1,16 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js",
+    "start:ts": "ts-node src/index.ts",
+    "dev": "node --watch index.js",
+    "dev:ts": "ts-node src/index.ts",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "start:prod": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -29,13 +35,27 @@
     "jsonwebtoken": "^9.0.3",
     "knex": "^3.1.0",
     "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "sqlite3": "^5.1.7",
+    "unzipper": "^0.12.3",
     "uuid": "^13.0.0",
+    "winston": "^3.19.0",
     "xlsx": "^0.18.5",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.1.0",
+    "@types/uuid": "^10.0.0",
     "jest": "^30.2.0",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

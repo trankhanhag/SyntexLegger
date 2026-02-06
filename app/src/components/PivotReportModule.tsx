@@ -13,6 +13,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { reportService, dimensionService } from '../api';
 import { FormModal, FormSection, FormGrid, FormField, FormButton, FormActions } from './FormModal';
+import logger from '../utils/logger';
 import { toInputDateValue } from '../utils/dateUtils';
 
 interface DimensionConfig {
@@ -61,7 +62,7 @@ export const PivotReportModule: React.FC<PivotReportModuleProps> = ({ onClose })
                 const configs = Array.isArray(res.data) ? res.data : [];
                 setDimensionConfigs(configs.filter((c: DimensionConfig) => c.isActive === 1));
             } catch (err) {
-                console.error('Failed to load dimension configs:', err);
+                logger.error('Failed to load dimension configs:', err);
             }
         };
         loadConfigs();
@@ -101,7 +102,7 @@ export const PivotReportModule: React.FC<PivotReportModuleProps> = ({ onClose })
             setPivotData(pivot);
             setShowConfigModal(false);
         } catch (err) {
-            console.error('Failed to generate pivot:', err);
+            logger.error('Failed to generate pivot:', err);
             alert('Lỗi khi tải dữ liệu báo cáo');
         } finally {
             setLoading(false);

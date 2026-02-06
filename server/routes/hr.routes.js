@@ -1,6 +1,6 @@
 /**
  * HR Routes
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
@@ -55,12 +55,12 @@ module.exports = (db) => {
     // ========================================
     // INSURANCE & REPORTS
     // ========================================
-    router.get('/hr/insurance-summary', verifyToken, hrApis.getInsuranceSummary(db));
-    router.get('/hr/insurance-detail', verifyToken, hrApis.getInsuranceDetail(db));
+    router.get('/hr/insurance/summary', verifyToken, hrApis.getInsuranceSummary(db));
+    router.get('/hr/insurance/detail', verifyToken, hrApis.getInsuranceDetail(db));
 
-    router.post('/hr/import-bhxh', verifyToken, requireRole('admin', 'manager'), hrApis.importBHXHData(db));
-    router.get('/hr/reconcile-bhxh', verifyToken, requireRole('admin', 'manager'), hrApis.reconcileBHXH(db));
-    router.post('/hr/resolve-discrepancy', verifyToken, requireRole('admin', 'manager'), hrApis.resolveDiscrepancy(db));
+    router.post('/hr/insurance/import-bhxh', verifyToken, requireRole('admin', 'manager'), hrApis.importBHXHData(db));
+    router.get('/hr/insurance/reconcile', verifyToken, requireRole('admin', 'manager'), hrApis.reconcileBHXH(db));
+    router.post('/hr/insurance/resolve-discrepancy', verifyToken, requireRole('admin', 'manager'), hrApis.resolveDiscrepancy(db));
 
     return router;
 };

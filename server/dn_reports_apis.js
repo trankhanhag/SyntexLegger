@@ -3,6 +3,8 @@
 // Thay thế TT 200/2014/TT-BTC từ 01/01/2026
 // ========================================
 
+const logger = require('./src/utils/logger');
+
 /**
  * API 1: Bảng Cân đối Kế toán Doanh nghiệp
  * Theo mẫu B01-DN (TT 99/2025)
@@ -695,7 +697,7 @@ function getCashFlowStatement(db) {
  */
 function getNotesToFinancialStatements(db) {
   return async (req, res) => {
-    console.log('[DEBUG] Executing getNotesToFinancialStatements');
+    logger.debug('[DEBUG] Executing getNotesToFinancialStatements');
     try {
       const { fiscalYear, section } = req.query;
       const year = fiscalYear || new Date().getFullYear();
@@ -736,7 +738,7 @@ function getNotesToFinancialStatements(db) {
 
       db.all(notesSql, params, (err, notes) => {
         if (err) {
-          console.error('Error fetching notes:', err);
+          logger.error('Error fetching notes:', err);
           return res.status(500).json({ error: err.message });
         }
 
@@ -771,7 +773,7 @@ function getNotesToFinancialStatements(db) {
         res.json(result);
       });
     } catch (error) {
-      console.error('Error in getNotesToFinancialStatements:', error);
+      logger.error('Error in getNotesToFinancialStatements:', error);
       res.status(500).json({ error: error.message });
     }
   };
@@ -1376,12 +1378,12 @@ function getBudgetPerformance(db) {
 
         db.all(sqlBudget, [fiscalYear], (err, budgetRows) => {
             if (err) {
-                console.error('Budget query error:', err);
+                logger.error('Budget query error:', err);
             }
 
             db.get(sqlActuals, [fromDate, toDate], (err2, actuals) => {
                 if (err2) {
-                    console.error('Actuals query error:', err2);
+                    logger.error('Actuals query error:', err2);
                 }
 
                 const act = actuals || {};
@@ -1566,6 +1568,381 @@ function getBudgetPerformance(db) {
     };
 }
 
+/**
+ * Phân tích Tài chính (Financial Analysis)
+ * Tính toán các chỉ số tài chính quan trọng: Thanh khoản, Hiệu quả, Đòn bẩy, Sinh lời
+ */
+function getFinancialAnalysis(db) {
+  return (req, res) => {
+    const toDate = req.query.to || req.query.toDate || new Date().toISOString().split('T')[0];
+    const fromDate = req.query.from || req.query.fromDate || `${toDate.slice(0, 4)}-01-01`;
+
+    // Tính kỳ trước (năm trước)
+    const currentYear = parseInt(toDate.slice(0, 4));
+    const prevFromDate = `${currentYear - 1}-01-01`;
+    const prevToDate = `${currentYear - 1}-12-31`;
+
+    // Query Balance Sheet data (cuối kỳ)
+    const sqlBalanceSheet = `
+      SELECT account_code, SUM(debit_amount) - SUM(credit_amount) as balance
+      FROM general_ledger
+      WHERE trx_date <= ?
+      GROUP BY account_code
+    `;
+
+    // Query PnL data (trong kỳ)
+    const sqlPnL = `
+      SELECT
+        -- Doanh thu
+        SUM(CASE WHEN account_code LIKE '511%' THEN credit_amount - debit_amount ELSE 0 END) as revenue,
+        SUM(CASE WHEN account_code LIKE '521%' THEN debit_amount - credit_amount ELSE 0 END) as deductions,
+        SUM(CASE WHEN account_code LIKE '515%' THEN credit_amount - debit_amount ELSE 0 END) as financial_income,
+        SUM(CASE WHEN account_code LIKE '711%' THEN credit_amount - debit_amount ELSE 0 END) as other_income,
+        -- Chi phí
+        SUM(CASE WHEN account_code LIKE '632%' THEN debit_amount - credit_amount ELSE 0 END) as cogs,
+        SUM(CASE WHEN account_code LIKE '641%' THEN debit_amount - credit_amount ELSE 0 END) as selling_exp,
+        SUM(CASE WHEN account_code LIKE '642%' THEN debit_amount - credit_amount ELSE 0 END) as admin_exp,
+        SUM(CASE WHEN account_code LIKE '635%' THEN debit_amount - credit_amount ELSE 0 END) as financial_exp,
+        SUM(CASE WHEN account_code LIKE '811%' THEN debit_amount - credit_amount ELSE 0 END) as other_exp,
+        SUM(CASE WHEN account_code LIKE '821%' THEN debit_amount - credit_amount ELSE 0 END) as tax_exp
+      FROM general_ledger
+      WHERE trx_date >= ? AND trx_date <= ?
+    `;
+
+    // Query Balance Sheet đầu kỳ
+    const sqlBalanceSheetPrev = `
+      SELECT account_code, SUM(debit_amount) - SUM(credit_amount) as balance
+      FROM general_ledger
+      WHERE trx_date <= ?
+      GROUP BY account_code
+    `;
+
+    db.all(sqlBalanceSheet, [toDate], (err, bsRows) => {
+      if (err) return res.status(400).json({ error: err.message });
+
+      db.get(sqlPnL, [fromDate, toDate], (err, pnl) => {
+        if (err) return res.status(400).json({ error: err.message });
+
+        db.all(sqlBalanceSheetPrev, [prevToDate], (err, bsPrevRows) => {
+          if (err) return res.status(400).json({ error: err.message });
+
+          db.get(sqlPnL, [prevFromDate, prevToDate], (err, pnlPrev) => {
+            if (err) return res.status(400).json({ error: err.message });
+
+            // Helper to sum by account prefix
+            const sumByPrefix = (rows, prefix) => {
+              if (!rows) return 0;
+              return rows.filter(r => r.account_code && r.account_code.startsWith(prefix))
+                .reduce((acc, r) => acc + (r.balance || 0), 0);
+            };
+
+            const num = (v) => parseFloat(v) || 0;
+
+            // === CURRENT PERIOD ===
+            // Assets
+            const cash = sumByPrefix(bsRows, '111') + sumByPrefix(bsRows, '112') + sumByPrefix(bsRows, '113');
+            const shortTermInv = sumByPrefix(bsRows, '121') + sumByPrefix(bsRows, '128');
+            const receivables = sumByPrefix(bsRows, '131') + sumByPrefix(bsRows, '136') + sumByPrefix(bsRows, '138');
+            const inventory = sumByPrefix(bsRows, '15');
+            const otherCurrAssets = sumByPrefix(bsRows, '133') + sumByPrefix(bsRows, '141') + sumByPrefix(bsRows, '242');
+            const currentAssets = cash + shortTermInv + receivables + inventory + otherCurrAssets;
+
+            const fixedAssets = sumByPrefix(bsRows, '211') + sumByPrefix(bsRows, '212') + sumByPrefix(bsRows, '213')
+              - sumByPrefix(bsRows, '214');
+            const longTermInv = sumByPrefix(bsRows, '221') + sumByPrefix(bsRows, '222') + sumByPrefix(bsRows, '228');
+            const otherLTAssets = sumByPrefix(bsRows, '241') + sumByPrefix(bsRows, '243') + sumByPrefix(bsRows, '244');
+            const nonCurrentAssets = fixedAssets + longTermInv + otherLTAssets;
+            const totalAssets = currentAssets + nonCurrentAssets;
+
+            // Liabilities
+            const shortTermDebt = sumByPrefix(bsRows, '311') + sumByPrefix(bsRows, '341');
+            const payables = sumByPrefix(bsRows, '331') + sumByPrefix(bsRows, '333') + sumByPrefix(bsRows, '334')
+              + sumByPrefix(bsRows, '335') + sumByPrefix(bsRows, '336') + sumByPrefix(bsRows, '338');
+            const otherCurrLiab = sumByPrefix(bsRows, '351') + sumByPrefix(bsRows, '352') + sumByPrefix(bsRows, '353');
+            const currentLiabilities = Math.abs(shortTermDebt) + Math.abs(payables) + Math.abs(otherCurrLiab);
+
+            const longTermDebt = Math.abs(sumByPrefix(bsRows, '342') + sumByPrefix(bsRows, '343'));
+            const otherLTLiab = Math.abs(sumByPrefix(bsRows, '352') + sumByPrefix(bsRows, '353'));
+            const nonCurrentLiabilities = longTermDebt + otherLTLiab;
+            const totalLiabilities = currentLiabilities + nonCurrentLiabilities;
+
+            // Equity
+            const equity = Math.abs(sumByPrefix(bsRows, '411') + sumByPrefix(bsRows, '412') + sumByPrefix(bsRows, '413')
+              + sumByPrefix(bsRows, '414') + sumByPrefix(bsRows, '418') + sumByPrefix(bsRows, '419')
+              + sumByPrefix(bsRows, '421'));
+
+            // PnL calculations
+            const p = pnl || {};
+            const netRevenue = num(p.revenue) - num(p.deductions);
+            const grossProfit = netRevenue - num(p.cogs);
+            const operatingProfit = grossProfit + num(p.financial_income) - num(p.selling_exp) - num(p.admin_exp) - num(p.financial_exp);
+            const ebit = operatingProfit + num(p.other_income) - num(p.other_exp);
+            const netIncome = ebit - num(p.tax_exp);
+
+            // === PREVIOUS PERIOD ===
+            const cashPrev = sumByPrefix(bsPrevRows, '111') + sumByPrefix(bsPrevRows, '112') + sumByPrefix(bsPrevRows, '113');
+            const shortTermInvPrev = sumByPrefix(bsPrevRows, '121') + sumByPrefix(bsPrevRows, '128');
+            const receivablesPrev = sumByPrefix(bsPrevRows, '131') + sumByPrefix(bsPrevRows, '136') + sumByPrefix(bsPrevRows, '138');
+            const inventoryPrev = sumByPrefix(bsPrevRows, '15');
+            const currentAssetsPrev = cashPrev + shortTermInvPrev + receivablesPrev + inventoryPrev
+              + sumByPrefix(bsPrevRows, '133') + sumByPrefix(bsPrevRows, '141') + sumByPrefix(bsPrevRows, '242');
+            const totalAssetsPrev = currentAssetsPrev + sumByPrefix(bsPrevRows, '2');
+            const currentLiabilitiesPrev = Math.abs(sumByPrefix(bsPrevRows, '311') + sumByPrefix(bsPrevRows, '331')
+              + sumByPrefix(bsPrevRows, '333') + sumByPrefix(bsPrevRows, '334') + sumByPrefix(bsPrevRows, '338')
+              + sumByPrefix(bsPrevRows, '341'));
+            const totalLiabilitiesPrev = currentLiabilitiesPrev + Math.abs(sumByPrefix(bsPrevRows, '342'));
+            const equityPrev = Math.abs(sumByPrefix(bsPrevRows, '41'));
+
+            const pp = pnlPrev || {};
+            const netRevenuePrev = num(pp.revenue) - num(pp.deductions);
+            const grossProfitPrev = netRevenuePrev - num(pp.cogs);
+            const operatingProfitPrev = grossProfitPrev + num(pp.financial_income) - num(pp.selling_exp) - num(pp.admin_exp) - num(pp.financial_exp);
+            const ebitPrev = operatingProfitPrev + num(pp.other_income) - num(pp.other_exp);
+            const netIncomePrev = ebitPrev - num(pp.tax_exp);
+
+            // === CALCULATE RATIOS ===
+            const calcRatio = (numerator, denominator) => denominator !== 0 ? (numerator / denominator) : 0;
+            const calcPct = (numerator, denominator) => denominator !== 0 ? ((numerator / denominator) * 100) : 0;
+            const formatRatio = (val) => val.toFixed(2);
+            const formatPct = (val) => val.toFixed(2);
+
+            // Build report
+            const report = [
+              // === A. CHỈ SỐ THANH KHOẢN ===
+              { id: 'liquidity_header', category: 'A. CHỈ SỐ THANH KHOẢN (LIQUIDITY)', is_header: true },
+              {
+                id: 'current_ratio',
+                indicator: 'Hệ số thanh toán hiện hành (Current Ratio)',
+                formula: 'Tài sản ngắn hạn / Nợ ngắn hạn',
+                current_value: formatRatio(calcRatio(currentAssets, currentLiabilities)),
+                previous_value: formatRatio(calcRatio(currentAssetsPrev, currentLiabilitiesPrev)),
+                unit: 'Lần',
+                benchmark: '> 1.5',
+                interpretation: currentAssets > currentLiabilities * 1.5 ? 'Tốt' : currentAssets > currentLiabilities ? 'Bình thường' : 'Cần cải thiện'
+              },
+              {
+                id: 'quick_ratio',
+                indicator: 'Hệ số thanh toán nhanh (Quick Ratio)',
+                formula: '(TS ngắn hạn - Hàng tồn kho) / Nợ ngắn hạn',
+                current_value: formatRatio(calcRatio(currentAssets - inventory, currentLiabilities)),
+                previous_value: formatRatio(calcRatio(currentAssetsPrev - inventoryPrev, currentLiabilitiesPrev)),
+                unit: 'Lần',
+                benchmark: '> 1.0',
+                interpretation: (currentAssets - inventory) > currentLiabilities ? 'Tốt' : 'Cần cải thiện'
+              },
+              {
+                id: 'cash_ratio',
+                indicator: 'Hệ số thanh toán tức thời (Cash Ratio)',
+                formula: 'Tiền và tương đương tiền / Nợ ngắn hạn',
+                current_value: formatRatio(calcRatio(cash, currentLiabilities)),
+                previous_value: formatRatio(calcRatio(cashPrev, currentLiabilitiesPrev)),
+                unit: 'Lần',
+                benchmark: '> 0.5',
+                interpretation: cash > currentLiabilities * 0.5 ? 'Tốt' : 'Cần cải thiện'
+              },
+              {
+                id: 'working_capital',
+                indicator: 'Vốn lưu động ròng (Working Capital)',
+                formula: 'Tài sản ngắn hạn - Nợ ngắn hạn',
+                current_value: (currentAssets - currentLiabilities).toLocaleString('vi-VN'),
+                previous_value: (currentAssetsPrev - currentLiabilitiesPrev).toLocaleString('vi-VN'),
+                unit: 'VNĐ',
+                benchmark: '> 0',
+                interpretation: currentAssets > currentLiabilities ? 'Dương (Tốt)' : 'Âm (Rủi ro)'
+              },
+
+              // === B. CHỈ SỐ HIỆU QUẢ HOẠT ĐỘNG ===
+              { id: 'efficiency_header', category: 'B. CHỈ SỐ HIỆU QUẢ HOẠT ĐỘNG (EFFICIENCY)', is_header: true },
+              {
+                id: 'asset_turnover',
+                indicator: 'Vòng quay Tổng tài sản (Asset Turnover)',
+                formula: 'Doanh thu thuần / Tổng tài sản bình quân',
+                current_value: formatRatio(calcRatio(netRevenue, (totalAssets + totalAssetsPrev) / 2)),
+                previous_value: formatRatio(calcRatio(netRevenuePrev, totalAssetsPrev)),
+                unit: 'Lần',
+                benchmark: '> 1.0',
+                interpretation: netRevenue > (totalAssets + totalAssetsPrev) / 2 ? 'Hiệu quả cao' : 'Cần cải thiện'
+              },
+              {
+                id: 'receivables_turnover',
+                indicator: 'Vòng quay Khoản phải thu (Receivables Turnover)',
+                formula: 'Doanh thu thuần / Phải thu bình quân',
+                current_value: formatRatio(calcRatio(netRevenue, (receivables + receivablesPrev) / 2)),
+                previous_value: formatRatio(calcRatio(netRevenuePrev, receivablesPrev)),
+                unit: 'Lần',
+                benchmark: '> 6',
+                interpretation: receivables > 0 ? `~${Math.round(365 / calcRatio(netRevenue, (receivables + receivablesPrev) / 2))} ngày thu tiền` : 'N/A'
+              },
+              {
+                id: 'inventory_turnover',
+                indicator: 'Vòng quay Hàng tồn kho (Inventory Turnover)',
+                formula: 'Giá vốn hàng bán / HTK bình quân',
+                current_value: formatRatio(calcRatio(num(p.cogs), (inventory + inventoryPrev) / 2)),
+                previous_value: formatRatio(calcRatio(num(pp.cogs), inventoryPrev)),
+                unit: 'Lần',
+                benchmark: '> 4',
+                interpretation: inventory > 0 ? `~${Math.round(365 / calcRatio(num(p.cogs), (inventory + inventoryPrev) / 2))} ngày tồn kho` : 'N/A'
+              },
+              {
+                id: 'payables_turnover',
+                indicator: 'Vòng quay Khoản phải trả (Payables Turnover)',
+                formula: 'Giá vốn hàng bán / Phải trả bình quân',
+                current_value: formatRatio(calcRatio(num(p.cogs), (payables + Math.abs(sumByPrefix(bsPrevRows, '331'))) / 2)),
+                previous_value: formatRatio(calcRatio(num(pp.cogs), Math.abs(sumByPrefix(bsPrevRows, '331')))),
+                unit: 'Lần',
+                benchmark: '4-6',
+                interpretation: payables > 0 ? `~${Math.round(365 / calcRatio(num(p.cogs), payables))} ngày trả nợ` : 'N/A'
+              },
+
+              // === C. CHỈ SỐ ĐÒN BẨY TÀI CHÍNH ===
+              { id: 'leverage_header', category: 'C. CHỈ SỐ ĐÒN BẨY TÀI CHÍNH (LEVERAGE)', is_header: true },
+              {
+                id: 'debt_ratio',
+                indicator: 'Hệ số Nợ (Debt Ratio)',
+                formula: 'Tổng nợ phải trả / Tổng tài sản',
+                current_value: formatPct(calcPct(totalLiabilities, totalAssets)),
+                previous_value: formatPct(calcPct(totalLiabilitiesPrev, totalAssetsPrev)),
+                unit: '%',
+                benchmark: '< 60%',
+                interpretation: totalLiabilities < totalAssets * 0.6 ? 'An toàn' : 'Rủi ro cao'
+              },
+              {
+                id: 'debt_equity',
+                indicator: 'Hệ số Nợ/Vốn CSH (Debt to Equity)',
+                formula: 'Tổng nợ phải trả / Vốn chủ sở hữu',
+                current_value: formatRatio(calcRatio(totalLiabilities, equity)),
+                previous_value: formatRatio(calcRatio(totalLiabilitiesPrev, equityPrev)),
+                unit: 'Lần',
+                benchmark: '< 2.0',
+                interpretation: totalLiabilities < equity * 2 ? 'Chấp nhận được' : 'Đòn bẩy cao'
+              },
+              {
+                id: 'equity_multiplier',
+                indicator: 'Hệ số đòn bẩy tài chính (Equity Multiplier)',
+                formula: 'Tổng tài sản / Vốn chủ sở hữu',
+                current_value: formatRatio(calcRatio(totalAssets, equity)),
+                previous_value: formatRatio(calcRatio(totalAssetsPrev, equityPrev)),
+                unit: 'Lần',
+                benchmark: '< 3.0',
+                interpretation: totalAssets < equity * 3 ? 'Bình thường' : 'Sử dụng đòn bẩy cao'
+              },
+              {
+                id: 'interest_coverage',
+                indicator: 'Hệ số khả năng trả lãi (Interest Coverage)',
+                formula: 'EBIT / Chi phí lãi vay',
+                current_value: num(p.financial_exp) > 0 ? formatRatio(calcRatio(ebit, num(p.financial_exp))) : 'N/A',
+                previous_value: num(pp.financial_exp) > 0 ? formatRatio(calcRatio(ebitPrev, num(pp.financial_exp))) : 'N/A',
+                unit: 'Lần',
+                benchmark: '> 3.0',
+                interpretation: num(p.financial_exp) > 0 ? (ebit > num(p.financial_exp) * 3 ? 'An toàn' : 'Rủi ro') : 'Không có nợ vay'
+              },
+
+              // === D. CHỈ SỐ SINH LỜI ===
+              { id: 'profitability_header', category: 'D. CHỈ SỐ SINH LỜI (PROFITABILITY)', is_header: true },
+              {
+                id: 'gross_margin',
+                indicator: 'Biên lợi nhuận gộp (Gross Profit Margin)',
+                formula: 'Lợi nhuận gộp / Doanh thu thuần',
+                current_value: formatPct(calcPct(grossProfit, netRevenue)),
+                previous_value: formatPct(calcPct(grossProfitPrev, netRevenuePrev)),
+                unit: '%',
+                benchmark: '> 25%',
+                interpretation: grossProfit > netRevenue * 0.25 ? 'Tốt' : 'Cần cải thiện'
+              },
+              {
+                id: 'operating_margin',
+                indicator: 'Biên lợi nhuận hoạt động (Operating Margin)',
+                formula: 'Lợi nhuận từ HĐKD / Doanh thu thuần',
+                current_value: formatPct(calcPct(operatingProfit, netRevenue)),
+                previous_value: formatPct(calcPct(operatingProfitPrev, netRevenuePrev)),
+                unit: '%',
+                benchmark: '> 10%',
+                interpretation: operatingProfit > netRevenue * 0.1 ? 'Tốt' : 'Cần cải thiện'
+              },
+              {
+                id: 'net_margin',
+                indicator: 'Biên lợi nhuận ròng (Net Profit Margin)',
+                formula: 'Lợi nhuận sau thuế / Doanh thu thuần',
+                current_value: formatPct(calcPct(netIncome, netRevenue)),
+                previous_value: formatPct(calcPct(netIncomePrev, netRevenuePrev)),
+                unit: '%',
+                benchmark: '> 5%',
+                interpretation: netIncome > netRevenue * 0.05 ? 'Tốt' : 'Cần cải thiện'
+              },
+              {
+                id: 'roa',
+                indicator: 'Tỷ suất sinh lời trên Tài sản (ROA)',
+                formula: 'Lợi nhuận sau thuế / Tổng TS bình quân',
+                current_value: formatPct(calcPct(netIncome, (totalAssets + totalAssetsPrev) / 2)),
+                previous_value: formatPct(calcPct(netIncomePrev, totalAssetsPrev)),
+                unit: '%',
+                benchmark: '> 5%',
+                interpretation: netIncome > (totalAssets + totalAssetsPrev) / 2 * 0.05 ? 'Tốt' : 'Cần cải thiện'
+              },
+              {
+                id: 'roe',
+                indicator: 'Tỷ suất sinh lời trên Vốn CSH (ROE)',
+                formula: 'Lợi nhuận sau thuế / Vốn CSH bình quân',
+                current_value: formatPct(calcPct(netIncome, (equity + equityPrev) / 2)),
+                previous_value: formatPct(calcPct(netIncomePrev, equityPrev)),
+                unit: '%',
+                benchmark: '> 15%',
+                interpretation: netIncome > (equity + equityPrev) / 2 * 0.15 ? 'Xuất sắc' : netIncome > (equity + equityPrev) / 2 * 0.1 ? 'Tốt' : 'Trung bình'
+              },
+
+              // === E. PHÂN TÍCH DUPONT ===
+              { id: 'dupont_header', category: 'E. PHÂN TÍCH DUPONT (ROE DECOMPOSITION)', is_header: true },
+              {
+                id: 'dupont_npm',
+                indicator: '1. Biên lợi nhuận ròng (NPM)',
+                formula: 'Lợi nhuận sau thuế / Doanh thu',
+                current_value: formatPct(calcPct(netIncome, netRevenue)),
+                previous_value: formatPct(calcPct(netIncomePrev, netRevenuePrev)),
+                unit: '%',
+                benchmark: '-',
+                interpretation: 'Hiệu quả kiểm soát chi phí'
+              },
+              {
+                id: 'dupont_ato',
+                indicator: '2. Vòng quay tài sản (ATO)',
+                formula: 'Doanh thu / Tổng tài sản',
+                current_value: formatRatio(calcRatio(netRevenue, totalAssets)),
+                previous_value: formatRatio(calcRatio(netRevenuePrev, totalAssetsPrev)),
+                unit: 'Lần',
+                benchmark: '-',
+                interpretation: 'Hiệu quả sử dụng tài sản'
+              },
+              {
+                id: 'dupont_em',
+                indicator: '3. Đòn bẩy tài chính (EM)',
+                formula: 'Tổng tài sản / Vốn CSH',
+                current_value: formatRatio(calcRatio(totalAssets, equity)),
+                previous_value: formatRatio(calcRatio(totalAssetsPrev, equityPrev)),
+                unit: 'Lần',
+                benchmark: '-',
+                interpretation: 'Mức sử dụng đòn bẩy'
+              },
+              {
+                id: 'dupont_roe',
+                indicator: '→ ROE = NPM × ATO × EM',
+                formula: 'Lợi nhuận / Vốn CSH',
+                current_value: formatPct(calcPct(netIncome, equity)),
+                previous_value: formatPct(calcPct(netIncomePrev, equityPrev)),
+                unit: '%',
+                benchmark: '> 15%',
+                is_total: true,
+                interpretation: netIncome > equity * 0.15 ? 'Xuất sắc' : netIncome > equity * 0.1 ? 'Tốt' : 'Cần cải thiện'
+              }
+            ];
+
+            res.json(report);
+          });
+        });
+      });
+    });
+  };
+}
+
 module.exports = {
   getBalanceSheetDN,
   getProfitLossStatement,
@@ -1573,5 +1950,6 @@ module.exports = {
   getNotesToFinancialStatements,
   getCostAnalysis,
   getProfitabilityAnalysis,
-  getBudgetPerformance
+  getBudgetPerformance,
+  getFinancialAnalysis
 };

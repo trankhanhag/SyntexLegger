@@ -1,6 +1,6 @@
 /**
  * Budget Control Service
- * SyntexHCSN - Hệ thống Kiểm soát Ngân sách theo TT 24/2024/TT-BTC
+ * SyntexLegger - Hệ thống Kiểm soát Ngân sách theo TT 99/2025/TT-BTC
  *
  * Provides comprehensive budget management including:
  * - Budget availability checking

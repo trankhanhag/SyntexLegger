@@ -1,6 +1,6 @@
 /**
  * VNPT Invoice Provider
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * Integration with VNPT-INVOICE API
  * API Documentation: https://invoice.vnpt.vn/api-docs

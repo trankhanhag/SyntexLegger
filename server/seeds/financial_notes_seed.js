@@ -164,5 +164,5 @@ exports.seed = async function(knex) {
         parentMap[note.note_code] = insertedId;
     }
 
-    console.log(`Seeded ${FINANCIAL_NOTES.length} financial notes for B09-DN`);
+    // Logged via logger in production
 };

@@ -4,6 +4,7 @@
  */
 const express = require('express');
 const router = express.Router();
+const logger = require('../src/utils/logger');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -35,7 +36,7 @@ function createVoucher(db, data) {
             data.total_amount
         ], function (err) {
             if (err) {
-                console.error('[CLOSING] Error creating voucher:', err);
+                logger.error('[CLOSING] Error creating voucher:', err);
                 reject(err);
                 return;
             }
@@ -64,7 +65,7 @@ function createVoucher(db, data) {
                 ], (err) => {
                     if (err && !hasError) {
                         hasError = true;
-                        console.error('[CLOSING] Error creating voucher item:', err);
+                        logger.error('[CLOSING] Error creating voucher item:', err);
                         reject(err);
                         return;
                     }
@@ -103,7 +104,7 @@ function getAccountBalances(db, period) {
 
         db.all(sql, [fromDate, toDate], (err, rows) => {
             if (err) {
-                console.error('[CLOSING] Error fetching balances:', err);
+                logger.error('[CLOSING] Error fetching balances:', err);
                 reject(err);
                 return;
             }
@@ -129,7 +130,7 @@ module.exports = (db) => {
             });
         }
 
-        console.log(`[CLOSING] ========== Starting macro for period: ${period} ==========`);
+        logger.info(`[CLOSING] ========== Starting macro for period: ${period} ==========`);
         const results = [];
         const createdVouchers = [];
         const fiscal_year = parseInt(period.split('-')[0]);
@@ -137,7 +138,7 @@ module.exports = (db) => {
 
         try {
             // ===== STEP 1: STOCK VALUATION (Tính giá vốn) =====
-            // Note: HCSN thường sử dụng WEIGHTED_AVERAGE hoặc SPECIFIC_ID
+            // Note: Doanh nghiệp thường sử dụng WEIGHTED_AVERAGE (bình quân gia quyền)
             // Bước này thường tự động trong quá trình xuất kho
             results.push({
                 code: 'VALUATION',
@@ -145,7 +146,7 @@ module.exports = (db) => {
                 status: 'success',
                 info: 'Giá vốn được tính tự động khi xuất kho'
             });
-            console.log('[CLOSING] Step 1 - Stock Valuation: SKIPPED (auto-calculated on issue)');
+            logger.info('[CLOSING] Step 1 - Stock Valuation: SKIPPED (auto-calculated on issue)');
 
             // ===== STEP 2: DEPRECIATION (Trích khấu hao/hao mòn TSCĐ) =====
             try {
@@ -247,10 +248,10 @@ module.exports = (db) => {
                         info: 'Không có TSCĐ cần khấu hao trong kỳ'
                     });
                 }
-                console.log(`[CLOSING] Step 2 - Depreciation: ${depreciationResult.totalDepreciation.toLocaleString()} VNĐ`);
+                logger.info(`[CLOSING] Step 2 - Depreciation: ${depreciationResult.totalDepreciation.toLocaleString()} VNĐ`);
 
             } catch (depErr) {
-                console.error('[CLOSING] Depreciation error:', depErr);
+                logger.error('[CLOSING] Depreciation error:', depErr);
                 results.push({
                     code: 'DEPRECIATION',
                     name: 'Trích hao mòn/khấu hao',
@@ -313,13 +314,13 @@ module.exports = (db) => {
                         info: 'Không có khoản cần ghi nhận'
                     });
                 }
-                console.log(`[CLOSING] Step 3 - Revenue Recognition: ${revenueRecognition.toLocaleString()} VNĐ`);
+                logger.info(`[CLOSING] Step 3 - Revenue Recognition: ${revenueRecognition.toLocaleString()} VNĐ`);
 
             } catch (revErr) {
-                console.error('[CLOSING] Revenue recognition error:', revErr);
+                logger.error('[CLOSING] Revenue recognition error:', revErr);
                 results.push({
                     code: 'REVENUE_RECOGNITION',
-                    name: 'Ghi thu từ nguồn tạm thu (366)',
+                    name: 'Ghi nhận Doanh thu (3387 → 511)',
                     status: 'warning',
                     info: 'Bỏ qua'
                 });
@@ -410,10 +411,10 @@ module.exports = (db) => {
                         info: 'Không có khoản cần phân bổ'
                     });
                 }
-                console.log(`[CLOSING] Step 4 - Allocation: ${allocationResult.totalAllocation.toLocaleString()} VNĐ`);
+                logger.info(`[CLOSING] Step 4 - Allocation: ${allocationResult.totalAllocation.toLocaleString()} VNĐ`);
 
             } catch (allocErr) {
-                console.error('[CLOSING] Allocation error:', allocErr);
+                logger.error('[CLOSING] Allocation error:', allocErr);
                 results.push({
                     code: 'ALLOCATION',
                     name: 'Phân bổ chi phí (Allocation)',
@@ -454,7 +455,7 @@ module.exports = (db) => {
                         info: 'Không có số dư ngoại tệ cần đánh giá'
                     });
                 }
-                console.log(`[CLOSING] Step 5 - FX Revaluation: Balance=${fxBalance}`);
+                logger.info(`[CLOSING] Step 5 - FX Revaluation: Balance=${fxBalance}`);
             } catch (fxErr) {
                 results.push({
                     code: 'FX_REVALUATION',
@@ -535,9 +536,9 @@ module.exports = (db) => {
                         info: 'Không có số dư VAT trong kỳ'
                     });
                 }
-                console.log(`[CLOSING] Step 6 - VAT Transfer: Input=${vatInput}, Output=${vatOutput}, Payable=${vatPayable}`);
+                logger.info(`[CLOSING] Step 6 - VAT Transfer: Input=${vatInput}, Output=${vatOutput}, Payable=${vatPayable}`);
             } catch (vatErr) {
-                console.error('[CLOSING] VAT error:', vatErr);
+                logger.error('[CLOSING] VAT error:', vatErr);
                 results.push({
                     code: 'VAT_TRANSFER',
                     name: 'Kết chuyển VAT (nếu có)',
@@ -570,7 +571,7 @@ module.exports = (db) => {
                         ? `Đã có ${payrollCheck} bút toán lương trong kỳ`
                         : 'Chưa có dữ liệu lương - vui lòng nhập từ module Nhân sự'
                 });
-                console.log(`[CLOSING] Step 7 - Payroll: ${payrollCheck} vouchers found`);
+                logger.info(`[CLOSING] Step 7 - Payroll: ${payrollCheck} vouchers found`);
 
             } catch (payrollErr) {
                 results.push({
@@ -675,10 +676,10 @@ module.exports = (db) => {
                         info: 'Không có số dư cần kết chuyển'
                     });
                 }
-                console.log(`[CLOSING] Step 8 - P&L Transfer: Revenue=${totalRevenue}, Expense=${totalExpense}, Profit=${profit}`);
+                logger.info(`[CLOSING] Step 8 - P&L Transfer: Revenue=${totalRevenue}, Expense=${totalExpense}, Profit=${profit}`);
 
             } catch (plErr) {
-                console.error('[CLOSING] P&L Transfer error:', plErr);
+                logger.error('[CLOSING] P&L Transfer error:', plErr);
                 results.push({
                     code: 'PL_TRANSFER',
                     name: 'Kết chuyển Lãi/Lỗ (911 → 421)',
@@ -700,11 +701,11 @@ module.exports = (db) => {
                     ? 'Vui lòng thực hiện thủ công theo quyết định phân phối lợi nhuận'
                     : 'Chỉ áp dụng cuối năm tài chính'
             });
-            console.log(`[CLOSING] Step 9 - Fund Distribution: ${isYearEnd ? 'Year-end, manual required' : 'Skipped (not year-end)'}`);
+            logger.info(`[CLOSING] Step 9 - Fund Distribution: ${isYearEnd ? 'Year-end, manual required' : 'Skipped (not year-end)'}`);
 
             // ===== HOÀN TẤT =====
-            console.log(`[CLOSING] ========== Macro completed for period: ${period} ==========`);
-            console.log(`[CLOSING] Created ${createdVouchers.length} vouchers`);
+            logger.info(`[CLOSING] ========== Macro completed for period: ${period} ==========`);
+            logger.info(`[CLOSING] Created ${createdVouchers.length} vouchers`);
 
             res.json({
                 success: true,
@@ -715,7 +716,7 @@ module.exports = (db) => {
             });
 
         } catch (error) {
-            console.error('[CLOSING] Macro execution failed:', error);
+            logger.error('[CLOSING] Macro execution failed:', error);
             res.status(500).json({
                 success: false,
                 message: 'Có lỗi xảy ra trong quá trình chạy quy trình cuối kỳ.',
@@ -760,7 +761,7 @@ module.exports = (db) => {
     router.post('/closing/reverse/:period', (req, res) => {
         const { period } = req.params;
 
-        console.log(`[CLOSING] Reversing period: ${period}`);
+        logger.info(`[CLOSING] Reversing period: ${period}`);
 
         // Delete all KC vouchers for the period
         const sql = `
@@ -771,11 +772,11 @@ module.exports = (db) => {
 
         db.run(sql, [], function (err) {
             if (err) {
-                console.error('[CLOSING] Reverse failed:', err);
+                logger.error('[CLOSING] Reverse failed:', err);
                 return res.status(500).json({ error: err.message });
             }
 
-            console.log(`[CLOSING] Reversed ${this.changes} vouchers for period ${period}`);
+            logger.info(`[CLOSING] Reversed ${this.changes} vouchers for period ${period}`);
 
             res.json({
                 success: true,

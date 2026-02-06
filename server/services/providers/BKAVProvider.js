@@ -1,6 +1,6 @@
 /**
  * BKAV eHoadon Provider
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * Integration with BKAV eHoadon API
  * API Documentation: https://ehoadon.bkav.com/api-docs

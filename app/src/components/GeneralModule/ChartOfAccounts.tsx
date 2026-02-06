@@ -8,6 +8,7 @@ import { SmartTable, type ColumnDef } from '../SmartTable';
 import { masterDataService } from '../../api';
 import { ExcelImportModal, type ColumnDef as ImportColumnDef } from '../ExcelImportModal';
 import { ACCOUNT_TEMPLATE } from '../../utils/excelTemplates';
+import logger from '../../utils/logger';
 
 interface ChartOfAccountsProps {
     onSelectionChange?: (v: any) => void;
@@ -87,7 +88,7 @@ export const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({
                 description: acc.description
             })));
         } catch (err) {
-            console.error("Failed to fetch accounts:", err);
+            logger.error("Failed to fetch accounts:", err);
         } finally {
             setLoading(false);
         }

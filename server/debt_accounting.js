@@ -1,5 +1,5 @@
 // ========================================
-// DEBT MANAGEMENT ACCOUNTING INTEGRATION - HCSN (TT 24/2024)
+// DEBT MANAGEMENT ACCOUNTING INTEGRATION - DN (TT 99/2025)
 // ========================================
 // Module tự động tạo chứng từ kế toán cho nghiệp vụ công nợ và tạm ứng
 

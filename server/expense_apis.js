@@ -1,8 +1,9 @@
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./src/utils/logger');
 
 /**
- * Expense Module APIs for HCSN
- * Quản lý Chi sự nghiệp theo TT 24/2024
+ * Expense Module APIs
+ * Quản lý Chi phí doanh nghiệp theo TT 99/2025
  */
 
 // ==================== EXPENSE CATEGORIES ====================
@@ -32,7 +33,7 @@ function getCategories(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get expense categories error:', err);
+                logger.error('Get expense categories error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -60,7 +61,7 @@ function createCategory(db) {
         db.run(sql, [id, code, name, expense_type, account_code || '611', description, new Date().toISOString()],
             function (err) {
                 if (err) {
-                    console.error('Create expense category error:', err);
+                    logger.error('Create expense category error:', err);
                     return res.status(500).json({ error: err.message });
                 }
                 res.status(201).json({ id, code, name, expense_type });
@@ -120,7 +121,7 @@ function getVouchers(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get expense vouchers error:', err);
+                logger.error('Get expense vouchers error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -144,7 +145,7 @@ function getVoucherDetail(db) {
 
         db.get(sql, [id], (err, row) => {
             if (err) {
-                console.error('Get expense voucher detail error:', err);
+                logger.error('Get expense voucher detail error:', err);
                 return res.status(500).json({ error: err.message });
             }
             if (!row) {
@@ -200,7 +201,7 @@ function createVoucher(db) {
             notes, req.user?.username, now, now
         ], function (err) {
             if (err) {
-                console.error('Create expense voucher error:', err);
+                logger.error('Create expense voucher error:', err);
                 return res.status(500).json({ error: err.message });
             }
 
@@ -220,7 +221,7 @@ function createVoucher(db) {
                 debitAcc, creditAcc, amount, payee_tax_code || null, id
             ], (ledgerErr) => {
                 if (ledgerErr) {
-                    console.error('Auto-create ledger error:', ledgerErr);
+                    logger.error('Auto-create ledger error:', ledgerErr);
                 }
             });
 
@@ -234,7 +235,7 @@ function createVoucher(db) {
 
                 db.run(budgetSql, [amount, amount, now, budget_estimate_id], (budgetErr) => {
                     if (budgetErr) {
-                        console.error('Update budget estimate error:', budgetErr);
+                        logger.error('Update budget estimate error:', budgetErr);
                     }
                 });
             }
@@ -288,7 +289,7 @@ function updateVoucher(db) {
             new Date().toISOString(), id
         ], function (err) {
             if (err) {
-                console.error('Update expense voucher error:', err);
+                logger.error('Update expense voucher error:', err);
                 return res.status(500).json({ error: err.message });
             }
             if (this.changes === 0) {
@@ -309,7 +310,7 @@ function deleteVoucher(db) {
 
         db.run('DELETE FROM expense_vouchers WHERE id = ?', [id], function (err) {
             if (err) {
-                console.error('Delete expense voucher error:', err);
+                logger.error('Delete expense voucher error:', err);
                 return res.status(500).json({ error: err.message });
             }
             if (this.changes === 0) {
@@ -384,7 +385,7 @@ function getExpenseReport(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get expense report error:', err);
+                logger.error('Get expense report error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -422,7 +423,7 @@ function getBudgetComparison(db) {
 
             db.all(sql, [fiscal_year], (err, rows) => {
                 if (err) {
-                    console.error('[EXPENSE_BUDGET_COMP_ERROR] SQL Error:', err.message);
+                    logger.error('[EXPENSE_BUDGET_COMP_ERROR] SQL Error:', err.message);
                     return res.status(500).json({
                         error: err.message,
                         context: 'db.all callback error',
@@ -433,7 +434,7 @@ function getBudgetComparison(db) {
                 res.json(rows);
             });
         } catch (fatal) {
-            console.error('[EXPENSE_BUDGET_COMP_FATAL]', fatal);
+            logger.error('[EXPENSE_BUDGET_COMP_FATAL]', fatal);
             return res.status(500).json({
                 error: fatal.message,
                 context: 'Fatal catch block',

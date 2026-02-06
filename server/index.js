@@ -1,10 +1,13 @@
 /**
  * Server Entry Point
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const db = require('./database');
 const createApp = require('./app');
+const knex = require('./knex_db');
+const logger = require('./src/utils/logger');
+const { getInstance: getBackupScheduler } = require('./src/services/backup-scheduler.service');
 
 const PORT = process.env.PORT || 3000;
 
@@ -12,22 +15,40 @@ const PORT = process.env.PORT || 3000;
 const app = createApp(db);
 
 // Start Server
-const server = app.listen(PORT, () => {
-    console.log(`===============================================`);
-    console.log(`   SyntexHCSN Backend Server is running!`);
-    console.log(`   Port: ${PORT}`);
-    console.log(`   Mode: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`   Circular 24/2024/TT-BTC Compliance: ENABLED`);
-    console.log(`===============================================`);
+const server = app.listen(PORT, async () => {
+    logger.info('===============================================');
+    logger.info('   SyntexLegger Backend Server is running!');
+    logger.info(`   Port: ${PORT}`);
+    logger.info(`   Mode: ${process.env.NODE_ENV || 'development'}`);
+    logger.info('   Circular 99/2025/TT-BTC Compliance: ENABLED');
+    logger.info('===============================================');
+
+    // Initialize Backup Scheduler
+    try {
+        const scheduler = getBackupScheduler(knex);
+        await scheduler.initialize();
+        logger.info('BackupScheduler initialized');
+    } catch (err) {
+        logger.error('BackupScheduler init error', { error: err.message });
+    }
 });
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('SIGTERM signal received: closing HTTP server');
+    logger.info('SIGTERM signal received: closing HTTP server');
+
+    // Stop backup scheduler
+    const scheduler = getBackupScheduler();
+    if (scheduler) {
+        scheduler.stopJob();
+        logger.info('Backup scheduler stopped');
+    }
+
     server.close(() => {
-        console.log('HTTP server closed');
+        logger.info('HTTP server closed');
         db.close(() => {
-            console.log('Database connection closed');
+            logger.info('Database connection closed');
         });
     });
 });
+

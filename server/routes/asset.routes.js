@@ -1,9 +1,10 @@
 /**
  * Asset Routes (Fixed Assets, CCDC, Infrastructure)
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
+const logger = require('../src/utils/logger');
 
 const { verifyToken } = require('../middleware');
 const assetApis = require('../asset_apis');
@@ -129,7 +130,7 @@ module.exports = (db) => {
     });
 
     // ========================================
-    // HCSN - FIXED ASSETS EXTENDED
+    // DN - FIXED ASSETS EXTENDED
     // ========================================
 
     router.get('/assets/fixed', verifyToken, assetApis.getFixedAssets(db));
@@ -141,26 +142,28 @@ module.exports = (db) => {
     router.put('/assets/fixed/:id/revaluation', verifyToken, assetApis.revaluateFixedAsset(db));
 
     // ========================================
-    // HCSN - INFRASTRUCTURE ASSETS
+    // DN - INFRASTRUCTURE ASSETS
     // ========================================
 
     router.get('/infrastructure-assets', verifyToken, assetApis.getInfrastructureAssets(db));
     router.post('/infrastructure-assets', verifyToken, assetApis.createInfrastructureAsset(db));
     router.put('/infrastructure-assets/:id', verifyToken, assetApis.updateInfrastructureAsset(db));
+    router.delete('/infrastructure-assets/:id', verifyToken, assetApis.deleteInfrastructureAsset(db));
     router.post('/infrastructure/maintenance', verifyToken, assetApis.recordMaintenance(db));
     router.put('/infrastructure/:id/condition', verifyToken, assetApis.assessCondition(db));
 
     // ========================================
-    // HCSN - LONG-TERM INVESTMENTS
+    // DN - LONG-TERM INVESTMENTS
     // ========================================
 
     router.get('/investments/long-term', verifyToken, assetApis.getLongTermInvestments(db));
     router.post('/investments/long-term', verifyToken, assetApis.createInvestment(db));
     router.put('/investments/long-term/:id', verifyToken, assetApis.updateInvestment(db));
+    router.delete('/investments/long-term/:id', verifyToken, assetApis.deleteInvestment(db));
     router.post('/investments/income', verifyToken, assetApis.recordInvestmentIncome(db));
 
     // ========================================
-    // HCSN - ASSET INVENTORY
+    // DN - ASSET INVENTORY
     // ========================================
 
     router.get('/assets/inventory', verifyToken, assetApis.getInventoryRecords(db));
@@ -170,7 +173,7 @@ module.exports = (db) => {
     router.get('/assets/inventory/:id/report', verifyToken, assetApis.getInventoryReport(db));
 
     // ========================================
-    // HCSN - ASSET CARDS
+    // DN - ASSET CARDS
     // ========================================
 
     router.get('/assets/cards/:asset_id', verifyToken, assetApis.getAssetCard(db));
@@ -204,6 +207,29 @@ module.exports = (db) => {
         db.run(sql, [id, code, name, start_date, cost, life_months, 0, cost], function (err) {
             if (err) return res.status(400).json({ "error": err.message });
             res.json({ message: "CCDC created", id });
+        });
+    });
+
+    /**
+     * PUT /api/ccdc/:id
+     * Update an existing CCDC item
+     */
+    router.put('/ccdc/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        const { code, name, start_date, cost, life_months, category, department, status } = req.body;
+        const sql = `UPDATE ccdc_items SET
+            code = COALESCE(?, code),
+            name = COALESCE(?, name),
+            start_date = COALESCE(?, start_date),
+            cost = COALESCE(?, cost),
+            life_months = COALESCE(?, life_months),
+            category = COALESCE(?, category),
+            department = COALESCE(?, department),
+            status = COALESCE(?, status)
+            WHERE id = ?`;
+        db.run(sql, [code, name, start_date, cost, life_months, category, department, status, id], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "CCDC updated", changes: this.changes });
         });
     });
 
@@ -292,7 +318,7 @@ module.exports = (db) => {
             if (item_type === 'CCDC' || !item_type) {
                 db.run("UPDATE ccdc_items SET allocated = allocated + ?, remaining = remaining - ? WHERE id = ? OR code = ?",
                     [amount, amount, item_id, item_id], function (updateErr) {
-                        if (updateErr) console.error("Failed to update CCDC:", updateErr);
+                        if (updateErr) logger.error("Failed to update CCDC:", updateErr);
                     });
             }
 

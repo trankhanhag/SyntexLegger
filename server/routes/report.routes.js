@@ -5,8 +5,6 @@
 
 const express = require('express');
 const dnReports = require('../dn_reports_apis');
-// Legacy HCSN reports (kept for reference)
-// const hcsnReports = require('../hcsn_reports_apis');
 
 const { verifyToken } = require('../middleware');
 
@@ -31,7 +29,7 @@ module.exports = (db) => {
 
         if (type === 'vat') {
             // VAT Calculation (01/GTGT)
-            // Input VAT: 133 (or 3113 in HCSN mapping if applicable, usually 133/333 in commercial view)
+            // Input VAT: 133 (or 3113 in DN mapping if applicable, usually 133/333 in commercial view)
             // Output VAT: 3331
             const sql = `
                 SELECT 
@@ -397,20 +395,38 @@ module.exports = (db) => {
 
     /**
     * GET /api/reports/debt-ledger
-    * Sổ chi tiết công nợ
+    * Sổ chi tiết công nợ (Phải thu, Phải trả, Tạm ứng)
     */
     router.get('/reports/debt-ledger', verifyToken, (req, res) => {
         const fromDate = req.query.from || '2024-01-01';
         const toDate = req.query.to || '2024-12-31';
+        const partnerCode = req.query.partner_code;
 
-        const sql = `
-             SELECT * FROM general_ledger 
-             WHERE (account_code LIKE '331%' OR account_code LIKE '131%')
-             AND trx_date >= ? AND trx_date <= ?
-             ORDER BY trx_date ASC, id ASC
+        // Các tài khoản công nợ theo TT 99/2025:
+        // Phải thu: 131, 136, 138
+        // Phải trả: 331, 334, 336, 338
+        // Tạm ứng: 141
+        let sql = `
+             SELECT gl.*, p.partner_name
+             FROM general_ledger gl
+             LEFT JOIN partners p ON gl.partner_code = p.partner_code
+             WHERE (
+                 gl.account_code LIKE '131%' OR gl.account_code LIKE '136%' OR gl.account_code LIKE '138%' OR
+                 gl.account_code LIKE '331%' OR gl.account_code LIKE '334%' OR gl.account_code LIKE '336%' OR gl.account_code LIKE '338%' OR
+                 gl.account_code LIKE '141%'
+             )
+             AND gl.trx_date >= ? AND gl.trx_date <= ?
         `;
+        const params = [fromDate, toDate];
 
-        db.all(sql, [fromDate, toDate], (err, rows) => {
+        if (partnerCode) {
+            sql += ` AND gl.partner_code = ?`;
+            params.push(partnerCode);
+        }
+
+        sql += ` ORDER BY gl.trx_date ASC, gl.id ASC`;
+
+        db.all(sql, params, (err, rows) => {
             if (err) return res.status(400).json({ error: err.message });
             res.json(rows);
         });
@@ -442,8 +458,8 @@ module.exports = (db) => {
                 doc_no: r.doc_no,
                 description: r.description,
                 reciprocal_acc: r.reciprocal_acc,
-                debit_amount: r.debit_amount,
-                credit_amount: r.credit_amount,
+                debit_amount: r.debit_amount || 0,
+                credit_amount: r.credit_amount || 0,
                 balance: 0 // Journal typically doesn't have a single running balance
             }));
             res.json(report);
@@ -823,13 +839,8 @@ module.exports = (db) => {
     // Báo cáo Thực hiện Kế hoạch/Ngân sách
     router.get('/reports/budget-performance', verifyToken, dnReports.getBudgetPerformance(db));
 
-    // ========================================
-    // Legacy HCSN REPORTS (TT 24/2024/TT-BTC)
-    // REMOVED - Không còn sử dụng cho Doanh nghiệp
-    // ========================================
-    // router.get('/reports/balance-sheet-hcsn', verifyToken, hcsnReports.getBalanceSheetHCSN(db));
-    // router.get('/reports/activity-result', verifyToken, hcsnReports.getActivityResult(db));
-    // router.get('/reports/budget-settlement-*', verifyToken, ...);
+    // Phân tích Tài chính (Financial Analysis)
+    router.get('/reports/financial-analysis', verifyToken, dnReports.getFinancialAnalysis(db));
 
     return router;
 };

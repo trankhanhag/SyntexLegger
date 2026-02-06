@@ -1,14 +1,15 @@
 /**
  * Authentication & Authorization Middleware
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../database');
+const logger = require('../src/utils/logger');
 
 if (!process.env.JWT_SECRET) {
-    console.warn('[SECURITY WARNING] JWT_SECRET environment variable is not set. Using a randomly generated secret. Set JWT_SECRET in production for persistent sessions.');
+    logger.warn('[SECURITY WARNING] JWT_SECRET environment variable is not set. Using a randomly generated secret. Set JWT_SECRET in production for persistent sessions.');
 }
 const SECRET_KEY = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 const LOGIN_WINDOW_MS = Number.parseInt(process.env.LOGIN_WINDOW_MS || '900000', 10);

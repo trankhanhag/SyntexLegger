@@ -4,6 +4,7 @@ import { SmartTable, type ColumnDef } from './SmartTable';
 import { exportToCSV } from '../utils/exportUtils';
 import { formatTimeVN } from '../utils/dateUtils';
 import { TrendLineChart, SparkBarChart, CompactRadialGauge } from './MiniCharts';
+import logger from '../utils/logger';
 
 interface DashboardProps {
     subView?: string;
@@ -53,7 +54,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ subView = 'dashboard', onN
                 setOverdueData(overdueRes.data);
                 setIncompleteData(incompleteRes.data);
             } catch (err) {
-                console.error("Failed to fetch dashboard data:", err);
+                logger.error("Failed to fetch dashboard data:", err);
             } finally {
                 setLoading(false);
             }

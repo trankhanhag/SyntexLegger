@@ -1,12 +1,13 @@
 /**
  * E-Invoice Service
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * Main service for managing e-invoice providers and imported invoices
  */
 
 const db = require('../knex_db');
 const EInvoiceProviderFactory = require('./einvoice-provider.factory');
+const logger = require('../src/utils/logger');
 
 class EInvoiceService {
     constructor() {
@@ -40,7 +41,7 @@ class EInvoiceService {
 
             return { success: true, data: providers };
         } catch (error) {
-            console.error('EInvoiceService.getProviders error:', error);
+            logger.error('EInvoiceService.getProviders error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -90,7 +91,7 @@ class EInvoiceService {
                 }
             };
         } catch (error) {
-            console.error('EInvoiceService.getProviderConfig error:', error);
+            logger.error('EInvoiceService.getProviderConfig error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -142,7 +143,7 @@ class EInvoiceService {
 
             return { success: true, message: 'Đã lưu cấu hình nhà cung cấp' };
         } catch (error) {
-            console.error('EInvoiceService.saveProviderConfig error:', error);
+            logger.error('EInvoiceService.saveProviderConfig error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -166,7 +167,7 @@ class EInvoiceService {
             const provider = EInvoiceProviderFactory.getProvider(providerCode, config);
             return await provider.testConnection();
         } catch (error) {
-            console.error('EInvoiceService.testProviderConnection error:', error);
+            logger.error('EInvoiceService.testProviderConnection error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -253,7 +254,7 @@ class EInvoiceService {
                 }
             };
         } catch (error) {
-            console.error('EInvoiceService.syncInvoices error:', error);
+            logger.error('EInvoiceService.syncInvoices error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -384,7 +385,7 @@ class EInvoiceService {
                 }
             };
         } catch (error) {
-            console.error('EInvoiceService.getInvoices error:', error);
+            logger.error('EInvoiceService.getInvoices error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -417,7 +418,7 @@ class EInvoiceService {
                 }
             };
         } catch (error) {
-            console.error('EInvoiceService.getInvoice error:', error);
+            logger.error('EInvoiceService.getInvoice error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -433,7 +434,7 @@ class EInvoiceService {
 
             return { success: true, message: 'Đã cập nhật trạng thái hóa đơn' };
         } catch (error) {
-            console.error('EInvoiceService.updateInvoiceStatus error:', error);
+            logger.error('EInvoiceService.updateInvoiceStatus error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -472,7 +473,7 @@ class EInvoiceService {
 
             return { success: false, error: { message: 'Thiếu thông tin tra cứu' } };
         } catch (error) {
-            console.error('EInvoiceService.lookupInvoice error:', error);
+            logger.error('EInvoiceService.lookupInvoice error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -534,7 +535,7 @@ class EInvoiceService {
                 message: 'Đã khớp hóa đơn với chứng từ'
             };
         } catch (error) {
-            console.error('EInvoiceService.matchToVoucher error:', error);
+            logger.error('EInvoiceService.matchToVoucher error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -588,7 +589,7 @@ class EInvoiceService {
 
             return { success: true, data: matches };
         } catch (error) {
-            console.error('EInvoiceService.findPotentialMatches error:', error);
+            logger.error('EInvoiceService.findPotentialMatches error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -624,7 +625,7 @@ class EInvoiceService {
                 }))
             };
         } catch (error) {
-            console.error('EInvoiceService.getSyncLogs error:', error);
+            logger.error('EInvoiceService.getSyncLogs error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -675,7 +676,7 @@ class EInvoiceService {
                 message: saveResult.isNew ? 'Đã import hóa đơn mới' : 'Hóa đơn đã tồn tại trong hệ thống'
             };
         } catch (error) {
-            console.error('EInvoiceService.importFromXml error:', error);
+            logger.error('EInvoiceService.importFromXml error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -770,7 +771,7 @@ class EInvoiceService {
                 message: `Đã tạo chứng từ ${voucherNo} từ hóa đơn`
             };
         } catch (error) {
-            console.error('EInvoiceService.createVoucherFromInvoice error:', error);
+            logger.error('EInvoiceService.createVoucherFromInvoice error:', error);
             return { success: false, error: { message: error.message } };
         }
     }
@@ -782,7 +783,7 @@ class EInvoiceService {
     _determineAccounts(invoice, options = {}) {
         const isPurchase = invoice.invoice_type === 'purchase';
 
-        // Default accounts for HCSN (TT 24/2024)
+        // Default accounts for DN (TT 99/2025)
         if (isPurchase) {
             // Mua hàng/dịch vụ
             return {
@@ -905,7 +906,7 @@ class EInvoiceService {
             const [partnerId] = await db('partners').insert(partnerData);
             return { id: partnerId, ...partnerData };
         } catch (error) {
-            console.error('_findOrCreatePartner error:', error);
+            logger.error('_findOrCreatePartner error:', error);
             return null;
         }
     }
@@ -961,7 +962,7 @@ class EInvoiceService {
                 }
             };
         } catch (error) {
-            console.error('EInvoiceService.getVoucherPreview error:', error);
+            logger.error('EInvoiceService.getVoucherPreview error:', error);
             return { success: false, error: { message: error.message } };
         }
     }

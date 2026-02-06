@@ -1,6 +1,6 @@
 /**
  * Jest Test Setup
- * SyntexHCSN - Unit Tests
+ * SyntexLegger - Unit Tests
  */
 
 // Increase timeout for database operations

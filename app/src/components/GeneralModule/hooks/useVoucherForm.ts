@@ -8,6 +8,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { voucherService } from '../../../api';
 import type { Voucher, VoucherLine } from '../types/voucher.types';
+import logger from '../../../utils/logger';
 
 /**
  * Check if account is off-balance sheet (TK ngoài bảng)
@@ -449,7 +450,7 @@ export function useVoucherForm(options: UseVoucherFormOptions = {}): UseVoucherF
             onSaveSuccess?.(savedVoucher);
             return true;
         } catch (err: any) {
-            console.error('Save voucher failed:', err);
+            logger.error('Save voucher failed:', err);
             const errorMsg = err.response?.data?.error || err.message || 'Không thể lưu chứng từ';
             setSaveError(errorMsg);
             onSaveError?.(errorMsg);

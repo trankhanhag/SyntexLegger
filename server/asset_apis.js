@@ -1,5 +1,5 @@
 // ========================================
-// ASSET MANAGEMENT APIs - HCSN (TT 24/2024)
+// ASSET MANAGEMENT APIs - Enterprise (TT 99/2025)
 // ========================================
 // Module xử lý 3 loại tài sản:
 // 1. Tài sản Cố định (TSCĐ)
@@ -8,6 +8,7 @@
 
 const { v4: uuidv4 } = require('uuid');
 const assetAccounting = require('./asset_accounting');
+const logger = require('./src/utils/logger');
 
 // ========================================
 // 1. TSCĐ - FIXED ASSETS APIs
@@ -706,13 +707,43 @@ exports.recordInvestmentIncome = (db) => (req, res) => {
     const { investment_id, income_amount, income_date, note } = req.body;
 
     db.run(`
-        UPDATE long_term_investments 
+        UPDATE long_term_investments
         SET income_received = income_received + ?,
             updated_at = datetime('now')
         WHERE id = ?
     `, [income_amount, investment_id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true, message: 'Đã ghi nhận thu nhập đầu tư', income_amount });
+    });
+};
+
+/**
+ * DELETE /api/infrastructure-assets/:id - Xóa tài sản hạ tầng
+ */
+exports.deleteInfrastructureAsset = (db) => (req, res) => {
+    const { id } = req.params;
+
+    db.run('DELETE FROM infrastructure_assets WHERE id = ?', [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Không tìm thấy tài sản hạ tầng' });
+        }
+        res.json({ success: true, message: 'Đã xóa tài sản hạ tầng' });
+    });
+};
+
+/**
+ * DELETE /api/investments/long-term/:id - Xóa khoản đầu tư dài hạn
+ */
+exports.deleteInvestment = (db) => (req, res) => {
+    const { id } = req.params;
+
+    db.run('DELETE FROM long_term_investments WHERE id = ?', [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Không tìm thấy khoản đầu tư' });
+        }
+        res.json({ success: true, message: 'Đã xóa khoản đầu tư' });
     });
 };
 
@@ -743,9 +774,9 @@ function createAssetCard(db, assetId, purchaseDate, originalValue) {
         originalValue   // closing_net_value (chưa khấu hao)
     ], (err) => {
         if (err) {
-            console.error('Error creating asset_card:', err);
+            logger.error('Error creating asset_card:', err);
         } else {
-            console.log(`✓ Created asset card ${cardNo} for fiscal year ${fiscal_year}`);
+            logger.info(`✓ Created asset card ${cardNo} for fiscal year ${fiscal_year}`);
         }
     });
 }

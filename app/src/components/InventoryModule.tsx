@@ -8,6 +8,7 @@ import { settingsService, inventoryService, API_URL } from '../api';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { MATERIAL_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 /**
  * Inventory Module
@@ -191,8 +192,8 @@ const MaterialFormModal = ({ material, onClose, onSave }: any) => {
     const handleSubmit = async () => {
         try {
             const url = material
-                ? `${API_URL}/hcsn/materials/${material.id}`
-                : `${API_URL}/hcsn/materials`;
+                ? `${API_URL}/inventory/materials/${material.id}`
+                : `${API_URL}/inventory/materials`;
             const method = material ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -212,7 +213,7 @@ const MaterialFormModal = ({ material, onClose, onSave }: any) => {
                 alert('Lỗi: ' + err.error);
             }
         } catch (err) {
-            console.error('Save material error:', err);
+            logger.error('Save material error:', err);
             alert('Không thể lưu vật tư');
         }
     };
@@ -305,16 +306,16 @@ const ReceiptFormModal = ({ onClose, onSave, initialData }: any) => {
     const [materials, setMaterials] = useState<any[]>([]);
 
     useEffect(() => {
-        fetch(`${API_URL}/hcsn/materials`, {
+        fetch(`${API_URL}/inventory/materials`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => res.json())
             .then(data => setMaterials(data))
-            .catch(err => console.error(err));
+            .catch(err => logger.error(err));
 
         // If editing, fetch details to get items
         if (initialData?.id && (!initialData.items || initialData.items.length === 0)) {
-            fetch(`${API_URL}/hcsn/material-receipts/${initialData.id}`, {
+            fetch(`${API_URL}/inventory/receipts/${initialData.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
@@ -323,15 +324,15 @@ const ReceiptFormModal = ({ onClose, onSave, initialData }: any) => {
                         setFormData((prev: any) => ({ ...prev, items: data.items }));
                     }
                 })
-                .catch(err => console.error(err));
+                .catch(err => logger.error(err));
         }
     }, [initialData]);
 
     const handleSubmit = async (status: 'DRAFT' | 'POSTED') => {
         try {
             const url = initialData?.id
-                ? `${API_URL}/hcsn/material-receipts/${initialData.id}`
-                : `${API_URL}/hcsn/material-receipts`;
+                ? `${API_URL}/inventory/receipts/${initialData.id}`
+                : `${API_URL}/inventory/receipts`;
             const method = initialData?.id ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -455,15 +456,15 @@ const IssueFormModal = ({ onClose, onSave, initialData }: any) => {
     const [materials, setMaterials] = useState<any[]>([]);
 
     useEffect(() => {
-        fetch(`${API_URL}/hcsn/materials`, {
+        fetch(`${API_URL}/inventory/materials`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => res.json())
             .then(data => setMaterials(data))
-            .catch(err => console.error(err));
+            .catch(err => logger.error(err));
 
         if (initialData?.id && (!initialData.items || initialData.items.length === 0)) {
-            fetch(`${API_URL}/hcsn/material-issues/${initialData.id}`, {
+            fetch(`${API_URL}/inventory/issues/${initialData.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
@@ -472,15 +473,15 @@ const IssueFormModal = ({ onClose, onSave, initialData }: any) => {
                         setFormData((prev: any) => ({ ...prev, items: data.items }));
                     }
                 })
-                .catch(err => console.error(err));
+                .catch(err => logger.error(err));
         }
     }, [initialData]);
 
     const handleSubmit = async (status: 'DRAFT' | 'POSTED') => {
         try {
             const url = initialData?.id
-                ? `${API_URL}/hcsn/material-issues/${initialData.id}`
-                : `${API_URL}/hcsn/material-issues`;
+                ? `${API_URL}/inventory/issues/${initialData.id}`
+                : `${API_URL}/inventory/issues`;
             const method = initialData?.id ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -595,15 +596,15 @@ const TransferFormModal = ({ onClose, onSave, initialData }: any) => {
     const [materials, setMaterials] = useState<any[]>([]);
 
     useEffect(() => {
-        fetch(`${API_URL}/hcsn/materials`, {
+        fetch(`${API_URL}/inventory/materials`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => res.json())
             .then(data => setMaterials(data))
-            .catch(err => console.error(err));
+            .catch(err => logger.error(err));
 
         if (initialData?.id && (!initialData.items || initialData.items.length === 0)) {
-            fetch(`${API_URL}/hcsn/material-transfers/${initialData.id}`, {
+            fetch(`${API_URL}/inventory/transfers/${initialData.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
@@ -612,7 +613,7 @@ const TransferFormModal = ({ onClose, onSave, initialData }: any) => {
                         setFormData((prev: any) => ({ ...prev, items: data.items }));
                     }
                 })
-                .catch(err => console.error(err));
+                .catch(err => logger.error(err));
         }
     }, [initialData]);
 
@@ -628,8 +629,8 @@ const TransferFormModal = ({ onClose, onSave, initialData }: any) => {
 
         try {
             const url = initialData?.id
-                ? `${API_URL}/hcsn/material-transfers/${initialData.id}`
-                : `${API_URL}/hcsn/material-transfers`;
+                ? `${API_URL}/inventory/transfers/${initialData.id}`
+                : `${API_URL}/inventory/transfers`;
             const method = initialData?.id ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -728,12 +729,12 @@ const InventoryCardModal = ({ material, onClose }: any) => {
 
     useEffect(() => {
         if (material) {
-            fetch(`${API_URL}/hcsn/inventory/cards/${material.material_id || material.id}`, {
+            fetch(`${API_URL}/inventory/cards/${material.material_id || material.id}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             })
                 .then(res => res.json())
                 .then(data => setCardData(data))
-                .catch(err => console.error(err));
+                .catch(err => logger.error(err));
         }
     }, [material]);
 
@@ -781,6 +782,7 @@ const normalizeView = (v?: string) => {
     if (v === 'issue') return 'issues';
     if (v === 'transfer') return 'transfers';
     if (v === 'status') return 'summary';
+    if (v === 'card') return 'card'; // Thẻ kho
     return v;
 };
 
@@ -805,7 +807,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                 name: res.data.company_name || 'Đơn vị...',
                 address: res.data.company_address || 'Địa chỉ...'
             });
-        }).catch(console.error);
+        }).catch(logger.error);
     }, []);
     const [editingMaterial, setEditingMaterial] = useState<any>(null);
     const [selectedCardMaterial, setSelectedCardMaterial] = useState<any>(null);
@@ -822,11 +824,11 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
         try {
             let url = '';
             if (view === 'receipts' || view === 'receipt') {
-                url = `${API_URL}/hcsn/material-receipts/${record.id}`;
+                url = `${API_URL}/inventory/receipts/${record.id}`;
             } else if (view === 'issues' || view === 'issue') {
-                url = `${API_URL}/hcsn/material-issues/${record.id}`;
+                url = `${API_URL}/inventory/issues/${record.id}`;
             } else if (view === 'transfers' || view === 'transfer') {
-                url = `${API_URL}/hcsn/material-transfers/${record.id}`;
+                url = `${API_URL}/inventory/transfers/${record.id}`;
             }
 
             if (!url) return record; // Return original if no detail endpoint
@@ -836,14 +838,14 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
             });
 
             if (!res.ok) {
-                console.warn('Failed to fetch detail for print, using list data');
+                logger.warn('Failed to fetch detail for print, using list data');
                 return record;
             }
 
             const detail = await res.json();
             return detail;
         } catch (err) {
-            console.error('Error fetching detail for print:', err);
+            logger.error('Error fetching detail for print:', err);
             return record;
         }
     };
@@ -883,21 +885,21 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
         try {
             let url = '';
             if (view === 'materials') {
-                url = `${API_URL}/hcsn/materials`;
+                url = `${API_URL}/inventory/materials`;
             } else if (view === 'receipts' || view === 'receipt') {
-                url = `${API_URL}/hcsn/material-receipts`;
+                url = `${API_URL}/inventory/receipts`;
             } else if (view === 'issues' || view === 'issue') {
-                url = `${API_URL}/hcsn/material-issues`;
+                url = `${API_URL}/inventory/issues`;
             } else if (view === 'transfers' || view === 'transfer') {
-                url = `${API_URL}/hcsn/material-transfers`;
-            } else if (view === 'summary') {
+                url = `${API_URL}/inventory/transfers`;
+            } else if (view === 'summary' || view === 'card') {
                 const year = new Date().getFullYear();
-                url = `${API_URL}/hcsn/inventory/summary?fiscal_year=${year}`;
+                url = `${API_URL}/inventory/summary?fiscal_year=${year}`;
             }
 
             if (!url) {
                 if (view !== 'overview') {
-                    console.warn('Unknown view for InventoryModule:', view);
+                    logger.warn('Unknown view for InventoryModule:', view);
                 }
                 setLoading(false);
                 return;
@@ -910,7 +912,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
             const result = await res.json();
             setData(Array.isArray(result) ? result : []);
         } catch (err) {
-            console.error('Fetch inventory data failed:', err);
+            logger.error('Fetch inventory data failed:', err);
             setData([]);
         } finally {
             setLoading(false);
@@ -932,7 +934,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                 throw new Error(res.data.error || 'Import failed');
             }
         } catch (err: any) {
-            console.error('Import materials failed:', err);
+            logger.error('Import materials failed:', err);
             throw new Error(err.response?.data?.error || err.message || 'Lỗi khi nhập vật tư');
         }
     };
@@ -959,6 +961,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                     case 'transfers':
                     case 'transfer': return 'Điều chuyển Kho';
                     case 'summary': return 'Tổng hợp Tồn kho';
+                    case 'card': return 'Thẻ kho';
                     default: return 'Quản lý Kho';
                 }
             };
@@ -1191,6 +1194,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({ subView = 'mat
                 {view === 'issues' && <SmartTable data={data} columns={issueCols} keyField="id" minRows={15} onRowClick={setSelectedRow} selectedRow={selectedRow} />}
                 {view === 'transfers' && <SmartTable data={data} columns={transferCols} keyField="id" minRows={15} onRowClick={setSelectedRow} selectedRow={selectedRow} />}
                 {view === 'summary' && <SmartTable data={data} columns={summaryCols} keyField="material_code" minRows={15} onRowClick={setSelectedRow} selectedRow={selectedRow} />}
+                {view === 'card' && <SmartTable data={data} columns={summaryCols} keyField="material_code" minRows={15} onRowClick={setSelectedRow} selectedRow={selectedRow} />}
             </div>
 
             {showMaterialModal && (

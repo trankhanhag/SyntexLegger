@@ -1,6 +1,6 @@
 /**
  * Base Invoice Provider - Abstract Class
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * All invoice providers (VNPT, Viettel, BKAV, MISA) must extend this class
  */

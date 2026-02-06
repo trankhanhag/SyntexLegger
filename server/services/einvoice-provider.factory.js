@@ -1,6 +1,6 @@
 /**
  * E-Invoice Provider Factory
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * Factory pattern for creating invoice provider instances
  */

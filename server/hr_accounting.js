@@ -1,5 +1,5 @@
 // ==========================================
-// HR & SALARY ACCOUNTING MODULE (TT 24/2024)
+// HR & SALARY ACCOUNTING MODULE (TT 99/2025)
 // ==========================================
 // Tự động sinh bút toán cho nghiệp vụ Lương & Bảo hiểm
 

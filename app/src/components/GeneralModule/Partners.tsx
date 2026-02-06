@@ -8,6 +8,7 @@ import { SmartTable, type ColumnDef } from '../SmartTable';
 import { masterDataService } from '../../api';
 import { ExcelImportModal, type ColumnDef as ImportColumnDef } from '../ExcelImportModal';
 import { PARTNER_TEMPLATE } from '../../utils/excelTemplates';
+import logger from '../../utils/logger';
 
 interface PartnersProps {
     onSelectionChange?: (v: any) => void;
@@ -127,7 +128,7 @@ export const Partners: React.FC<PartnersProps> = ({
                 bankName: p.bank_name
             })));
         } catch (err) {
-            console.error("Failed to fetch partners:", err);
+            logger.error("Failed to fetch partners:", err);
         } finally {
             setLoading(false);
         }

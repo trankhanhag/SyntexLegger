@@ -1,9 +1,10 @@
 // ========================================
-// HUMAN RESOURCES APIs - HCSN (TT 24/2024)
+// HUMAN RESOURCES APIs - Enterprise (TT 99/2025)
 // ========================================
 
 const { v4: uuidv4 } = require('uuid');
 const hrAccounting = require('./hr_accounting');
+const logger = require('./src/utils/logger');
 
 /**
  * GET /api/hr/employees
@@ -143,7 +144,7 @@ exports.calculatePayroll = (db) => async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Calculate Payroll Error:", err);
+        logger.error("Calculate Payroll Error:", err);
         res.status(500).json({ error: err.message });
     }
 };
@@ -408,7 +409,7 @@ exports.createSalaryChange = (db) => (req, res) => {
         `;
 
         db.run(updateEmployee, [new_grade_id, new_level, new_coefficient, employee_id], (updateErr) => {
-            if (updateErr) console.error('Failed to update employee salary:', updateErr);
+            if (updateErr) logger.error('Failed to update employee salary:', updateErr);
             res.json({ id, message: 'Salary change recorded successfully' });
         });
     });

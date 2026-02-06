@@ -12,6 +12,7 @@ import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { type PaperSize, getPaperSizeClass } from './PrintTemplates';
 import { CustomReportGenerator } from './CustomReportGenerator';
 import { GeneralVoucherForm } from './GeneralModule/GeneralVoucherForm';
+import logger from '../utils/logger';
 
 /**
  * Get CSS @page rule for paper size - used for direct browser print
@@ -149,7 +150,7 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     director: s.director || s.ceo_name || s.legal_representative || prev.director
                 }));
             })
-            .catch(err => console.error('Load company info failed:', err));
+            .catch(err => logger.error('Load company info failed:', err));
     }, []);
 
     useEffect(() => {
@@ -353,8 +354,7 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     res = await api.get('/reports/profitability-analysis', { params: rangeParams });
                     break;
                 case 'financial_analysis':
-                    // Chưa có API - hiển thị thông báo
-                    res = { data: [{ id: 'notice', note: 'Chức năng đang được phát triển. Vui lòng sử dụng Báo cáo Tùy biến để tạo báo cáo phân tích.' }] };
+                    res = await api.get('/reports/financial-analysis', { params: rangeParams });
                     break;
 
                 // === SỔ KẾ TOÁN (GIỮ NGUYÊN) ===
@@ -382,6 +382,9 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                     break;
                 case 'inventory_summary':
                     res = await reportService.getInventorySummary(rangeParams);
+                    break;
+                case 'debt_ledger':
+                    res = await reportService.getDebtLedger({ from: filters.fromDate, to: filters.toDate, partner_code: filters.partnerCode || undefined });
                     break;
 
                 // === BÁO CÁO KHÁC ===
@@ -419,7 +422,7 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
             const enrichedData = enrichWithTraceability(numericData, activeSubView);
             setEntries(enrichedData);
         } catch (err) {
-            console.error("Failed to load report data", err);
+            logger.error("Failed to load report data", err);
             setEntries([]);
         } finally {
             setLoading(false);
@@ -718,7 +721,61 @@ export const Reports: React.FC<ReportsProps> = ({ subView: initialSubView = 'bal
                 ];
             case 'financial_analysis':
                 return [
-                    { field: 'note', headerName: 'Thông báo', width: 'min-w-[600px]' }
+                    { field: 'indicator', headerName: 'Chỉ tiêu', width: 'min-w-[350px]',
+                      renderCell: (v: any, r: any) => {
+                        if (r.is_header) {
+                            return <span className="font-bold text-blue-700 dark:text-blue-400 uppercase text-xs tracking-wider">{r.category}</span>;
+                        }
+                        return (
+                            <span className={`${r.is_total ? 'font-bold text-emerald-700 dark:text-emerald-400' : ''}`}>
+                                {v}
+                            </span>
+                        );
+                      }
+                    },
+                    { field: 'formula', headerName: 'Công thức', width: 'w-64',
+                      renderCell: (v: any, r: any) => r.is_header ? '' : <span className="text-slate-500 text-xs italic">{v}</span>
+                    },
+                    { field: 'current_value', headerName: 'Kỳ này', width: 'w-32', align: 'right' as const,
+                      renderCell: (v: any, r: any) => {
+                        if (r.is_header) return '';
+                        return <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{v}</span>;
+                      }
+                    },
+                    { field: 'previous_value', headerName: 'Kỳ trước', width: 'w-32', align: 'right' as const,
+                      renderCell: (v: any, r: any) => {
+                        if (r.is_header) return '';
+                        return <span className="font-mono text-slate-500">{v}</span>;
+                      }
+                    },
+                    { field: 'unit', headerName: 'ĐVT', width: 'w-20', align: 'center' as const,
+                      renderCell: (v: any, r: any) => r.is_header ? '' : <span className="text-xs">{v}</span>
+                    },
+                    { field: 'benchmark', headerName: 'Chuẩn', width: 'w-24', align: 'center' as const,
+                      renderCell: (v: any, r: any) => r.is_header ? '' : <span className="text-xs text-slate-400">{v}</span>
+                    },
+                    { field: 'interpretation', headerName: 'Đánh giá', width: 'w-40',
+                      renderCell: (v: any, r: any) => {
+                        if (r.is_header) return '';
+                        const colorMap: Record<string, string> = {
+                            'Tốt': 'text-green-600 bg-green-50',
+                            'Xuất sắc': 'text-emerald-600 bg-emerald-50',
+                            'An toàn': 'text-green-600 bg-green-50',
+                            'Hiệu quả cao': 'text-green-600 bg-green-50',
+                            'Dương (Tốt)': 'text-green-600 bg-green-50',
+                            'Bình thường': 'text-amber-600 bg-amber-50',
+                            'Trung bình': 'text-amber-600 bg-amber-50',
+                            'Chấp nhận được': 'text-amber-600 bg-amber-50',
+                            'Cần cải thiện': 'text-red-600 bg-red-50',
+                            'Rủi ro': 'text-red-600 bg-red-50',
+                            'Rủi ro cao': 'text-red-600 bg-red-50',
+                            'Âm (Rủi ro)': 'text-red-600 bg-red-50',
+                            'Đòn bẩy cao': 'text-amber-600 bg-amber-50',
+                        };
+                        const colorClass = Object.entries(colorMap).find(([key]) => v?.includes(key))?.[1] || 'text-slate-600 bg-slate-50';
+                        return <span className={`px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}>{v}</span>;
+                      }
+                    }
                 ];
 
             // === BÁO CÁO TÀI CHÍNH DN (TT 99/2025) ===

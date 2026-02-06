@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { hrService } from '../api';
 import { formatNumber } from '../utils/format';
+import { exportToCSV } from '../utils/exportUtils';
 
 interface InsuranceReportViewProps {
     period: string;
@@ -12,6 +13,53 @@ interface InsuranceReportViewProps {
 
 const InsuranceReportView: React.FC<InsuranceReportViewProps> = ({ period, summary, detail, discrepancies, onDiscrepanciesUpdate }) => {
     const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleExportExcel = () => {
+        if (!detail || detail.length === 0) {
+            alert('Không có dữ liệu để xuất.');
+            return;
+        }
+
+        const exportData = detail.map((emp: any) => ({
+            'Mã NV': emp.code,
+            'Họ tên': emp.name,
+            'Lương đóng BH': emp.insurance_salary,
+            'BHXH NV': emp.bhxh_employee,
+            'BHYT NV': emp.bhyt_employee,
+            'BHTN NV': emp.bhtn_employee || 0,
+            'Tổng NV': emp.total_employee,
+            'BHXH DN': emp.bhxh_company,
+            'BHYT DN': emp.bhyt_company,
+            'BHTN DN': emp.bhtn_company || 0,
+            'Tổng DN': emp.total_company,
+        }));
+
+        exportToCSV(exportData, `BaoCaoBHXH_${period}`);
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Basic validation
+        if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx')) {
+            alert('Vui lòng chọn file CSV hoặc Excel (.xlsx)');
+            return;
+        }
+
+        // TODO: Implement actual file parsing and import
+        alert(`Đã chọn file: ${file.name}\nChức năng import đang được phát triển. File sẽ được xử lý trong phiên bản tiếp theo.`);
+
+        // Reset input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
 
     const handleReconcile = async () => {
         setLoading(true);
@@ -104,16 +152,24 @@ const InsuranceReportView: React.FC<InsuranceReportViewProps> = ({ period, summa
                 </button>
 
                 <button
-                    onClick={() => alert('Chức năng import đang phát triển. Vui lòng liên hệ admin.')}
+                    onClick={handleImportClick}
                     className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
                 >
                     <span className="material-symbols-outlined text-[20px]">upload_file</span>
                     Import dữ liệu BHXH
                 </button>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv,.xlsx"
+                    onChange={handleFileChange}
+                    className="hidden"
+                />
 
                 <button
-                    onClick={() => alert('Xuất Excel đang phát triển. Vui lòng liên hệ admin.')}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
+                    onClick={handleExportExcel}
+                    disabled={!detail || detail.length === 0}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
                 >
                     <span className="material-symbols-outlined text-[20px]">download</span>
                     Xuất báo cáo Excel

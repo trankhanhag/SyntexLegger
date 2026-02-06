@@ -8,6 +8,7 @@ import { formatDateVN } from '../utils/dateUtils';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { triggerBrowserPrint } from '../hooks/usePrintHandler';
+import logger from '../utils/logger';
 
 // E-Invoice Provider type
 interface EInvoiceProvider {
@@ -137,7 +138,7 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
                 setInvoices(prev => [res.data.data, ...prev]);
                 alert("Đã thêm hóa đơn XML thành công!");
             } catch (err: any) {
-                console.error("Upload XML error:", err);
+                logger.error("Upload XML error:", err);
                 alert("Lỗi khi đọc file XML: " + (err.response?.data?.error || err.message));
             } finally {
                 setLoadingSync(false);
@@ -162,7 +163,7 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
             setImportSuccess(`Đã lưu thành công vào danh mục ${target === 'KH' ? 'Khách hàng' : 'Nhà cung cấp'}`);
             setTimeout(() => setImportSuccess(null), 3000);
         } catch (err: any) {
-            console.error("Import failed:", err);
+            logger.error("Import failed:", err);
             alert("Không thể lưu thông tin: " + (err.response?.data?.error || "Lỗi hệ thống."));
         } finally {
             setImporting(false);
@@ -176,7 +177,7 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
             const res = await taxService.lookupGST(lookupMst);
             setBusinessInfo(res.data);
         } catch (err) {
-            console.error("Lookup failed:", err);
+            logger.error("Lookup failed:", err);
             alert("Không tìm thấy thông tin cho Mã số thuế này hoặc lỗi kết nối Tổng cục thuế.");
         } finally {
             setLoadingLookup(false);
@@ -207,7 +208,7 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
                 alert('Lỗi đồng bộ: ' + (res.data.error?.message || 'Unknown error'));
             }
         } catch (err: any) {
-            console.error('Sync error:', err);
+            logger.error('Sync error:', err);
             alert('Lỗi đồng bộ: ' + (err.response?.data?.error?.message || err.message));
         } finally {
             setSyncLoading(false);
@@ -292,7 +293,7 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
                 });
             }
         } catch (err) {
-            console.error('Failed to load config:', err);
+            logger.error('Failed to load config:', err);
             setConfigForm({
                 isActive: false,
                 demoMode: true,
@@ -362,11 +363,11 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
                         successCount++;
                     } else {
                         errorCount++;
-                        console.error(`Import error for ${file.name}:`, res.data.error);
+                        logger.error(`Import error for ${file.name}:`, res.data.error);
                     }
                 } catch (err) {
                     errorCount++;
-                    console.error(`Import error for ${file.name}:`, err);
+                    logger.error(`Import error for ${file.name}:`, err);
                 }
             }
 
@@ -461,7 +462,7 @@ export const TaxModule: React.FC<TaxModuleProps> = ({ subView = 'vat', printSign
                     }
                 }
             } catch (err) {
-                console.error("Failed to load tax data:", err);
+                logger.error("Failed to load tax data:", err);
             }
         };
         loadData();

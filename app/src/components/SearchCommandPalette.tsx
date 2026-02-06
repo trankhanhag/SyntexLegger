@@ -119,7 +119,6 @@ const ALL_SEARCHABLE_ITEMS: SearchableItem[] = [
     { id: 'sys_perms', label: 'Phân quyền', icon: 'security', section: 'QUẢN TRỊ', category: 'Hệ thống', keywords: ['phân quyền', 'permission'] },
     { id: 'sys_backup', label: 'Sao lưu dữ liệu', icon: 'backup', section: 'QUẢN TRỊ', category: 'Hệ thống', keywords: ['sao lưu', 'backup'] },
     { id: 'sys_audit_trail', label: 'Nhật ký Kiểm toán', icon: 'history_edu', section: 'KIỂM SOÁT', category: 'Hệ thống', keywords: ['kiểm toán', 'audit', 'nhật ký'] },
-    { id: 'sys_budget_control', label: 'Kiểm soát Ngân sách', icon: 'account_balance', section: 'KIỂM SOÁT', category: 'Hệ thống', keywords: ['kiểm soát', 'ngân sách'] },
     { id: 'audit', label: 'Kiểm tra Sức khỏe Hệ thống', icon: 'health_and_safety', category: 'Hệ thống', keywords: ['kiểm tra', 'sức khỏe', 'audit'] },
 ];
 

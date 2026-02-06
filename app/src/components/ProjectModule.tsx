@@ -8,6 +8,7 @@ import { DateInput } from './DateInput';
 import { ModuleOverview } from './ModuleOverview';
 import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { useSimplePrint } from '../hooks/usePrintHandler';
+import logger from '../utils/logger';
 
 interface ProjectModuleProps {
     subView?: string;
@@ -83,7 +84,7 @@ export const ProjectModule: React.FC<ProjectModuleProps> = ({ subView = 'list', 
             fetchData();
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     };
@@ -109,7 +110,7 @@ export const ProjectModule: React.FC<ProjectModuleProps> = ({ subView = 'list', 
                 setDisplayData(res.data);
             }
         } catch (err) {
-            console.error("Fetch project data failed:", err);
+            logger.error("Fetch project data failed:", err);
         } finally {
             setLoading(false);
         }
@@ -312,7 +313,7 @@ const ProjectFormModal = ({ onClose, onSave }: { onClose: () => void, onSave: ()
 
     useEffect(() => {
         import('../api').then(({ masterDataService }) => {
-            masterDataService.getPartners().then(res => setCustomers(res.data || [])).catch(err => console.error(err));
+            masterDataService.getPartners().then(res => setCustomers(res.data || [])).catch(err => logger.error(err));
         });
     }, []);
 

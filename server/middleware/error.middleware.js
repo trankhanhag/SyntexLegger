@@ -1,31 +1,97 @@
 /**
  * Error Handling Middleware
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Enterprise Accounting System (TT 99/2025)
  */
+
+const { AppError } = require('../src/errors');
+const logger = require('../src/utils/logger');
 
 /**
  * Global error handler
+ * Handles all errors consistently and returns proper JSON responses
  */
 const errorHandler = (err, req, res, next) => {
-    console.error('[ERROR]', err.stack);
+    // Skip if response already sent
+    if (res.headersSent) {
+        return next(err);
+    }
 
-    // Handle specific error types
+    // Log error using winston logger
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!isProduction || !err.isOperational) {
+        logger.logError(err, req);
+    }
+
+    // Handle custom AppError instances
+    if (err instanceof AppError) {
+        return res.status(err.statusCode).json({
+            success: false,
+            ...err.toJSON(),
+            ...(isProduction ? {} : { stack: err.stack }),
+        });
+    }
+
+    // Handle JWT errors
     if (err.name === 'JsonWebTokenError') {
-        return res.status(401).json({ error: 'Invalid token' });
+        return res.status(401).json({
+            success: false,
+            error: 'Token không hợp lệ',
+            code: 'INVALID_TOKEN',
+        });
     }
 
     if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({ error: 'Token expired' });
+        return res.status(401).json({
+            success: false,
+            error: 'Token đã hết hạn',
+            code: 'TOKEN_EXPIRED',
+        });
     }
 
+    // Handle SQLite constraint errors
     if (err.code === 'SQLITE_CONSTRAINT') {
-        return res.status(409).json({ error: 'Constraint violation', details: err.message });
+        return res.status(409).json({
+            success: false,
+            error: 'Vi phạm ràng buộc dữ liệu',
+            code: 'CONSTRAINT_VIOLATION',
+            details: isProduction ? undefined : err.message,
+        });
     }
 
-    // Default error response
-    res.status(err.status || 500).json({
-        error: err.message || 'Internal Server Error',
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    // Handle SQLite busy errors
+    if (err.code === 'SQLITE_BUSY') {
+        return res.status(503).json({
+            success: false,
+            error: 'Database đang bận, vui lòng thử lại',
+            code: 'DATABASE_BUSY',
+        });
+    }
+
+    // Handle validation errors from express-validator or similar
+    if (err.array && typeof err.array === 'function') {
+        return res.status(422).json({
+            success: false,
+            error: 'Dữ liệu không hợp lệ',
+            code: 'VALIDATION_ERROR',
+            details: { errors: err.array() },
+        });
+    }
+
+    // Handle SyntaxError (malformed JSON)
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        return res.status(400).json({
+            success: false,
+            error: 'JSON không hợp lệ',
+            code: 'INVALID_JSON',
+        });
+    }
+
+    // Default error response for unexpected errors
+    res.status(err.status || err.statusCode || 500).json({
+        success: false,
+        error: isProduction ? 'Lỗi hệ thống' : (err.message || 'Internal Server Error'),
+        code: 'INTERNAL_ERROR',
+        ...(isProduction ? {} : { stack: err.stack }),
     });
 };
 
@@ -38,12 +104,17 @@ const notFoundHandler = (req, res) => {
 
 /**
  * Request logging middleware
+ * Logs HTTP requests with timing information
  */
 const requestLogger = (req, res, next) => {
-    const logRequests = process.env.LOG_REQUESTS === 'true';
-    if (logRequests) {
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    }
+    const startTime = Date.now();
+
+    // Log after response finishes
+    res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        logger.logRequest(req, duration);
+    });
+
     next();
 };
 

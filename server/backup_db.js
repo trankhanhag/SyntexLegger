@@ -1,6 +1,6 @@
 /**
  * Database Backup Script
- * SyntexHCSN - Backup before migration
+ * SyntexLegger - Backup before migration
  * 
  * Usage: node backup_db.js
  */
@@ -51,7 +51,7 @@ function backupDatabase() {
 
 // Run if called directly
 if (require.main === module) {
-    console.log('\n🔄 SyntexHCSN Database Backup\n');
+    console.log('\n🔄 SyntexLegger Database Backup\n');
     backupDatabase();
 }
 

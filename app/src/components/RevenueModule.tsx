@@ -8,6 +8,7 @@ import { MODULE_CONFIGS } from '../config/moduleConfigs';
 import { FormModal, FormSection, FormGrid, FormField, FormButton, FormActions } from './FormModal';
 import { ExcelImportModal } from './ExcelImportModal';
 import { REVENUE_TEMPLATE } from '../utils/excelTemplates';
+import logger from '../utils/logger';
 
 
 // ==================== RECEIPT LIST ====================
@@ -18,7 +19,7 @@ const ReceiptList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => void
     useEffect(() => {
         revenueService.getReceipts({ type: 'RECEIPT' })
             .then(res => setReceipts(res.data))
-            .catch(err => console.error("Fetch receipts failed:", err))
+            .catch(err => logger.error("Fetch receipts failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -63,7 +64,7 @@ const PaymentList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => void
     useEffect(() => {
         revenueService.getReceipts({ type: 'PAYMENT' })
             .then(res => setPayments(res.data))
-            .catch(err => console.error("Fetch payments failed:", err))
+            .catch(err => logger.error("Fetch payments failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -108,7 +109,7 @@ const ReductionList = ({ onSelect, refreshSignal }: { onSelect: (rec: any) => vo
     useEffect(() => {
         revenueService.getReceipts({ type: 'REDUCTION' })
             .then(res => setReductions(res.data))
-            .catch(err => console.error("Fetch reductions failed:", err))
+            .catch(err => logger.error("Fetch reductions failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -152,7 +153,7 @@ const RevenueCategoryList = ({ onSelectionChange, refreshSignal }: { onSelection
     useEffect(() => {
         revenueService.getCategories()
             .then(res => setCategories(res.data))
-            .catch(err => console.error("Fetch categories failed:", err))
+            .catch(err => logger.error("Fetch categories failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -190,7 +191,7 @@ const PayerList = ({ onSelectionChange, refreshSignal }: { onSelectionChange: (r
         // Sử dụng partners table tạm thời
         masterDataService.getPartners()
             .then((res: any) => setPayers(res.data))
-            .catch((err: any) => console.error("Fetch payers failed:", err))
+            .catch((err: any) => logger.error("Fetch payers failed:", err))
             .finally(() => setLoading(false));
     }, [refreshSignal]);
 
@@ -225,7 +226,7 @@ const RevenueReportView = () => {
         setLoading(true);
         revenueService.getReport({ fiscal_year: fiscalYear, group_by: groupBy })
             .then(res => setReportData(res.data))
-            .catch(err => console.error("Fetch report failed:", err))
+            .catch(err => logger.error("Fetch report failed:", err))
             .finally(() => setLoading(false));
     }, [fiscalYear, groupBy]);
 
@@ -296,9 +297,9 @@ const BudgetComparisonView = () => {
         revenueService.getBudgetComparison({ fiscal_year: fiscalYear })
             .then(res => setComparisonData(res.data))
             .catch((error: any) => {
-                console.error('Fetch budget comparison failed:', error);
+                logger.error('Fetch budget comparison failed:', error);
                 if (error.response) {
-                    console.error('Server error details:', error.response.data);
+                    logger.error('Server error details:', error.response.data);
                 }
             })
             .finally(() => setLoading(false));
@@ -399,7 +400,7 @@ const ReceiptFormModal = ({ onClose, documentType, initialData }: { onClose: () 
             }
             onClose();
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi lưu chứng từ.");
         } finally {
             setLoading(false);
@@ -595,7 +596,7 @@ const CategoryFormModal = ({ onClose }: { onClose: () => void }) => {
             alert("Đã thêm loại thu thành công!");
             onClose();
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi lưu loại thu.");
         }
     };
@@ -654,7 +655,7 @@ const PayerFormModal = ({ onClose }: { onClose: () => void }) => {
             alert("Đã thêm đối tượng thành công!");
             onClose();
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi lưu đối tượng.");
         }
     };
@@ -745,7 +746,7 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
                     address: res.data.company_address || 'Địa chỉ...'
                 });
             })
-            .catch(console.error);
+            .catch(logger.error);
     }, []);
 
     // Excel import handler
@@ -940,7 +941,7 @@ export const RevenueModule: React.FC<RevenueModuleProps> = ({ subView = 'receipt
             setRefreshSignal(s => s + 1);
             setSelectedRow(null);
         } catch (err) {
-            console.error(err);
+            logger.error(err);
             alert("Lỗi khi xóa dữ liệu.");
         }
     };

@@ -1,6 +1,6 @@
 /**
  * Treasury API Service (Kho bạc Nhà nước)
- * SyntexHCSN - Integration with TABMIS
+ * SyntexLegger - Integration with TABMIS
  * 
  * Supports:
  * - Budget reconciliation (Đối chiếu dự toán)

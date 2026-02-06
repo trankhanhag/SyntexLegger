@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { checklistService } from '../api';
+import logger from '../utils/logger';
 
 interface ChecklistItem {
     id: number;
@@ -26,7 +27,7 @@ export const RightSidebar: React.FC = () => {
             const res = await checklistService.getAll();
             setItems(res.data);
         } catch (err) {
-            console.error("Failed to fetch checklist:", err);
+            logger.error("Failed to fetch checklist:", err);
         } finally {
             setLoading(false);
         }
@@ -38,7 +39,7 @@ export const RightSidebar: React.FC = () => {
             await checklistService.update(item.id, { status: newStatus });
             setItems(items.map(i => i.id === item.id ? { ...i, status: newStatus } : i));
         } catch (err) {
-            console.error("Failed to update status:", err);
+            logger.error("Failed to update status:", err);
         }
     };
 
@@ -48,7 +49,7 @@ export const RightSidebar: React.FC = () => {
             await checklistService.update(item.id, { is_visible: newVisibility });
             setItems(items.map(i => i.id === item.id ? { ...i, is_visible: newVisibility } : i));
         } catch (err) {
-            console.error("Failed to update visibility:", err);
+            logger.error("Failed to update visibility:", err);
         }
     };
 
@@ -58,7 +59,7 @@ export const RightSidebar: React.FC = () => {
             await checklistService.delete(id);
             setItems(items.filter(i => i.id !== id));
         } catch (err) {
-            console.error("Failed to delete item:", err);
+            logger.error("Failed to delete item:", err);
         }
     };
 
@@ -70,7 +71,7 @@ export const RightSidebar: React.FC = () => {
             setItems([...items, res.data]);
             setNewItemTitle('');
         } catch (err) {
-            console.error("Failed to add item:", err);
+            logger.error("Failed to add item:", err);
         }
     };
 

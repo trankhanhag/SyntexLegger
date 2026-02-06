@@ -1,6 +1,6 @@
 /**
  * GDT XML Parser
- * SyntexHCSN - Parse e-invoice XML files from Vietnam General Department of Taxation
+ * SyntexLegger - Parse e-invoice XML files from Vietnam General Department of Taxation
  *
  * Supports standard XML formats:
  * - Thông tư 78/2021/TT-BTC

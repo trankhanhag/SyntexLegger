@@ -1,11 +1,12 @@
 /**
  * Voucher Routes (General Vouchers, Staging, Receipt/Payment)
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
 const fs = require('fs');
 
+const logger = require('../src/utils/logger');
 const { verifyToken, requireRole, checkDateLock, logAction, sanitizeBody, sanitizeQuery, validateVoucher, validateVoucherBalance, isOffBalanceSheetAccount, validateDateRange } = require('../middleware');
 const auditService = require('../services/audit.service');
 const budgetService = require('../services/budget.service');
@@ -105,7 +106,7 @@ module.exports = (db) => {
             }
         } catch (e) {
             // Budget period check is optional, continue if table doesn't exist
-            console.warn('Budget period check skipped:', e.message);
+            logger.warn('Budget period check skipped:', e.message);
         }
 
         // Budget checking for expense vouchers
@@ -139,7 +140,7 @@ module.exports = (db) => {
                     });
                 }
             } catch (e) {
-                console.warn('Budget check skipped:', e.message);
+                logger.warn('Budget check skipped:', e.message);
             }
         }
 
@@ -164,7 +165,7 @@ module.exports = (db) => {
                     });
                 });
             } catch (e) {
-                console.warn('Failed to fetch old voucher for audit:', e.message);
+                logger.warn('Failed to fetch old voucher for audit:', e.message);
             }
         }
 
@@ -276,7 +277,7 @@ module.exports = (db) => {
                         fiscal_period: new Date(post_date).getMonth() + 1,
                         account_code: items[0]?.debit_acc,
                         created_by: req.user.username
-                    }).catch(e => console.warn('Budget transaction recording failed:', e.message));
+                    }).catch(e => logger.warn('Budget transaction recording failed:', e.message));
                 }
 
                 // Create budget alert if warning
@@ -297,7 +298,7 @@ module.exports = (db) => {
                         remaining_amount: budgetCheckResult.available - total_amount,
                         triggered_by_voucher: voucherId,
                         triggered_by_user: req.user.username
-                    }).catch(e => console.warn('Budget alert creation failed:', e.message));
+                    }).catch(e => logger.warn('Budget alert creation failed:', e.message));
                 }
 
                 // Comprehensive audit logging
@@ -310,7 +311,7 @@ module.exports = (db) => {
                     user: req.user,
                     ip_address: req.ip,
                     reason: description
-                }).catch(e => console.warn('Audit logging failed:', e.message));
+                }).catch(e => logger.warn('Audit logging failed:', e.message));
 
                 // Legacy log action (for backwards compatibility)
                 logAction(req.user.username, id ? 'UPDATE_VOUCHER' : 'CREATE_VOUCHER', doc_no, `Amount: ${total_amount}`);
@@ -379,7 +380,7 @@ module.exports = (db) => {
                 });
             }
         } catch (e) {
-            console.warn('Budget period check skipped:', e.message);
+            logger.warn('Budget period check skipped:', e.message);
         }
 
         db.serialize(() => {
@@ -410,7 +411,7 @@ module.exports = (db) => {
                             fiscal_year: new Date(voucher.post_date).getFullYear(),
                             fiscal_period: new Date(voucher.post_date).getMonth() + 1,
                             created_by: req.user.username
-                        }).catch(e => console.warn('Budget reversal failed:', e.message));
+                        }).catch(e => logger.warn('Budget reversal failed:', e.message));
                     }
                 }
 
@@ -424,7 +425,7 @@ module.exports = (db) => {
                     user: req.user,
                     ip_address: req.ip,
                     reason: reason || 'Xóa chứng từ'
-                }).catch(e => console.warn('Audit logging failed:', e.message));
+                }).catch(e => logger.warn('Audit logging failed:', e.message));
 
                 logAction(req.user.username, 'DELETE_VOUCHER', voucher.doc_no, `Amount: ${voucher.total_amount}`);
                 res.json({ message: "Voucher deleted" });

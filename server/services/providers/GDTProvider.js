@@ -1,6 +1,6 @@
 /**
  * GDT Provider
- * SyntexHCSN - Provider for importing e-invoices from GDT XML files
+ * SyntexLegger - Provider for importing e-invoices from GDT XML files
  *
  * Since hoadondientu.gdt.gov.vn doesn't have a public API,
  * this provider handles XML file imports instead.

@@ -1,6 +1,6 @@
 /**
  * Mock Invoice Provider - Demo Data
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * Provides sample invoice data for testing and demo purposes
  */

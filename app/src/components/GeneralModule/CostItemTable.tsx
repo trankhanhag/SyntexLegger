@@ -3,6 +3,7 @@ import { SmartTable, type ColumnDef } from '../SmartTable';
 import { masterDataService, budgetService } from '../../api';
 import { toInputMonthValue } from '../../utils/dateUtils';
 import { FormModal } from '../FormModal';
+import logger from '../../utils/logger';
 
 const Modal = ({ title, onClose, children, panelClass }: { title: string, onClose: () => void, children: React.ReactNode, panelClass?: string }) => (
     <FormModal title={title} onClose={onClose} panelClass={panelClass}>
@@ -33,7 +34,7 @@ export const CostItemTable = ({ type, refreshSignal }: { type: 'Chi' | 'Thu' | '
                 }));
                 setData(filtered);
             } catch (err) {
-                console.error("Failed to fetch cost items:", err);
+                logger.error("Failed to fetch cost items:", err);
             } finally {
                 setLoading(false);
             }
@@ -63,7 +64,7 @@ export const CostItemTable = ({ type, refreshSignal }: { type: 'Chi' | 'Thu' | '
             });
             alert("Đã lưu ngân sách!");
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             alert("Lỗi khi lưu ngân sách");
         }
     };
@@ -173,7 +174,7 @@ export const CostItemFormModal = ({ onClose }: { onClose: () => void }) => {
             alert("Đã lưu khoản mục thành công!");
             onClose();
         } catch (err) {
-            console.error("Save failed:", err);
+            logger.error("Save failed:", err);
             alert("Lỗi khi lưu dữ liệu.");
         }
     };

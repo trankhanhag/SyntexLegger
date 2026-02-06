@@ -4,6 +4,7 @@
  */
 
 const express = require('express');
+const logger = require('../src/utils/logger');
 const XmlExportService = require('../services/XmlExportService');
 const { verifyToken } = require('../middleware');
 
@@ -51,7 +52,7 @@ module.exports = (db) => {
 
             res.json({ success: true, xml });
         } catch (error) {
-            console.error('XML Preview Error:', error);
+            logger.error('XML Preview Error:', error);
             res.status(500).json({ error: error.message });
         }
     });
@@ -91,7 +92,7 @@ module.exports = (db) => {
 
             res.json({ success: true, vouchers: Object.values(grouped) });
         } catch (error) {
-            console.error('Get Vouchers Error:', error);
+            logger.error('Get Vouchers Error:', error);
             res.status(500).json({ error: error.message });
         }
     });
@@ -125,7 +126,7 @@ module.exports = (db) => {
             res.send(zipBuffer);
 
         } catch (error) {
-            console.error('XML Export Error:', error);
+            logger.error('XML Export Error:', error);
             res.status(500).json({ error: error.message });
         }
     });

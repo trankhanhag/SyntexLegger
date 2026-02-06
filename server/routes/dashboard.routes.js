@@ -1,6 +1,6 @@
 /**
  * Dashboard & Reminders Routes
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
@@ -107,7 +107,7 @@ module.exports = (db) => {
 
     /**
      * GET /api/dashboard/stats
-     * HCSN Dashboard statistics (TT 24/2024/TT-BTC)
+     * Dashboard statistics
      */
     router.get('/dashboard/stats', verifyToken, (req, res) => {
         const currentYear = new Date().getFullYear();

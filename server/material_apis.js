@@ -1,14 +1,15 @@
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./src/utils/logger');
 
 /**
- * Material Management APIs for HCSN Inventory
- * Theo Thông tư 24/2024/TT-BTC
+ * Material Management APIs for Inventory
+ * Theo Thông tư 99/2025/TT-BTC (Doanh nghiệp)
  */
 
 // ==================== MATERIALS ====================
 
 /**
- * GET /api/hcsn/materials
+ * GET /api/inventory/materials
  * Lấy danh sách vật tư
  */
 function getMaterials(db) {
@@ -37,7 +38,7 @@ function getMaterials(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get materials error:', err);
+                logger.error('Get materials error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -46,7 +47,7 @@ function getMaterials(db) {
 }
 
 /**
- * POST /api/hcsn/materials
+ * POST /api/inventory/materials
  * Tạo vật tư mới
  */
 function createMaterial(db) {
@@ -76,7 +77,7 @@ function createMaterial(db) {
             unit_price || 0, min_stock || 0, max_stock || 0, notes, now, now],
             function (err) {
                 if (err) {
-                    console.error('Create material error:', err);
+                    logger.error('Create material error:', err);
                     return res.status(500).json({ error: err.message });
                 }
                 res.status(201).json({ id, code, name, category });
@@ -86,7 +87,7 @@ function createMaterial(db) {
 }
 
 /**
- * PUT /api/hcsn/materials/:id
+ * PUT /api/inventory/materials/:id
  * Cập nhật vật tư
  */
 function updateMaterial(db) {
@@ -108,7 +109,7 @@ function updateMaterial(db) {
         db.run(sql, [name, unit, unit_price, min_stock, max_stock, status, notes, new Date().toISOString(), id],
             function (err) {
                 if (err) {
-                    console.error('Update material error:', err);
+                    logger.error('Update material error:', err);
                     return res.status(500).json({ error: err.message });
                 }
                 if (this.changes === 0) {
@@ -121,7 +122,7 @@ function updateMaterial(db) {
 }
 
 /**
- * DELETE /api/hcsn/materials/:id
+ * DELETE /api/inventory/materials/:id
  * Xóa vật tư (chỉ nếu chưa có giao dịch)
  */
 function deleteMaterial(db) {
@@ -138,7 +139,7 @@ function deleteMaterial(db) {
 
             db.run('DELETE FROM materials WHERE id = ?', [id], function (err) {
                 if (err) {
-                    console.error('Delete material error:', err);
+                    logger.error('Delete material error:', err);
                     return res.status(500).json({ error: err.message });
                 }
                 if (this.changes === 0) {
@@ -153,7 +154,7 @@ function deleteMaterial(db) {
 // ==================== MATERIAL RECEIPTS ====================
 
 /**
- * GET /api/hcsn/material-receipts
+ * GET /api/inventory/material-receipts
  * Lấy danh sách phiếu nhập kho
  */
 function getReceipts(db) {
@@ -191,7 +192,7 @@ function getReceipts(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get receipts error:', err);
+                logger.error('Get receipts error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -200,7 +201,7 @@ function getReceipts(db) {
 }
 
 /**
- * GET /api/hcsn/material-receipts/:id
+ * GET /api/inventory/material-receipts/:id
  */
 function getReceiptDetail(db) {
     return (req, res) => {
@@ -233,15 +234,15 @@ function getReceiptDetail(db) {
 }
 
 /**
- * POST /api/hcsn/material-receipts
+ * POST /api/inventory/material-receipts
  * Tạo phiếu nhập kho mới + Tự động tạo bút toán
  */
 /**
- * POST /api/hcsn/material-receipts
+ * POST /api/inventory/material-receipts
  * Tạo phiếu nhập kho mới + Tự động tạo bút toán
  */
 /**
- * POST /api/hcsn/material-receipts
+ * POST /api/inventory/material-receipts
  */
 function createReceipt(db) {
     return (req, res) => {
@@ -274,7 +275,7 @@ function createReceipt(db) {
             db.run(receiptSql, [id, receipt_no, receipt_date, year, fund_source_id, supplier, warehouse || 'Kho chính',
                 total_amount, notes, docStatus, req.user?.username, now, now], function (err) {
                     if (err) {
-                        console.error('Create receipt error:', err);
+                        logger.error('Create receipt error:', err);
                         return res.status(500).json({ error: err.message });
                     }
 
@@ -444,7 +445,7 @@ function updateReceipt(db) {
 // ==================== MATERIAL ISSUES ====================
 
 /**
- * GET /api/hcsn/material-issues
+ * GET /api/inventory/material-issues
  */
 function getIssues(db) {
     return (req, res) => {
@@ -480,7 +481,7 @@ function getIssues(db) {
 }
 
 /**
- * GET /api/hcsn/material-issues/:id
+ * GET /api/inventory/material-issues/:id
  */
 function getIssueDetail(db) {
     return (req, res) => {
@@ -505,13 +506,13 @@ function getIssueDetail(db) {
 }
 
 /**
- * POST /api/hcsn/material-issues
+ * POST /api/inventory/material-issues
  */
 /**
- * POST /api/hcsn/material-issues
+ * POST /api/inventory/material-issues
  */
 /**
- * POST /api/hcsn/material-issues
+ * POST /api/inventory/material-issues
  */
 function createIssue(db) {
     return (req, res) => {
@@ -543,7 +544,7 @@ function createIssue(db) {
                 wh, total_amount, notes, docStatus, approved_by, req.user?.username, now, now],
                 function (err) {
                     if (err) {
-                        console.error('Create issue error:', err);
+                        logger.error('Create issue error:', err);
                         return res.status(500).json({ error: err.message });
                     }
 
@@ -696,7 +697,7 @@ function updateIssue(db) {
 // ==================== MATERIAL TRANSFERS ====================
 
 /**
- * GET /api/hcsn/material-transfers
+ * GET /api/inventory/material-transfers
  */
 function getTransfers(db) {
     return (req, res) => {
@@ -732,7 +733,7 @@ function getTransfers(db) {
 }
 
 /**
- * GET /api/hcsn/material-transfers/:id
+ * GET /api/inventory/material-transfers/:id
  */
 function getTransferDetail(db) {
     return (req, res) => {
@@ -757,10 +758,10 @@ function getTransferDetail(db) {
 }
 
 /**
- * POST /api/hcsn/material-transfers
+ * POST /api/inventory/material-transfers
  */
 /**
- * POST /api/hcsn/material-transfers
+ * POST /api/inventory/material-transfers
  */
 function createTransfer(db) {
     return (req, res) => {
@@ -790,7 +791,7 @@ function createTransfer(db) {
                 notes, approved_by, req.user?.username, now, now],
                 function (err) {
                     if (err) {
-                        console.error('Create transfer error:', err);
+                        logger.error('Create transfer error:', err);
                         return res.status(500).json({ error: err.message });
                     }
 
@@ -906,7 +907,7 @@ function updateTransfer(db) {
 // ==================== INVENTORY & REPORTS ====================
 
 /**
- * GET /api/hcsn/inventory/summary
+ * GET /api/inventory/summary
  */
 function getInventorySummary(db) {
     return (req, res) => {
@@ -955,7 +956,7 @@ function getInventorySummary(db) {
 }
 
 /**
- * GET /api/hcsn/inventory/cards/:material_id
+ * GET /api/inventory/cards/:material_id
  */
 function getInventoryCards(db) {
     return (req, res) => {
@@ -990,8 +991,8 @@ function getFundSources(db) {
 }
 
 /**
- * GET /api/hcsn/budget-estimates
- * Lấy danh sách dự toán HCSN
+ * GET /api/inventory/budget-estimates
+ * Lấy danh sách dự toán
  */
 function getBudgetEstimates(db) {
     return (req, res) => {
@@ -1024,7 +1025,7 @@ function getBudgetEstimates(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get budget estimates error:', err);
+                logger.error('Get budget estimates error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -1033,7 +1034,7 @@ function getBudgetEstimates(db) {
 }
 
 /**
- * GET /api/hcsn/budget-allocations
+ * GET /api/inventory/budget-allocations
  * Lấy danh sách phân bổ dự toán
  */
 function getBudgetAllocations(db) {
@@ -1065,7 +1066,7 @@ function getBudgetAllocations(db) {
 
         db.all(sql, params, (err, rows) => {
             if (err) {
-                console.error('Get budget allocations error:', err);
+                logger.error('Get budget allocations error:', err);
                 return res.status(500).json({ error: err.message });
             }
             res.json(rows);
@@ -1084,7 +1085,7 @@ function updateInventoryCard(db, material_id, fund_source_id, fiscal_year, wareh
 
     db.get(selectSql, selectParams, (err, card) => {
         if (err) {
-            console.error('Error getting inventory card:', err);
+            logger.error('Error getting inventory card:', err);
             return;
         }
         const now = new Date().toISOString();
@@ -1140,7 +1141,7 @@ function updateInventoryCard(db, material_id, fund_source_id, fiscal_year, wareh
 // ==================== BULK IMPORT ====================
 
 /**
- * POST /api/hcsn/materials/import
+ * POST /api/inventory/materials/import
  * Nhập hàng loạt danh mục vật tư từ Excel
  */
 function importMaterials(db) {
@@ -1232,7 +1233,7 @@ function importMaterials(db) {
 }
 
 /**
- * POST /api/hcsn/fund-sources/import
+ * POST /api/inventory/fund-sources/import
  * Nhập hàng loạt nguồn vốn từ Excel
  */
 function importFundSources(db) {
@@ -1305,7 +1306,7 @@ function importFundSources(db) {
 }
 
 /**
- * POST /api/hcsn/budget-estimates/import
+ * POST /api/inventory/budget-estimates/import
  * Nhập hàng loạt dự toán từ Excel
  */
 function importBudgetEstimates(db) {

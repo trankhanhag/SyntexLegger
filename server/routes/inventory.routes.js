@@ -154,14 +154,23 @@ module.exports = (db) => {
 
     // ================================================================
     // LEGACY ROUTES (Backward compatibility với /hcsn/*)
-    // Sẽ được xóa trong phiên bản tiếp theo
+    // Deprecated: sử dụng /api/inventory/* thay thế
+    // Sunset date: 2026-06-01
     // ================================================================
 
-    router.get('/hcsn/materials', sanitizeQuery, verifyToken, materialApis.getMaterials(db));
-    router.post('/hcsn/materials', sanitizeBody, verifyToken, materialApis.createMaterial(db));
-    router.put('/hcsn/materials/:id', sanitizeBody, verifyToken, materialApis.updateMaterial(db));
-    router.delete('/hcsn/materials/:id', verifyToken, materialApis.deleteMaterial(db));
-    router.post('/hcsn/materials/import', sanitizeBody, verifyToken, materialApis.importMaterials(db));
+    const deprecationWarning = (req, res, next) => {
+        console.warn(`DEPRECATED: ${req.method} ${req.originalUrl} - use /api/inventory/* instead`);
+        res.set('Deprecation', 'true');
+        res.set('Sunset', 'Sat, 01 Jun 2026 00:00:00 GMT');
+        res.set('Link', '</api/inventory/materials>; rel="successor-version"');
+        next();
+    };
+
+    router.get('/hcsn/materials', deprecationWarning, sanitizeQuery, verifyToken, materialApis.getMaterials(db));
+    router.post('/hcsn/materials', deprecationWarning, sanitizeBody, verifyToken, materialApis.createMaterial(db));
+    router.put('/hcsn/materials/:id', deprecationWarning, sanitizeBody, verifyToken, materialApis.updateMaterial(db));
+    router.delete('/hcsn/materials/:id', deprecationWarning, verifyToken, materialApis.deleteMaterial(db));
+    router.post('/hcsn/materials/import', deprecationWarning, sanitizeBody, verifyToken, materialApis.importMaterials(db));
 
     return router;
 };

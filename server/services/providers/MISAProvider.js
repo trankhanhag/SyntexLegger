@@ -1,6 +1,6 @@
 /**
  * MISA meInvoice Provider
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * Integration with MISA meInvoice API
  * API Documentation: https://meinvoice.misa.vn/api-docs

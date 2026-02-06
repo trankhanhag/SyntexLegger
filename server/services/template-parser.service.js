@@ -1,6 +1,6 @@
 /**
  * Template Parser Service
- * SyntexHCSN - Analyzes Excel templates and maps fields to database schema
+ * SyntexLegger - Analyzes Excel templates and maps fields to database schema
  *
  * This is the PRIMARY parsing engine using local Vietnamese dictionary.
  * AI enhancement is optional and handled by ai-enhancer.service.js
@@ -366,7 +366,7 @@ function buildQueryStructure(templateData) {
 function buildJoins(tables, primaryTable) {
     const joins = [];
 
-    // Known relationships in HCSN schema
+    // Known relationships in DN schema
     const relationships = {
         'voucher_items': {
             'vouchers': 'voucher_items.voucher_id = vouchers.id',

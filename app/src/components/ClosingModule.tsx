@@ -2,6 +2,7 @@ import React from 'react';
 import { masterDataService, voucherService } from '../api';
 import { normalizeDateValue, toInputDateValue } from '../utils/dateUtils';
 import { FormModal } from './FormModal';
+import logger from '../utils/logger';
 
 // Simple Modal Wrapper
 const Modal = ({ title, onClose, children, panelClass }: { title: string, onClose: () => void, children: React.ReactNode, panelClass?: string }) => (
@@ -26,7 +27,7 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
                 const res = await masterDataService.getAccountBalances();
                 setBalances(res.data);
             } catch (err) {
-                console.error("Failed to fetch account balances:", err);
+                logger.error("Failed to fetch account balances:", err);
             } finally {
                 setLoading(false);
             }
@@ -108,7 +109,7 @@ export const ClosingEntries: React.FC<ClosingEntriesProps> = ({ onClose, lockedU
             await voucherService.save(voucher);
             setStep(3);
         } catch (err) {
-            console.error("Closing failed:", err);
+            logger.error("Closing failed:", err);
             alert("Không thể thực hiện kết chuyển. Vui lòng kiểm tra lại kết nối.");
         } finally {
             setLoading(false);

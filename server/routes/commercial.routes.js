@@ -1,6 +1,6 @@
 /**
  * Commercial Routes (Sales, Purchase, Contracts, Projects, Loans)
- * SyntexHCSN - Kế toán HCSN theo TT 24/2024/TT-BTC
+ * SyntexLegger - Kế toán Doanh nghiệp theo TT 99/2025/TT-BTC
  */
 
 const express = require('express');
@@ -26,6 +26,96 @@ module.exports = (db) => {
         db.run("DELETE FROM sales_orders WHERE id = ?", [id], function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ message: "Sales order deleted", changes: this.changes });
+        });
+    });
+
+    // Bulk import sales orders
+    router.post('/sales/orders/import', verifyToken, (req, res) => {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'No items to import' });
+        }
+
+        const now = new Date().toISOString();
+        let inserted = 0;
+        let skipped = 0;
+
+        const sql = `INSERT INTO sales_orders (
+            id, order_no, date, customer_code, customer_name,
+            description, delivery_date, total_amount, notes, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        db.serialize(() => {
+            const stmt = db.prepare(sql);
+            let remaining = items.length;
+
+            items.forEach((item) => {
+                const id = `SO_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                // Check if order_no already exists
+                db.get("SELECT id FROM sales_orders WHERE order_no = ?", [item.order_no], (err, existing) => {
+                    if (existing) {
+                        skipped++;
+                    } else {
+                        stmt.run([
+                            id, item.order_no, item.order_date || item.date,
+                            item.customer_code || '', item.customer_name || '',
+                            item.description || '', item.delivery_date || '',
+                            item.total_amount || 0, item.notes || '', 'DRAFT', now
+                        ]);
+                        inserted++;
+                    }
+                    remaining--;
+                    if (remaining === 0) {
+                        stmt.finalize();
+                        res.json({ success: true, inserted, skipped });
+                    }
+                });
+            });
+        });
+    });
+
+    // Bulk import sales invoices
+    router.post('/sales/invoices/import', verifyToken, (req, res) => {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'No items to import' });
+        }
+
+        const now = new Date().toISOString();
+        let inserted = 0;
+        let skipped = 0;
+
+        const sql = `INSERT INTO sales_invoices (
+            id, invoice_no, date, customer_code, customer_name, customer_tax_code,
+            amount_before_tax, tax_amount, total_amount, notes, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        db.serialize(() => {
+            const stmt = db.prepare(sql);
+            let remaining = items.length;
+
+            items.forEach((item) => {
+                const id = `SI_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                db.get("SELECT id FROM sales_invoices WHERE invoice_no = ?", [item.invoice_no], (err, existing) => {
+                    if (existing) {
+                        skipped++;
+                    } else {
+                        stmt.run([
+                            id, item.invoice_no, item.invoice_date || item.date,
+                            item.customer_code || '', item.customer_name || '',
+                            item.customer_tax_code || '',
+                            item.amount_before_tax || 0, item.tax_amount || 0,
+                            item.total_amount || 0, item.notes || '', 'DRAFT', now
+                        ]);
+                        inserted++;
+                    }
+                    remaining--;
+                    if (remaining === 0) {
+                        stmt.finalize();
+                        res.json({ success: true, inserted, skipped });
+                    }
+                });
+            });
         });
     });
 
@@ -90,6 +180,185 @@ module.exports = (db) => {
     });
 
     // ========================================
+    // SALES DELIVERIES (Giao hàng)
+    // ========================================
+
+    // Get all deliveries
+    router.get('/sales/deliveries', verifyToken, (req, res) => {
+        const { status, from_date, to_date } = req.query;
+        let sql = "SELECT * FROM sales_deliveries";
+        const params = [];
+        const conditions = [];
+
+        if (status) {
+            conditions.push("status = ?");
+            params.push(status);
+        }
+        if (from_date) {
+            conditions.push("delivery_date >= ?");
+            params.push(from_date);
+        }
+        if (to_date) {
+            conditions.push("delivery_date <= ?");
+            params.push(to_date);
+        }
+
+        if (conditions.length > 0) {
+            sql += " WHERE " + conditions.join(" AND ");
+        }
+        sql += " ORDER BY delivery_date DESC, created_at DESC";
+
+        db.all(sql, params, (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows);
+        });
+    });
+
+    // Get single delivery with items
+    router.get('/sales/deliveries/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        db.get("SELECT * FROM sales_deliveries WHERE id = ?", [id], (err, delivery) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!delivery) return res.status(404).json({ error: "Delivery not found" });
+
+            db.all("SELECT * FROM sales_delivery_items WHERE delivery_id = ?", [id], (err, items) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ ...delivery, items });
+            });
+        });
+    });
+
+    // Create new delivery
+    router.post('/sales/deliveries', verifyToken, (req, res) => {
+        const {
+            delivery_no, delivery_date, order_id, order_no,
+            customer_code, customer_name, delivery_address,
+            receiver_name, receiver_phone, shipper_name, shipper_phone,
+            vehicle_no, expected_date, notes, status, items
+        } = req.body;
+
+        const id = `DL_${Date.now()}`;
+        const now = new Date().toISOString();
+
+        const sql = `INSERT INTO sales_deliveries (
+            id, delivery_no, delivery_date, order_id, order_no,
+            customer_code, customer_name, delivery_address,
+            receiver_name, receiver_phone, shipper_name, shipper_phone,
+            vehicle_no, expected_date, notes, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        db.run(sql, [
+            id, delivery_no, delivery_date, order_id, order_no,
+            customer_code, customer_name, delivery_address,
+            receiver_name, receiver_phone, shipper_name, shipper_phone,
+            vehicle_no, expected_date, notes, status || 'PENDING', now, now
+        ], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+
+            // Insert items if provided
+            if (items && items.length > 0) {
+                const itemSql = `INSERT INTO sales_delivery_items (
+                    id, delivery_id, item_name, unit, ordered_qty, delivered_qty, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+                const stmt = db.prepare(itemSql);
+                items.forEach((item, index) => {
+                    const itemId = `${id}_ITEM_${index + 1}`;
+                    stmt.run([itemId, id, item.item_name, item.unit, item.ordered_qty, item.delivered_qty, item.notes]);
+                });
+                stmt.finalize();
+            }
+
+            // Update order status to DELIVERED if applicable
+            if (order_id && status === 'DELIVERED') {
+                db.run("UPDATE sales_orders SET status = 'DELIVERED' WHERE id = ?", [order_id]);
+            }
+
+            res.json({ message: "Delivery created", id });
+        });
+    });
+
+    // Update delivery
+    router.put('/sales/deliveries/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        const {
+            delivery_no, delivery_date, delivery_address,
+            receiver_name, receiver_phone, shipper_name, shipper_phone,
+            vehicle_no, expected_date, notes, status, items
+        } = req.body;
+
+        const now = new Date().toISOString();
+
+        // Get current delivery to check status change
+        db.get("SELECT * FROM sales_deliveries WHERE id = ?", [id], (err, delivery) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!delivery) return res.status(404).json({ error: "Delivery not found" });
+
+            const sql = `UPDATE sales_deliveries SET
+                delivery_no = COALESCE(?, delivery_no),
+                delivery_date = COALESCE(?, delivery_date),
+                delivery_address = COALESCE(?, delivery_address),
+                receiver_name = COALESCE(?, receiver_name),
+                receiver_phone = COALESCE(?, receiver_phone),
+                shipper_name = COALESCE(?, shipper_name),
+                shipper_phone = COALESCE(?, shipper_phone),
+                vehicle_no = COALESCE(?, vehicle_no),
+                expected_date = COALESCE(?, expected_date),
+                notes = COALESCE(?, notes),
+                status = COALESCE(?, status),
+                updated_at = ?
+            WHERE id = ?`;
+
+            db.run(sql, [
+                delivery_no, delivery_date, delivery_address,
+                receiver_name, receiver_phone, shipper_name, shipper_phone,
+                vehicle_no, expected_date, notes, status, now, id
+            ], function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+
+                // Update items if provided
+                if (items) {
+                    db.run("DELETE FROM sales_delivery_items WHERE delivery_id = ?", [id], (err) => {
+                        if (err) return res.status(500).json({ error: err.message });
+
+                        if (items.length > 0) {
+                            const itemSql = `INSERT INTO sales_delivery_items (
+                                id, delivery_id, item_name, unit, ordered_qty, delivered_qty, notes
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+                            const stmt = db.prepare(itemSql);
+                            items.forEach((item, index) => {
+                                const itemId = `${id}_ITEM_${index + 1}`;
+                                stmt.run([itemId, id, item.item_name, item.unit, item.ordered_qty, item.delivered_qty, item.notes]);
+                            });
+                            stmt.finalize();
+                        }
+                    });
+                }
+
+                // Update order status if delivery completed
+                if (status === 'DELIVERED' && delivery.order_id) {
+                    db.run("UPDATE sales_orders SET status = 'DELIVERED' WHERE id = ?", [delivery.order_id]);
+                }
+
+                res.json({ message: "Delivery updated" });
+            });
+        });
+    });
+
+    // Delete delivery
+    router.delete('/sales/deliveries/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        db.serialize(() => {
+            db.run("DELETE FROM sales_delivery_items WHERE delivery_id = ?", [id]);
+            db.run("DELETE FROM sales_deliveries WHERE id = ?", [id], function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ message: "Delivery deleted", changes: this.changes });
+            });
+        });
+    });
+
+    // ========================================
     // PURCHASE MODULE
     // ========================================
 
@@ -100,11 +369,148 @@ module.exports = (db) => {
         });
     });
 
+    router.post('/purchase/orders', verifyToken, (req, res) => {
+        const {
+            order_no, order_date, vendor_code, vendor_name,
+            description, delivery_date, total_amount, notes, status, request_id
+        } = req.body;
+
+        const id = `PO_${Date.now()}`;
+        const now = new Date().toISOString();
+
+        const sql = `INSERT INTO purchase_orders (
+            id, order_no, date, vendor_code, vendor_name,
+            description, delivery_date, total_amount, notes, status, request_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        db.run(sql, [
+            id, order_no, order_date, vendor_code, vendor_name,
+            description, delivery_date, total_amount || 0, notes, status || 'DRAFT', request_id, now
+        ], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Purchase order created", id });
+        });
+    });
+
+    router.put('/purchase/orders/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        const {
+            order_no, order_date, vendor_code, vendor_name,
+            description, delivery_date, total_amount, notes, status
+        } = req.body;
+
+        const now = new Date().toISOString();
+
+        const sql = `UPDATE purchase_orders SET
+            order_no = ?, date = ?, vendor_code = ?, vendor_name = ?,
+            description = ?, delivery_date = ?, total_amount = ?, notes = ?, status = ?, updated_at = ?
+        WHERE id = ?`;
+
+        db.run(sql, [
+            order_no, order_date, vendor_code, vendor_name,
+            description, delivery_date, total_amount, notes, status, now, id
+        ], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            if (this.changes === 0) return res.status(404).json({ error: "Purchase order not found" });
+            res.json({ message: "Purchase order updated" });
+        });
+    });
+
     router.delete('/purchase/orders/:id', verifyToken, (req, res) => {
         const { id } = req.params;
         db.run("DELETE FROM purchase_orders WHERE id = ?", [id], function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ message: "Purchase order deleted", changes: this.changes });
+        });
+    });
+
+    // Bulk import purchase orders
+    router.post('/purchase/orders/import', verifyToken, (req, res) => {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'No items to import' });
+        }
+
+        const now = new Date().toISOString();
+        let inserted = 0;
+        let skipped = 0;
+
+        const sql = `INSERT INTO purchase_orders (
+            id, order_no, date, vendor_code, vendor_name,
+            description, delivery_date, total_amount, notes, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        db.serialize(() => {
+            const stmt = db.prepare(sql);
+            let remaining = items.length;
+
+            items.forEach((item) => {
+                const id = `PO_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                db.get("SELECT id FROM purchase_orders WHERE order_no = ?", [item.order_no], (err, existing) => {
+                    if (existing) {
+                        skipped++;
+                    } else {
+                        stmt.run([
+                            id, item.order_no, item.order_date || item.date,
+                            item.vendor_code || '', item.vendor_name || '',
+                            item.description || '', item.delivery_date || '',
+                            item.total_amount || 0, item.notes || '', 'DRAFT', now
+                        ]);
+                        inserted++;
+                    }
+                    remaining--;
+                    if (remaining === 0) {
+                        stmt.finalize();
+                        res.json({ success: true, inserted, skipped });
+                    }
+                });
+            });
+        });
+    });
+
+    // Bulk import purchase invoices
+    router.post('/purchase/invoices/import', verifyToken, (req, res) => {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'No items to import' });
+        }
+
+        const now = new Date().toISOString();
+        let inserted = 0;
+        let skipped = 0;
+
+        const sql = `INSERT INTO purchase_invoices (
+            id, invoice_no, date, vendor_code, vendor_name, vendor_tax_code,
+            amount_before_tax, tax_amount, total_amount, type, notes, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        db.serialize(() => {
+            const stmt = db.prepare(sql);
+            let remaining = items.length;
+
+            items.forEach((item) => {
+                const id = `PI_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                db.get("SELECT id FROM purchase_invoices WHERE invoice_no = ?", [item.invoice_no], (err, existing) => {
+                    if (existing) {
+                        skipped++;
+                    } else {
+                        stmt.run([
+                            id, item.invoice_no, item.invoice_date || item.date,
+                            item.vendor_code || '', item.vendor_name || '',
+                            item.vendor_tax_code || '',
+                            item.amount_before_tax || 0, item.tax_amount || 0,
+                            item.total_amount || 0, 'INBOUND',
+                            item.notes || '', 'DRAFT', now
+                        ]);
+                        inserted++;
+                    }
+                    remaining--;
+                    if (remaining === 0) {
+                        stmt.finalize();
+                        res.json({ success: true, inserted, skipped });
+                    }
+                });
+            });
         });
     });
 
@@ -177,6 +583,202 @@ module.exports = (db) => {
     });
 
     // ========================================
+    // PURCHASE REQUESTS (Đề xuất mua hàng)
+    // ========================================
+
+    // Get all purchase requests
+    router.get('/purchase/requests', verifyToken, (req, res) => {
+        const { status, from_date, to_date } = req.query;
+        let sql = "SELECT * FROM purchase_requests";
+        const params = [];
+        const conditions = [];
+
+        if (status) {
+            conditions.push("status = ?");
+            params.push(status);
+        }
+        if (from_date) {
+            conditions.push("request_date >= ?");
+            params.push(from_date);
+        }
+        if (to_date) {
+            conditions.push("request_date <= ?");
+            params.push(to_date);
+        }
+
+        if (conditions.length > 0) {
+            sql += " WHERE " + conditions.join(" AND ");
+        }
+        sql += " ORDER BY request_date DESC, created_at DESC";
+
+        db.all(sql, params, (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows);
+        });
+    });
+
+    // Get single purchase request with items
+    router.get('/purchase/requests/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        db.get("SELECT * FROM purchase_requests WHERE id = ?", [id], (err, request) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!request) return res.status(404).json({ error: "Purchase request not found" });
+
+            db.all("SELECT * FROM purchase_request_items WHERE request_id = ?", [id], (err, items) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ ...request, items });
+            });
+        });
+    });
+
+    // Create new purchase request
+    router.post('/purchase/requests', verifyToken, (req, res) => {
+        const {
+            request_no, request_date, requester_name, department,
+            description, reason, priority, needed_date,
+            vendor_code, vendor_name, total_amount, notes, status, items
+        } = req.body;
+
+        const id = `PR_${Date.now()}`;
+        const now = new Date().toISOString();
+
+        const sql = `INSERT INTO purchase_requests (
+            id, request_no, request_date, requester_name, department,
+            description, reason, priority, needed_date,
+            vendor_code, vendor_name, total_amount, notes, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        db.run(sql, [
+            id, request_no, request_date, requester_name, department,
+            description, reason, priority || 'MEDIUM', needed_date,
+            vendor_code, vendor_name, total_amount || 0, notes, status || 'DRAFT', now, now
+        ], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+
+            // Insert items if provided
+            if (items && items.length > 0) {
+                const itemSql = `INSERT INTO purchase_request_items (
+                    id, request_id, item_name, quantity, unit, unit_price, amount, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+
+                const stmt = db.prepare(itemSql);
+                items.forEach((item, index) => {
+                    const itemId = `${id}_ITEM_${index + 1}`;
+                    stmt.run([itemId, id, item.item_name, item.quantity, item.unit, item.unit_price, item.amount, item.notes]);
+                });
+                stmt.finalize();
+            }
+
+            res.json({ message: "Purchase request created", id });
+        });
+    });
+
+    // Update purchase request
+    router.put('/purchase/requests/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        const {
+            request_no, request_date, requester_name, department,
+            description, reason, priority, needed_date,
+            vendor_code, vendor_name, total_amount, notes, status, items
+        } = req.body;
+
+        const now = new Date().toISOString();
+
+        const sql = `UPDATE purchase_requests SET
+            request_no = ?, request_date = ?, requester_name = ?, department = ?,
+            description = ?, reason = ?, priority = ?, needed_date = ?,
+            vendor_code = ?, vendor_name = ?, total_amount = ?, notes = ?, status = ?, updated_at = ?
+        WHERE id = ?`;
+
+        db.run(sql, [
+            request_no, request_date, requester_name, department,
+            description, reason, priority, needed_date,
+            vendor_code, vendor_name, total_amount, notes, status, now, id
+        ], function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            if (this.changes === 0) return res.status(404).json({ error: "Purchase request not found" });
+
+            // Update items if provided
+            if (items) {
+                db.run("DELETE FROM purchase_request_items WHERE request_id = ?", [id], (err) => {
+                    if (err) return res.status(500).json({ error: err.message });
+
+                    if (items.length > 0) {
+                        const itemSql = `INSERT INTO purchase_request_items (
+                            id, request_id, item_name, quantity, unit, unit_price, amount, notes
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+
+                        const stmt = db.prepare(itemSql);
+                        items.forEach((item, index) => {
+                            const itemId = `${id}_ITEM_${index + 1}`;
+                            stmt.run([itemId, id, item.item_name, item.quantity, item.unit, item.unit_price, item.amount, item.notes]);
+                        });
+                        stmt.finalize();
+                    }
+
+                    res.json({ message: "Purchase request updated" });
+                });
+            } else {
+                res.json({ message: "Purchase request updated" });
+            }
+        });
+    });
+
+    // Delete purchase request
+    router.delete('/purchase/requests/:id', verifyToken, (req, res) => {
+        const { id } = req.params;
+        db.serialize(() => {
+            db.run("DELETE FROM purchase_request_items WHERE request_id = ?", [id]);
+            db.run("DELETE FROM purchase_requests WHERE id = ?", [id], function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ message: "Purchase request deleted", changes: this.changes });
+            });
+        });
+    });
+
+    // Approve purchase request
+    router.post('/purchase/requests/:id/approve', verifyToken, (req, res) => {
+        const { id } = req.params;
+        const { notes } = req.body;
+        const now = new Date().toISOString();
+
+        db.get("SELECT * FROM purchase_requests WHERE id = ?", [id], (err, request) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!request) return res.status(404).json({ error: "Purchase request not found" });
+            if (request.status !== 'PENDING') {
+                return res.status(400).json({ error: "Only PENDING requests can be approved" });
+            }
+
+            const sql = `UPDATE purchase_requests SET status = 'APPROVED', approved_at = ?, approved_notes = ?, updated_at = ? WHERE id = ?`;
+            db.run(sql, [now, notes, now, id], function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ message: "Purchase request approved" });
+            });
+        });
+    });
+
+    // Reject purchase request
+    router.post('/purchase/requests/:id/reject', verifyToken, (req, res) => {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const now = new Date().toISOString();
+
+        db.get("SELECT * FROM purchase_requests WHERE id = ?", [id], (err, request) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!request) return res.status(404).json({ error: "Purchase request not found" });
+            if (request.status !== 'PENDING') {
+                return res.status(400).json({ error: "Only PENDING requests can be rejected" });
+            }
+
+            const sql = `UPDATE purchase_requests SET status = 'REJECTED', rejection_reason = ?, updated_at = ? WHERE id = ?`;
+            db.run(sql, [reason, now, id], function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ message: "Purchase request rejected" });
+            });
+        });
+    });
+
+    // ========================================
     // CONTRACTS
     // ========================================
 
@@ -197,27 +799,52 @@ module.exports = (db) => {
 
     router.post('/contracts', verifyToken, (req, res) => {
         const {
-            id, code, name, partner, date, value, received_or_paid, status, type,
-            // HCSN fields
+            id, code, name, partner, date, end_date, value, received_or_paid, status, type,
+            // Extended fields
             partner_code, contract_type, fund_source_id, budget_estimate_id,
             approval_no, approval_date, payment_method, payment_terms,
             warranty_period, notes
         } = req.body;
         const contractId = id || `C${Date.now()}`;
         const sql = `INSERT OR REPLACE INTO contracts (
-            id, code, name, partner, date, value, received_or_paid, status, type,
+            id, code, name, partner, date, end_date, value, received_or_paid, status, type,
             partner_code, contract_type, fund_source_id, budget_estimate_id,
             approval_no, approval_date, payment_method, payment_terms,
             warranty_period, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         db.run(sql, [
-            contractId, code, name, partner, date, value, received_or_paid || 0, status || 'Đang thực hiện', type,
+            contractId, code, name, partner, date, end_date, value, received_or_paid || 0, status || 'Đang thực hiện', type,
             partner_code, contract_type, fund_source_id, budget_estimate_id,
             approval_no, approval_date, payment_method, payment_terms,
             warranty_period, notes
         ], function (err) {
             if (err) return res.status(400).json({ "error": err.message });
             res.json({ message: "Contract saved", id: contractId });
+        });
+    });
+
+    // Get expiring contracts (within specified days, default 30)
+    router.get('/contracts/expiring', verifyToken, (req, res) => {
+        const { days = 30 } = req.query;
+        const today = new Date().toISOString().split('T')[0];
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + parseInt(days));
+        const futureDateStr = futureDate.toISOString().split('T')[0];
+
+        const sql = `SELECT *,
+            CAST(julianday(end_date) - julianday(?) AS INTEGER) as days_remaining
+            FROM contracts
+            WHERE end_date IS NOT NULL
+            AND end_date != ''
+            AND end_date <= ?
+            AND end_date >= ?
+            AND status != 'Đã hoàn thành'
+            AND status != 'Đã thanh lý'
+            ORDER BY end_date ASC`;
+
+        db.all(sql, [today, futureDateStr, today], (err, rows) => {
+            if (err) return res.status(400).json({ error: err.message });
+            res.json(rows || []);
         });
     });
 
@@ -251,7 +878,7 @@ module.exports = (db) => {
     router.post('/projects', verifyToken, (req, res) => {
         const {
             id, code, name, customer, budget, start, end, progress, status,
-            // HCSN fields
+            // Extended fields
             project_type, fund_source_id, budget_estimate_id, approval_no, approval_date,
             managing_agency, task_code, objective, expected_output, completion_date, partner_code
         } = req.body;

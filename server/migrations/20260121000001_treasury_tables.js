@@ -1,6 +1,6 @@
 /**
  * Treasury Imports Table Migration
- * SyntexHCSN - Store imported data from KBNN
+ * SyntexLegger - Store imported data from KBNN
  */
 
 /**

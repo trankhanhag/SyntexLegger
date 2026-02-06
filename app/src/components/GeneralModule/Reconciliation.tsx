@@ -8,6 +8,7 @@
 import React from 'react';
 import { masterDataService, reportService, auditService, taxService } from '../../api';
 import { FormModal } from '../FormModal';
+import logger from '../../utils/logger';
 
 interface ReconciliationProps {
     onClose: () => void;
@@ -299,7 +300,7 @@ export const Reconciliation: React.FC<ReconciliationProps> = ({ onClose }) => {
                 });
                 addLog("✅ Đã lưu kết quả đối chiếu vào hệ thống.");
             } catch (saveErr) {
-                console.warn("Could not save reconciliation record:", saveErr);
+                logger.warn("Could not save reconciliation record:", saveErr);
                 addLog("⚠️ Không thể lưu kết quả (có thể do quyền truy cập).");
             }
 
@@ -308,7 +309,7 @@ export const Reconciliation: React.FC<ReconciliationProps> = ({ onClose }) => {
             addLog(`Hoàn tất kiểm tra. ${hasDiscrepancy ? 'Phát hiện chênh lệch!' : 'Số liệu khớp.'}`);
 
         } catch (err: any) {
-            console.error("Reconciliation check failed:", err);
+            logger.error("Reconciliation check failed:", err);
             setError(err.message || 'Lỗi khi thực hiện đối chiếu');
             setResults([{
                 item: 'Lỗi hệ thống',

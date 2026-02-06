@@ -1,14 +1,55 @@
 /**
  * Voucher API Tests
- * SyntexHCSN - Unit Tests
+ * SyntexLegger - Unit Tests
  */
 
 const request = require('supertest');
 const express = require('express');
 const bodyParser = require('body-parser');
-const voucherRoutes = require('../routes/voucher.routes');
 
-// Mock Middleware
+// Reset modules to ensure mock is applied
+beforeEach(() => {
+    jest.resetModules();
+});
+
+// Mock database module to prevent real DB connections
+jest.mock('../database', () => ({
+    all: jest.fn(),
+    get: jest.fn(),
+    run: jest.fn(),
+    serialize: jest.fn(),
+    prepare: jest.fn()
+}));
+
+// Mock audit service to prevent real DB connections
+jest.mock('../services/audit.service', () => ({
+    logVoucherCreate: jest.fn().mockResolvedValue({ success: true }),
+    logVoucherUpdate: jest.fn().mockResolvedValue({ success: true }),
+    logVoucherDelete: jest.fn().mockResolvedValue({ success: true }),
+    logVoucherAction: jest.fn().mockResolvedValue({ success: true }),
+    logVoucherAudit: jest.fn().mockResolvedValue({ success: true }),
+    logBudgetTransaction: jest.fn().mockResolvedValue({ success: true }),
+    getAuditTrail: jest.fn().mockResolvedValue([]),
+    generateAuditId: jest.fn().mockReturnValue('AUD_TEST_123'),
+    calculateChecksum: jest.fn().mockReturnValue('test-checksum'),
+    getFiscalPeriod: jest.fn().mockReturnValue({ year: 2024, period: 1 })
+}));
+
+// Mock budget service to prevent real DB connections
+jest.mock('../services/budget.service', () => ({
+    isPeriodLocked: jest.fn().mockResolvedValue({ locked: false }),
+    checkBudgetAvailability: jest.fn().mockResolvedValue({ available: true, remaining: 100000 }),
+    checkBudgetForSpending: jest.fn().mockResolvedValue({ allowed: true, status: 'OK' }),
+    reserveBudget: jest.fn().mockResolvedValue({ success: true }),
+    releaseBudget: jest.fn().mockResolvedValue({ success: true }),
+    reverseBudgetTransaction: jest.fn().mockResolvedValue({ success: true }),
+    recordBudgetTransaction: jest.fn().mockResolvedValue({ success: true }),
+    createBudgetAlert: jest.fn().mockResolvedValue({ success: true }),
+    getBudgetPeriod: jest.fn().mockReturnValue({ year: 2024, period: 1, quarter: 1 }),
+    generateId: jest.fn().mockReturnValue('BUD_TEST_123')
+}));
+
+// Mock Middleware - comprehensive mock
 const mockCheckDateLock = jest.fn();
 jest.mock('../middleware', () => ({
     verifyToken: (req, res, next) => {
@@ -16,15 +57,56 @@ jest.mock('../middleware', () => ({
         next();
     },
     requireRole: (role) => (req, res, next) => next(),
+    rateLimitLogin: jest.fn(),
+    clearLoginAttempts: jest.fn(),
     checkDateLock: (...args) => mockCheckDateLock(...args),
-    logAction: jest.fn()
+    logAction: jest.fn(),
+    SECRET_KEY: 'test-secret',
+    loginAttempts: new Map(),
+    verifyWebhookAuth: (req, res, next) => next(),
+    webhookAuth: (req, res, next) => next(),
+    errorHandler: (err, req, res, next) => res.status(500).json({ error: err.message }),
+    notFoundHandler: (req, res) => res.status(404).json({ error: 'Not found' }),
+    requestLogger: (req, res, next) => next(),
+    sanitizeAll: (req, res, next) => next(),
+    sanitizeBody: (req, res, next) => next(),
+    sanitizeQuery: (req, res, next) => next(),
+    sanitizeParams: (req, res, next) => next(),
+    validateVoucher: (req, res, next) => next(),
+    validateVoucherBalance: (req, res, next) => next(),
+    isOffBalanceSheetAccount: (code) => code?.startsWith('0'),
+    validatePartner: (req, res, next) => next(),
+    validateAccount: (req, res, next) => next(),
+    validateLogin: (req, res, next) => next(),
+    validatePagination: (req, res, next) => next(),
+    validateDateRange: (req, res, next) => next(),
+    createAuditMiddleware: () => (req, res, next) => next(),
+    voucherAuditMiddleware: (req, res, next) => next(),
+    budgetAuditMiddleware: (req, res, next) => next(),
+    sessionAuditMiddleware: (req, res, next) => next(),
+    captureOldValues: () => (req, res, next) => next(),
+    setAuditEntityId: () => (req, res, next) => next(),
+    logCustomAudit: jest.fn(),
+    AppError: class AppError extends Error {
+        constructor(message, statusCode = 500) { super(message); this.statusCode = statusCode; }
+    },
+    BadRequestError: class BadRequestError extends Error {
+        constructor(message = 'Bad request') { super(message); this.statusCode = 400; }
+    },
+    NotFoundError: class NotFoundError extends Error {
+        constructor(resource = 'Resource') { super(`${resource} not found`); this.statusCode = 404; }
+    },
+    asyncHandler: (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next),
 }));
 
 describe('Voucher Routes', () => {
     let app;
     let mockDb;
+    let voucherRoutes;
 
     beforeEach(() => {
+        jest.clearAllMocks();
+
         // Reset mocks
         mockCheckDateLock.mockReset();
         mockCheckDateLock.mockResolvedValue({ locked: false });
@@ -44,11 +126,21 @@ describe('Voucher Routes', () => {
                 return this;
             }),
             serialize: jest.fn(cb => cb()),
-            prepare: jest.fn(() => ({
-                run: jest.fn(),
-                finalize: jest.fn(cb => cb && cb(null))
-            }))
+            prepare: jest.fn(() => {
+                const stmt = {
+                    run: jest.fn(function (...args) {
+                        const cb = args.find(a => typeof a === 'function');
+                        if (cb) cb.call({ lastID: 1, changes: 1 }, null);
+                        return stmt;
+                    }),
+                    finalize: jest.fn(cb => cb && cb(null))
+                };
+                return stmt;
+            })
         };
+
+        // Require routes fresh with mock in place
+        voucherRoutes = require('../routes/voucher.routes');
 
         // Create App
         app = express();

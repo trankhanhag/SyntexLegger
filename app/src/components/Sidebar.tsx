@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { reminderService } from '../api';
 import { MENU_MAP, TAB_TITLES, TAB_ICONS, SECTION_CONFIG, searchMenuItems, type MenuItem } from '../config/sidebarConfig';
+import logger from '../utils/logger';
 
 interface SidebarProps {
     activeTab: string;
@@ -45,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 const res = await reminderService.getStats();
                 setCashBalance(res.data.cash || 0);
             } catch (err) {
-                console.error("Failed to fetch sidebar balance", err);
+                logger.error("Failed to fetch sidebar balance", err);
             }
         };
         fetchBalance();

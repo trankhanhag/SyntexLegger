@@ -33,5 +33,5 @@ db.serialize(() => {
 
     // Update system_settings
     db.run("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('accounting_regime', 'CIRCULAR_24_2024')");
-    db.run("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('app_brand', 'SyntexHCSN')");
+    db.run("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('app_brand', 'SyntexLegger')");
 });

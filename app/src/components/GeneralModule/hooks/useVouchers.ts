@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { voucherService, masterDataService, dimensionService } from '../../../api';
 import type { Voucher, VoucherFilter, Account, Partner, Product, Dimension, DimensionConfig } from '../types/voucher.types';
+import logger from '../../../utils/logger';
 
 // Constants
 const DEFAULT_FILTER: VoucherFilter = {
@@ -91,7 +92,7 @@ export function useVouchers(initialFilter?: Partial<VoucherFilter>): UseVouchers
                 setVouchers([]);
             }
         } catch (err: any) {
-            console.error('Fetch vouchers failed:', err);
+            logger.error('Fetch vouchers failed:', err);
             setError(err.message || 'Không thể tải danh sách chứng từ');
             setVouchers([]);
         } finally {
@@ -161,7 +162,7 @@ export function useVouchers(initialFilter?: Partial<VoucherFilter>): UseVouchers
 
             setMasterData(newMasterData);
         } catch (err) {
-            console.error('Fetch master data failed:', err);
+            logger.error('Fetch master data failed:', err);
         } finally {
             setLoadingMasterData(false);
         }
@@ -176,7 +177,7 @@ export function useVouchers(initialFilter?: Partial<VoucherFilter>): UseVouchers
             setVouchers(prev => prev.filter(v => v.id !== id));
             return true;
         } catch (err: any) {
-            console.error('Delete voucher failed:', err);
+            logger.error('Delete voucher failed:', err);
             setError(err.message || 'Không thể xóa chứng từ');
             return false;
         }

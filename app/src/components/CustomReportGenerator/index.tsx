@@ -9,6 +9,7 @@ import { FieldMappingEditor } from './FieldMappingEditor';
 import { ReportPreview } from './ReportPreview';
 import { TemplateList } from './TemplateList';
 import { customReportService } from '../../api';
+import logger from '../../utils/logger';
 
 // Types
 export interface DetectedField {
@@ -163,7 +164,7 @@ export const CustomReportGenerator: React.FC<CustomReportGeneratorProps> = ({ on
             const response = await customReportService.getTemplates();
             setSavedTemplates(response.data.data || []);
         } catch (err) {
-            console.error('Failed to load templates:', err);
+            logger.error('Failed to load templates:', err);
         }
     };
 
@@ -172,7 +173,7 @@ export const CustomReportGenerator: React.FC<CustomReportGeneratorProps> = ({ on
             const response = await customReportService.getSchemaInfo();
             setSchemaInfo(response.data.data || []);
         } catch (err) {
-            console.error('Failed to load schema info:', err);
+            logger.error('Failed to load schema info:', err);
         }
     };
 

@@ -1,6 +1,6 @@
 /**
  * AI Enhancer Service
- * SyntexHCSN - Uses Claude API for advanced field mapping when local parser fails
+ * SyntexLegger - Uses Claude API for advanced field mapping when local parser fails
  *
  * This is an OPTIONAL enhancement layer. The system works without it.
  * When enabled, it improves mapping accuracy for complex/ambiguous fields.
@@ -102,7 +102,7 @@ async function enhanceFieldMappings(unmappedFields, schemaMetadata, options = {}
                 }
             ],
             system: `Bạn là chuyên gia kế toán hành chính sự nghiệp Việt Nam với kiến thức sâu về:
-- Thông tư 24/2024/TT-BTC về kế toán đơn vị HCSN
+- Thông tư 99/2025/TT-BTC về kế toán doanh nghiệp
 - Hệ thống tài khoản kế toán Việt Nam
 - Mục lục ngân sách nhà nước
 - Các mẫu báo cáo tài chính: Sổ cái, Bảng cân đối, Nhật ký chung...
@@ -314,7 +314,7 @@ Output JSON:
   "requiredFilters": [{"name": "...", "type": "date|text|..."}]
 }`
             }],
-            system: 'Bạn là chuyên gia báo cáo kế toán HCSN Việt Nam. Trả về JSON hợp lệ.'
+            system: 'Bạn là chuyên gia báo cáo kế toán doanh nghiệp Việt Nam. Trả về JSON hợp lệ.'
         });
 
         const content = response.content[0]?.text || '';

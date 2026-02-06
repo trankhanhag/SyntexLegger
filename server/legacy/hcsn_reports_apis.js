@@ -2,6 +2,8 @@
 // HCSN REPORTS APIs - TT 24/2024/TT-BTC
 // ========================================
 
+const logger = require('./src/utils/logger');
+
 /**
  * API 1: Bảng Cân đối Tài khoản Kế toán HCSN
  * Theo mẫu B01-BCTC (TT 24/2024)
@@ -167,7 +169,7 @@ function getBudgetSettlementRegular(db) {
 
             db.all(sql, [fiscal_year], (err, rows) => {
                 if (err) {
-                    console.error('[SETTLEMENT_REGULAR_ERROR]', err.message);
+                    logger.error('[SETTLEMENT_REGULAR_ERROR]', err.message);
                     return res.status(500).json({ error: err.message });
                 }
 
@@ -194,7 +196,7 @@ function getBudgetSettlementRegular(db) {
                 res.json(rows);
             });
         } catch (fatal) {
-            console.error('[SETTLEMENT_REGULAR_FATAL]', fatal);
+            logger.error('[SETTLEMENT_REGULAR_FATAL]', fatal);
             res.status(500).json({ error: fatal.message });
         }
     };
@@ -228,7 +230,7 @@ function getBudgetSettlementNonRegular(db) {
 
             db.all(sql, [fiscal_year], (err, rows) => {
                 if (err) {
-                    console.error('[SETTLEMENT_NONREG_ERROR]', err.message);
+                    logger.error('[SETTLEMENT_NONREG_ERROR]', err.message);
                     return res.status(500).json({ error: err.message });
                 }
 
@@ -254,7 +256,7 @@ function getBudgetSettlementNonRegular(db) {
                 res.json(rows);
             });
         } catch (fatal) {
-            console.error('[SETTLEMENT_NONREG_FATAL]', fatal);
+            logger.error('[SETTLEMENT_NONREG_FATAL]', fatal);
             res.status(500).json({ error: fatal.message });
         }
     };
@@ -288,7 +290,7 @@ function getBudgetSettlementCapex(db) {
 
             db.all(sql, [fiscal_year], (err, rows) => {
                 if (err) {
-                    console.error('[SETTLEMENT_CAPEX_ERROR]', err.message);
+                    logger.error('[SETTLEMENT_CAPEX_ERROR]', err.message);
                     return res.status(500).json({ error: err.message });
                 }
 
@@ -314,7 +316,7 @@ function getBudgetSettlementCapex(db) {
                 res.json(rows);
             });
         } catch (fatal) {
-            console.error('[SETTLEMENT_CAPEX_FATAL]', fatal);
+            logger.error('[SETTLEMENT_CAPEX_FATAL]', fatal);
             res.status(500).json({ error: fatal.message });
         }
     };
@@ -575,7 +577,7 @@ function getBudgetPerformance(db) {
 
             db.all(sql, [fiscal_year, fiscal_year], (err, rows) => {
                 if (err) {
-                    console.error('[BUDGET_PERF_ERROR]', err.message);
+                    logger.error('[BUDGET_PERF_ERROR]', err.message);
                     // Fallback to simple query if complex one fails
                     const fallbackSql = `
                         SELECT
@@ -598,7 +600,7 @@ function getBudgetPerformance(db) {
                 res.json(rows || []);
             });
         } catch (fatal) {
-            console.error('[BUDGET_PERF_FATAL]', fatal);
+            logger.error('[BUDGET_PERF_FATAL]', fatal);
             res.status(500).json({ error: fatal.message });
         }
     };

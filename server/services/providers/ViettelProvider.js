@@ -1,6 +1,6 @@
 /**
  * Viettel S-Invoice Provider
- * SyntexHCSN - E-Invoice Integration
+ * SyntexLegger - E-Invoice Integration
  *
  * Integration with Viettel S-Invoice API
  * API Documentation: https://sinvoice.viettel.vn/api-docs
